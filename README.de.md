@@ -15,7 +15,7 @@
 
 <p align="center"><a href="README.md">English</a> · <b>Deutsch</b></p>
 
-**Zotivity** (vormals ZotLLM) ist ein Programm für den Desktop, das mit Zotero zusammenarbeitet und **umfassendes
+**Zotivity** (vormals ZotLLM) ist eine Desktop Applikation, die mit Zotero zusammenarbeitet und **umfassendes
 wissenschaftliches Arbeiten** ermöglicht: von der Recherche in Fachdatenbanken und dem Sichten der Treffer über das Lesen und
 Befragen der Quellen bis zum geprüften Forschungsstand mit Belegen bis auf die Seite.
 
