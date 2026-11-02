@@ -526,7 +526,7 @@ function setupTab() {
     first ? h('p', null, t('Willkommen. Hier richtest du einmal ein, was Zotivity auf diesem Computer braucht. Jeder Schritt lässt sich überspringen und später hier nachholen.')) : null,
     setupCard(),
     h('div', { class: 'row wrap' }, h('p', { class: 'muted small grow' }, t('Einmal je Computer. Wie es danach weitergeht, zeigt die Anleitung.')),
-      btn(t('Weiter: Anleitung'), { kind: first || (s && s.ready) ? 'primary' : 'secondary', icon: 'arrowRight', onClick: () => navigate('guide') }))];
+      btn(t('Weiter: Anleitung'), { kind: 'primary', icon: 'arrowRight', onClick: () => navigate('guide') }))];
 }
 
 // ------------------------------------------------------------------ Sprache

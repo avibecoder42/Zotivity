@@ -105,7 +105,7 @@ async function startJob(path, okMessage, { nextTab = null, body } = {}) {
 async function rewriteSection(r, i) {
   const sec = (r.state.sections || [])[i];
   if (!sec) return;
-  if (!await confirmDialog(t('Abschnitt neu schreiben?'), t('„{h}“ wird anhand der Auswertungsblätter neu geschrieben; die übrigen Abschnitte bleiben unverändert.', { h: sec.heading }), { ok: t('Neu schreiben') })) return;
+  if (!await confirmDialog(t('Abschnitt neu schreiben?'), t('„{h}“ wird anhand der Auswertungsblätter neu geschrieben; die übrigen Abschnitte bleiben unverändert.', { h: sec.heading }), { ok: t('Neu schreiben'), ai: true })) return;
   startJob(`/api/reviews/${r.id}/sections/${i}/rewrite`, t('Abschnitt neu geschrieben'));
 }
 
@@ -115,7 +115,7 @@ async function shortenSections(r, list) {
   const text = one
     ? t('„{h}“ wird vom Sprachmodell auf etwa {n} Wörter gekürzt. Belege und wörtliche Zitate bleiben; Neues kommt nicht dazu. Die bisherige Fassung wird ersetzt.', { h: list[0].heading, n: fmtInt(list[0].planned) })
     : t('{n} Abschnitte werden vom Sprachmodell auf ihre geplante Länge gekürzt. Belege und wörtliche Zitate bleiben; Neues kommt nicht dazu. Die bisherigen Fassungen werden ersetzt.', { n: list.length });
-  if (!await confirmDialog(one ? t('Abschnitt kürzen?') : t('Abschnitte kürzen?'), text, { ok: t('Kürzen') })) return;
+  if (!await confirmDialog(one ? t('Abschnitt kürzen?') : t('Abschnitte kürzen?'), text, { ok: t('Kürzen'), ai: true })) return;
   startJob(`/api/reviews/${r.id}/shorten`, t('Gekürzt'), { body: { sections: list.map(x => x.index) } });
 }
 
@@ -128,9 +128,9 @@ function longCard(r, job) {
     list.map(x => h('div', { key: x.index, class: 'row incomplete-sec' },
       h('div', { class: 'grow' }, h('b', null, x.heading), h('div', { class: 'muted small' },
         t('{a} statt etwa {b} Wörter (+{p} %)', { a: fmtInt(x.words), b: fmtInt(x.planned), p: Math.round(100 * (x.words / x.planned - 1)) }))),
-      btn(t('Kürzen'), { size: 'sm', icon: 'scissors', ...busy, onClick: () => shortenSections(r, [x]) }))),
+      btn(t('Kürzen'), { size: 'sm', kind: 'ai', icon: 'scissors', ...busy, onClick: () => shortenSections(r, [x]) }))),
     h('p', { class: 'muted small' }, t('„Kürzen“ lässt das Sprachmodell den Abschnitt auf die Länge aus der Gliederung straffen – ohne die Auswertungsblätter, also ohne neue Inhalte. Danach den Abschnitt lesen.'))),
-  { class: 'card-warning', actions: list.length > 1 ? btn(t('Alle kürzen'), { size: 'sm', icon: 'scissors', ...busy, onClick: () => shortenSections(r, list) }) : null });
+  { class: 'card-warning', actions: list.length > 1 ? btn(t('Alle kürzen'), { size: 'sm', kind: 'ai', icon: 'scissors', ...busy, onClick: () => shortenSections(r, list) }) : null });
 }
 
 // Abschnitte, die abgebrochen bzw. unvollständig sind (aus der Prüfung), mit „Neu schreiben“ je Abschnitt
@@ -147,7 +147,7 @@ function incompleteCard(r, job) {
   return card(t('Unvollständige Abschnitte'), 'alert', h('div', { class: 'stack-sm' },
     list.map(x => h('div', { key: x.index, class: 'row incomplete-sec' },
       h('div', { class: 'grow' }, h('b', null, x.heading), h('div', { class: 'muted small' }, x.reasons.map(reason(x)).join(' · '))),
-      btn(t('Neu schreiben'), { size: 'sm', icon: 'edit', disabled: !!job, why: t('Es läuft bereits ein Auftrag.'), onClick: () => rewriteSection(r, x.index) }))),
+      btn(t('Neu schreiben'), { size: 'sm', kind: 'ai', icon: 'edit', disabled: !!job, why: t('Es läuft bereits ein Auftrag.'), onClick: () => rewriteSection(r, x.index) }))),
     h('p', { class: 'muted small' }, t('Meist hat der Anbieter die Ausgabe abgebrochen – beim Längenlimit oder (bei Gemini) wegen einer längeren wörtlichen Wiedergabe. „Neu schreiben“ ersetzt nur diesen Abschnitt.'))),
   { class: 'card-warning' });
 }
@@ -221,7 +221,7 @@ function newReviewForm() {
         field(t('Sprache des Textes'), select({ value: f.language, options: OUTPUT_LANGUAGES.map(c => ({ value: c, label: languageName(c) })), onChange: v => { f.language = v; update(); } })),
         field(t('Ziel-Länge (Wörter)'), numberInput({ value: f.words, min: 300, max: 40000, step: 500, int: true, onChange: v => { f.words = v; update(); } }), { help: t('Länge des Textes mit Überschriften und Belegen – Literaturverzeichnis und Anhang „Methode der Literatursuche“ kommen dazu.') })),
       h('div', { class: 'row end' },
-        btn(t('Anlegen und Suchstrategie vorschlagen'), { kind: 'primary', icon: 'search', disabled: !!runningJob('review') || !options.length,
+        btn(t('Anlegen und Suchstrategie vorschlagen'), { kind: 'ai', icon: 'ai', disabled: !!runningJob('review') || !options.length,
           why: options.length ? t('Es läuft bereits ein Auftrag.') : t('Zuerst einen Korpus anlegen.'), onClick: create }))));
 }
 
@@ -272,7 +272,7 @@ function step1(r, job) {
     startJob(`/api/reviews/${r.id}/candidates`, t('Texte gefunden'), { nextTab: 2 });
   };
   const regenerate = async () => {
-    if (q.length && !await confirmDialog(t('Neue Vorschläge?'), t('Die aktuellen Suchanfragen werden durch neue Vorschläge ersetzt.'), { ok: t('Ersetzen') })) return;
+    if (q.length && !await confirmDialog(t('Neue Vorschläge?'), t('Die aktuellen Suchanfragen werden durch neue Vorschläge ersetzt.'), { ok: t('Ersetzen'), ai: true })) return;
     s.queries = null;
     startJob(`/api/reviews/${r.id}/strategy`, t('Suchstrategie vorgeschlagen'));
   };
@@ -299,7 +299,7 @@ function step1(r, job) {
     !confirmed && h('div', { class: 'row wrap' },
       btn(t('Anfrage hinzufügen'), { size: 'sm', kind: 'ghost', icon: 'plus', onClick: () => { q.push(''); dirty(); update();
         requestAnimationFrame(() => { const all = document.querySelectorAll('.query-row input'); all[all.length - 1]?.focus(); }); } }),
-      btn(q.length ? t('Neu vorschlagen') : t('Suchstrategie vorschlagen'), { size: 'sm', kind: q.length ? 'ghost' : 'primary', icon: 'ai', disabled: !!job, onClick: regenerate }),
+      btn(q.length ? t('Neu vorschlagen') : t('Suchstrategie vorschlagen'), { size: 'sm', kind: 'ai', icon: 'ai', disabled: !!job, onClick: regenerate }),
       h('div', { class: 'spacer' }),
       s.queriesDirty && btn(t('Änderungen speichern'), { size: 'sm', icon: 'check', onClick: () => saveQueries(r) }))));
   return { actions, body };
@@ -366,7 +366,7 @@ function step3(r, job) {
   const cfg = state.settings && state.settings.review;
   const extracted = reachedOf(r) > 3;
   const money = v => fmtNum(v, 2);
-  const extract = label => btn(label, { kind: extracted ? 'secondary' : 'primary', icon: 'play', disabled: !docs.length || !!job,
+  const extract = label => btn(label, { kind: 'ai', icon: 'play', disabled: !docs.length || !!job,
     onClick: () => startJob(`/api/reviews/${r.id}/extract`, t('Auswertungsblätter erstellt')) });
   const actions = !extracted ? [extract(t('Auswertungsblätter erstellen'))]
     : [withSheet < docs.length ? extract(t('Fehlende Blätter erstellen')) : null, nextBtn(4, t('Weiter: Schreiben'))];
@@ -429,7 +429,7 @@ function sheetView(r, d, job) {
   const list = val => (Array.isArray(val) ? val : val ? [val] : []).map(String);
   const page = p => p === 'o. S.' ? t('o. S.') : t('S. {p}', { p });
   const rebuild = async () => {
-    if (!await confirmDialog(t('Blatt neu erstellen?'), t('„{title}“ wird erneut gelesen und ausgewertet; das bisherige Blatt wird ersetzt. Ein bereits geschriebener Text bleibt unverändert.', { title: d.title || d.item_key }), { ok: t('Neu erstellen') })) return;
+    if (!await confirmDialog(t('Blatt neu erstellen?'), t('„{title}“ wird erneut gelesen und ausgewertet; das bisherige Blatt wird ersetzt. Ein bereits geschriebener Text bleibt unverändert.', { title: d.title || d.item_key }), { ok: t('Neu erstellen'), ai: true })) return;
     startJob(`/api/reviews/${r.id}/sheets/rebuild`, t('Auswertungsblatt neu erstellt'), { body: { lib: d.lib, item_key: d.item_key } });
   };
   const findings = list(x.zentrale_befunde);
@@ -449,7 +449,7 @@ function sheetView(r, d, job) {
       h('div', { class: 'sheet-actions' },
         btn(t('In Zotero zeigen'), { size: 'sm', kind: 'ghost', icon: 'zotero', onClick: () => api.openExternal(d.zotero_select) }),
         v.note_select ? btn(t('Notiz in Zotero zeigen'), { size: 'sm', kind: 'ghost', icon: 'file', onClick: () => api.openExternal(v.note_select) }) : null,
-        btn(t('Blatt neu erstellen'), { size: 'sm', icon: 'refresh', disabled: !!job, why: t('Es läuft bereits ein Auftrag.'), onClick: rebuild }))));
+        btn(t('Blatt neu erstellen'), { size: 'sm', kind: 'ai', icon: 'refresh', disabled: !!job, why: t('Es läuft bereits ein Auftrag.'), onClick: rebuild }))));
 }
 
 function stat(label, value, title) {
@@ -499,9 +499,9 @@ function step4(r, job) {
   const s = st();
   const hasOutline = !!r.state.outline;
   const written = (r.state.sections || []).length;
-  const outline = btn(hasOutline ? t('Gliederung neu erstellen') : t('Gliederung erstellen'), { kind: hasOutline ? 'ghost' : 'primary', icon: 'layers', disabled: !!job,
-    onClick: async () => { if (hasOutline && !await confirmDialog(t('Gliederung neu erstellen?'), t('Die bisherige Gliederung und bereits geschriebene Abschnitte werden ersetzt.'), { ok: t('Neu erstellen') })) return; s.outline = null; startJob(`/api/reviews/${r.id}/outline`, t('Gliederung erstellt')); } });
-  const write = hasOutline && btn(written ? t('Neu schreiben') : t('Abschnitte schreiben'), { kind: written ? 'secondary' : 'primary', icon: 'edit',
+  const outline = btn(hasOutline ? t('Gliederung neu erstellen') : t('Gliederung erstellen'), { kind: 'ai', icon: 'layers', disabled: !!job,
+    onClick: async () => { if (hasOutline && !await confirmDialog(t('Gliederung neu erstellen?'), t('Die bisherige Gliederung und bereits geschriebene Abschnitte werden ersetzt.'), { ok: t('Neu erstellen'), ai: true })) return; s.outline = null; startJob(`/api/reviews/${r.id}/outline`, t('Gliederung erstellt')); } });
+  const write = hasOutline && btn(written ? t('Neu schreiben') : t('Abschnitte schreiben'), { kind: 'ai', icon: 'edit',
     disabled: s.outlineDirty || !!job, why: s.outlineDirty ? t('Zuerst die Gliederung speichern.') : t('Es läuft bereits ein Auftrag.'),
     onClick: () => startJob(`/api/reviews/${r.id}/write`, t('Forschungsstand geschrieben'), { nextTab: 5 }) });
   const actions = [outline, write, written ? nextBtn(5, t('Weiter: Prüfen')) : null];

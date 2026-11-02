@@ -61,11 +61,11 @@ export function dismiss(id) { state.toasts = state.toasts.filter(t => t.id !== i
 export function openModal(modal) { state.modal = modal; update(); }
 export function closeModal() { state.modal = null; update(); }
 
-export function confirmDialog(title, text, { ok = t('OK'), danger = false } = {}) {
+export function confirmDialog(title, text, { ok = t('OK'), danger = false, ai = false } = {}) {
   return new Promise(resolve => {
     openModal({ title, body: text, onClose: () => resolve(false), actions: [
       { label: t('Abbrechen'), onClick: () => { closeModal(); resolve(false); } },
-      { label: ok, kind: danger ? 'danger' : 'primary', onClick: () => { closeModal(); resolve(true); } },
+      { label: ok, kind: danger ? 'danger' : ai ? 'ai' : 'primary', onClick: () => { closeModal(); resolve(true); } },
     ] });
   });
 }

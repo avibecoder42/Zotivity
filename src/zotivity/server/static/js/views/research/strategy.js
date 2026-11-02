@@ -204,7 +204,7 @@ function suggestion(st, sb, same) {
     sb.asking ? h('div', { class: 'row' },
       h('div', { class: 'grow' }, textInput({ value: sb.hint || '', placeholder: t('Was soll anders sein? (optional, z. B. mehr Alltagsbegriffe, ohne Mobbing)'),
         onInput: v => { sb.hint = v; }, onKeyDown: e => { if (e.key === 'Enter') redoBlock(st, sb); } })),
-      btn(t('Neu anfordern'), { size: 'sm', icon: 'ai', busy: isBusy(busyKey), onClick: () => redoBlock(st, sb) })) : null);
+      btn(t('Neu anfordern'), { size: 'sm', kind: 'ai', icon: 'ai', busy: isBusy(busyKey), onClick: () => redoBlock(st, sb) })) : null);
 }
 
 function aiButton(st, opts = {}) {
@@ -212,7 +212,7 @@ function aiButton(st, opts = {}) {
   if (!ai.available) return null;
   const p = rs().project || {};
   const ready = !!(p.question || p.description || '').trim();
-  return btn(t('KI-Vorschlag'), { icon: 'ai', size: 'sm', kind: 'ghost', ...opts, busy: isBusy('ai-blocks'), disabled: !ready, onClick: () => askAi(st),
+  return btn(t('KI-Vorschlag'), { icon: 'ai', size: 'sm', kind: 'ai', ...opts, busy: isBusy('ai-blocks'), disabled: !ready, onClick: () => askAi(st),
     title: ready ? t('Schlägt aus Fragestellung und Kriterien Blöcke mit Begriffen, MeSH und PsycInfo-Schlagwörtern vor ({m}, {v}). Gesendet werden Projekttext und die Blöcke hier.',
       { m: ai.label, v: ai.vendor }) : t('Zuerst unter Projekt eine Fragestellung eintragen.') });
 }
@@ -295,7 +295,7 @@ export function strategyTab() {
     aiBar(st),
     st.blocks.length ? st.blocks.map((b, i) => blockCard(b, i, st))
       : st.ai ? null : emptyState('layers', t('Noch keine Blöcke'), t('Typisch sind Population, Phänomen und Kontext, dazu ein Ausschlussblock. Blöcke sind freiwillig: fertige Suchstrings gehen auch direkt unter Suche & Import.'),
-        aiButton(st, { kind: 'primary', size: '' })),
+        aiButton(st, { size: '' })),
     suggestedCards(st),
     h('div', { class: 'row' }, btn(t('Block hinzufügen'), { icon: 'plus', kind: st.blocks.length || st.ai || !aiInfo().available ? 'secondary' : 'ghost',
       onClick: () => addBlock(st), title: t('Neuer Block; die ersten heissen Population, Phänomen, Kontext') }),

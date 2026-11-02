@@ -194,7 +194,7 @@ function reportCard() {
       field(t('Interessenkonflikte (optional)'), textInput({ value: st.info.competing || '', onInput: v => setInfo('competing', v) }))),
     h('div', { class: 'row wrap' },
       segmented({ size: 'sm', value: st.language, onChange: v => { st.language = v; update(); }, options: [{ value: 'de', label: t('Deutsch') }, { value: 'en', label: t('Englisch') }] }),
-      ai.available ? btn(last ? t('Neu schreiben lassen') : t('Bericht schreiben lassen'), { icon: 'ai', kind: last ? 'secondary' : 'primary', busy: isBusy('ai-report'), onClick: ask,
+      ai.available ? btn(last ? t('Neu schreiben lassen') : t('Bericht schreiben lassen'), { icon: 'ai', kind: 'ai', busy: isBusy('ai-report'), onClick: ask,
         title: t('Sendet die Protokoll-Angaben (ohne Titel und Abstracts der Treffer) an {m} ({v}).', { m: ai.label, v: ai.vendor }) })
         : h('span', { class: 'muted small', title: ai.message || '' }, t('Dafür unter Einstellungen › Sprachmodelle einen Schlüssel speichern')),
       saveState(),

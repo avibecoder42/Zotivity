@@ -2,6 +2,18 @@
 
 All notable changes, newest first.
 
+## 1.1.1 – 2026-11-02
+
+### Fixed
+- **Scrolling with two fingers no longer zooms.** During a two-finger scroll on a touchpad, Windows also reports small
+  scaling movements. They added up across gestures until the interface zoomed, most noticeably in long lists such as the
+  collections of a corpus. Now only a deliberate pinch within one gesture zooms.
+
+### Changed
+- **Buttons that start a language model are violet**, for example AI suggestion, Create evaluation sheets, Write sections
+  and Shorten. Send in Ask stays blue, and so do buttons that only apply a suggestion.
+- **Settings → Setup:** the button leading on to the Guide is always highlighted.
+
 ## 1.1.0 – 2026-11-01
 
 **ZotLLM is now Zotivity.** The name fits what the application has become: comprehensive scholarly work with your Zotero

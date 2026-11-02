@@ -200,7 +200,7 @@ function aiFoldersDialog(x = null) {
       x.result ? { label: t('Neu vorschlagen'), icon: 'refresh', disabled: isBusy('ai-folders'), onClick: ask } : null,
       x.result ? { label: t('Als neue Ordner übernehmen ({n})', { n: Math.min(x.picked.size, free()) }), kind: 'primary',
         disabled: !x.picked.size || !free(), onClick: adopt }
-        : { label: t('Vorschlag holen'), kind: 'primary', icon: 'ai', disabled: !x.parent || isBusy('ai-folders'), busy: isBusy('ai-folders'), onClick: ask },
+        : { label: t('Vorschlag holen'), kind: 'ai', icon: 'ai', disabled: !x.parent || isBusy('ai-folders'), busy: isBusy('ai-folders'), onClick: ask },
     ].filter(Boolean),
   });
 }
@@ -308,7 +308,7 @@ export function foldersTab() {
           fresh.length ? btn(t('{n} neue Sammlungen jetzt anlegen …', { n: fresh.length }), { size: 'sm', icon: 'plus', disabled: st.dirty,
             busy: isBusy('create-collections'), title: st.dirty ? t('Wird gespeichert …') : t('Legt die mit „neu“ markierten Sammlungen in Zotero an – nach Rückfrage.'),
             onClick: () => createNow(fresh.map(f => norm(f.path))) }) : null)),
-      { actions: [aiInfo().available ? btn(t('KI-Vorschlag für Unterordner …'), { size: 'sm', icon: 'ai', onClick: () => aiFoldersDialog(),
+      { actions: [aiInfo().available ? btn(t('KI-Vorschlag für Unterordner …'), { size: 'sm', kind: 'ai', icon: 'ai', onClick: () => aiFoldersDialog(),
         title: t('Schlägt 3–6 thematische Ordner unter einer gewählten Sammlung vor ({m}).', { m: aiInfo().label }) }) : null] }),
       draftBar()));
 }

@@ -361,7 +361,7 @@ function aiStartDialog() {
           { m: d.plan.model, e: d.plan.effort || '–', k: d.plan.key_source || '–' })));
     },
     actions: () => [{ label: t('Abbrechen'), onClick: closeModal },
-      { label: t('Starten'), kind: 'primary', icon: 'ai', disabled: !d.plan || !count(),
+      { label: t('Starten'), kind: 'ai', icon: 'ai', disabled: !d.plan || !count(),
         onClick: () => { const args = [d.scope, redo(), count()]; closeModal(); aiRun(...args); } }],
   });
 }
@@ -403,7 +403,7 @@ function aiBar(queue) {
         : h('div', { class: 'chips' }, chip('ai_include', AI_LABELS.include()), chip('ai_borderline', AI_LABELS.borderline()),
           chip('ai_exclude', AI_LABELS.exclude()), chip('ai_none', t('ohne Vorschlag'))),
     h('span', { class: 'spacer' }),
-    btn(t('Vorschläge holen …'), { size: 'sm', icon: 'ai', kind: none || c.none ? 'primary' : 'ghost', onClick: aiStartDialog,
+    btn(t('Vorschläge holen …'), { size: 'sm', icon: 'ai', kind: 'ai', onClick: aiStartDialog,
       title: c.none ? t('{n} offene Treffer haben noch keinen Vorschlag', { n: fmtInt(c.none) }) : '' }),
     meta);
 }

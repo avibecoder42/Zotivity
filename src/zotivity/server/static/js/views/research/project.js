@@ -289,7 +289,7 @@ function databasesCard() {
       h('button', { type: 'button', class: 'rs-link small', onclick: () => { ui('settings', {}).tab = 'databases'; navigate('settings'); } }, t('In den Einstellungen eingeben')))
     : null);
   const aiButton = aiInfo().available
-    ? btn(t('KI-Vorschlag aus der Fragestellung'), { size: 'sm', icon: 'ai', busy: isBusy('ai-sources'), onClick: askAiSources,
+    ? btn(t('KI-Vorschlag aus der Fragestellung'), { size: 'sm', kind: 'ai', icon: 'ai', busy: isBusy('ai-sources'), onClick: askAiSources,
       disabled: !((s.project.question || s.project.description || '').trim()),
       title: t('Sendet Titel, Fragestellung, Kurzbeschreibung und Kriterien an {m} ({v}). Übernommen wird nur, was du anklickst.',
         { m: aiInfo().label, v: aiInfo().vendor }) })

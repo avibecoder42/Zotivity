@@ -1,6 +1,6 @@
 /* Zotivity – Gestaltungssystem. Aufbau und Bedienelemente angelehnt an LLMplot 4, eigener Akzent (Indigo).
    Farben nur als Tokens; Hell, Grau und Dunkel sind eigens abgestimmt. Farbe trägt Bedeutung:
-   Aktion/Auswahl – Indigo · erledigt – Grün · prüfen – Bernstein · Fehler – Rot · Hinweis – Petrol · Belege – Akzent. */
+   Aktion/Auswahl – Indigo · Sprachmodell anstossen – Violett · erledigt – Grün · prüfen – Bernstein · Fehler – Rot · Hinweis – Petrol · Belege – Akzent. */
 :root {
   --bg: #f4f3f0;
   --surface: #ffffff;
@@ -19,6 +19,9 @@
   --accent-fill: #4a43c4;
   --accent-fill-ink: #ffffff;
   --accent-fill-hover: #3b35a6;
+  --ai-fill: #9333ea;
+  --ai-fill-ink: #ffffff;
+  --ai-fill-hover: #7e22ce;
   --danger: #be2a30;
   --danger-soft: #fceaea;
   --warn: #935805;
@@ -237,6 +240,8 @@ ul, ol { margin: .4em 0; padding-left: 1.4em; }
 .btn-sm.btn-icon { width: 29px; }
 .btn-primary { background: var(--accent-fill); color: var(--accent-fill-ink); box-shadow: 0 1px 2px rgba(40, 30, 140, .2); }
 .btn-primary:hover:not(:disabled) { background: var(--accent-fill-hover); }
+.btn-ai { background: var(--ai-fill); color: var(--ai-fill-ink); box-shadow: 0 1px 2px rgba(90, 30, 140, .2); }
+.btn-ai:hover:not(:disabled) { background: var(--ai-fill-hover); }
 .btn-secondary { background: var(--surface); border-color: var(--line-strong); box-shadow: var(--shadow-1); }
 .btn-secondary:hover:not(:disabled) { background: var(--surface-2); border-color: var(--ink-3); }
 .btn-ghost { background: transparent; color: var(--ink-2); }
