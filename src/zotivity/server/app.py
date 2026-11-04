@@ -1022,22 +1022,24 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
 
         query = CatalogQuery.from_dict(body.get("query") or body)
         result = search_catalog(engine.store, query)
-        # In welchen Korpora des Projekts steckt jeder Treffer?
-        pid = body.get("project_id")
-        if pid and result["results"]:
+        # Nur die Ansicht „Suchen“ will mehr wissen (anderswo, z. B. im CSL-Editor, wird bloss nachgeschlagen)
+        if not body.get("remember"):
+            return result
+        # In welchen Korpora steckt jeder Treffer?
+        if result["results"]:
             # Mitgliedschaft wie in den Sammlungen (ohne Abbildung von Dubletten auf die gewählte Kopie)
-            scopes = {cid: indexer.scope(corpus_id=cid, resolve=False) for cid in engine.store.project_corpus_ids(int(pid))}
+            scopes = {c["id"]: indexer.scope(corpus_id=c["id"], resolve=False) for c in engine.store.corpora()}
             for r in result["results"]:
                 r["corpora"] = [cid for cid, sc in scopes.items() if (r["lib"], r["key"]) in sc]
-        # Neue Suche (nicht „Weitere laden“) in den Suchverlauf des Projekts
-        if pid and query.offset == 0 and body.get("remember", True):
-            result["search_id"] = remember_search(engine.store, int(pid), query, result["total"])
-            result["searches"] = engine.store.searches(int(pid))
+        # Neue Suche (nicht „Weitere laden“) in den Suchverlauf
+        if query.offset == 0:
+            result["search_id"] = remember_search(engine.store, query, result["total"])
+            result["searches"] = engine.store.searches()
         return result
 
     @app.get("/api/library/searches")
-    def library_searches(project: int):
-        return {"searches": engine.store.searches(project)}
+    def library_searches():
+        return {"searches": engine.store.searches()}
 
     # -- Auswahl aus der Suche: Literaturnachweise, Export, Zotero-Sammlung ---------------------------------
     def _selection(body: dict) -> list[tuple[str, str]]:
@@ -1107,10 +1109,10 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
                 "collection": collection, "select": zotero_select_url(lib, mine[0], collection)}
 
     @app.delete("/api/library/searches")
-    def library_searches_forget(project: int, id: int | None = None):
-        """Eine Suche aus dem Verlauf des Projekts entfernen (id) oder ohne id den ganzen Verlauf."""
-        engine.store.forget_searches(project, id)
-        return {"searches": engine.store.searches(project)}
+    def library_searches_forget(id: int | None = None):
+        """Eine Suche aus dem Verlauf entfernen (id) oder ohne id den ganzen Verlauf."""
+        engine.store.forget_searches(id)
+        return {"searches": engine.store.searches()}
 
     @app.get("/api/library/status")
     def library_status():

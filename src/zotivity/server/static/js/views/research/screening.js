@@ -69,7 +69,7 @@ async function setAiVisible(v) {
   if (!v && sc().status.startsWith('ai_')) setStatus('open'); else update();
 }
 
-// Wer gerade entscheidet (Namen unter „Projekt“): steht beim Entscheid und im Protokoll
+// Wer gerade entscheidet (Namen unter „Fragestellung“): steht beim Entscheid und im Protokoll
 async function setReviewer(v) {
   const s = rs();
   const p = await run(() => api.put(`${R}/projects/${s.pid}`, { settings: { current_reviewer: v } }));
@@ -112,7 +112,7 @@ async function decide(status, folder = null, reason = '') {
   const st = sc();
   if (!it || st.saving) return;
   if (status === 'include' && !(s.project.folder_map || []).some(f => String(f.slot) === String(folder) && f.path)) {
-    toast(t('Ordner {n} ist noch keiner Sammlung zugeordnet (Tab „Ordner“). Der Entscheid gilt trotzdem.', { n: folder }), 'warning', 5000);
+    toast(t('Ordner {n} ist noch keiner Sammlung zugeordnet (Reiter „Ziel & Ordner“). Der Entscheid gilt trotzdem.', { n: folder }), 'warning', 5000);
   }
   st.saving = true;
   try {
@@ -202,7 +202,7 @@ export function screeningKey(e) {
   else if (k === 'k' || k === 'K' || k === 'ArrowLeft') go(-1);
   else if (/^[1-9]$/.test(k)) {
     if ((rs().project.folder_map || []).some(f => Number(f.slot) === Number(k))) decide('include', Number(k));
-    else toast(t('Ordner {n} gibt es nicht (Tab „Ordner“).', { n: k }), 'info', 2500);
+    else toast(t('Ordner {n} gibt es nicht (Reiter „Ziel & Ordner“).', { n: k }), 'info', 2500);
   }
   else if (k === 'x' || k === 'X') decide('exclude');
   else if (k === '?' || k === 'ß') decide('maybe');
@@ -225,7 +225,7 @@ function decisionPanel(it, queue) {
   const key = k => h('kbd', { class: 'rs-kbd' }, k);
   return h('div', { class: 'stack' },
     h('div', { class: 'rs-keys' },
-      slots.length ? null : h('div', { class: 'muted small' }, t('Noch keine Ordner – im Tab „Ordner“ anlegen.')),
+      slots.length ? null : h('div', { class: 'muted small' }, t('Noch keine Ordner – unter „Ziel & Ordner“ anlegen.')),
       slots.map(n => h('button', { key: n, type: 'button', class: ['rs-key', 'rs-key-in', active('include', n) && 'active',
         !(p.folder_map || []).some(f => Number(f.slot) === n && f.path) && 'rs-key-unset', hint('include', n)], onclick: () => decide('include', n),
         title: n > 9 ? t('Ordner {n} (ohne Kürzel)', { n }) : undefined },
@@ -373,6 +373,9 @@ function aiBar(queue) {
   const st = sc();
   const ai = aiInfo();
   if (!aiVisible()) return null;
+  // Nichts mehr offen: nichts vorzuschlagen, die Leiste entfällt
+  const sum = s.project.summary || {};
+  if (!aiSt().run && !((sum.visible || 0) - (sum.screened || 0))) return null;
   if (!ai.available) {
     return h('div', { class: 'rs-ai-bar' }, icon('ai', 15),
       h('span', { class: 'muted small grow' }, t('KI-Vorschläge: unter Einstellungen › Sprachmodelle einen Schlüssel speichern. Die Recherche nutzt das Modell der Vorauswahl im Forschungsstand.')));

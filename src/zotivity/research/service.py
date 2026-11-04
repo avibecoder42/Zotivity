@@ -205,6 +205,11 @@ class ResearchService:
         visible = [it for it in items if not it["hidden_by"]]
         status = Counter(status_of(it) for it in visible)
         recall = self._recall(p, items)
+        lib = p["target_library"]
+        handed_over = {link["record_id"] for link in self.store.links(pid)}
+        queries = self.queries(pid)
+        included = [it for it in items if status_of(it) == "include"]
+        fulltexts = self.store.fulltexts(pid)
         return {
             "sources": dict(Counter(s for it in items for s in it["sources"])),
             "pool": len(items),
@@ -218,11 +223,16 @@ class ResearchService:
             "borderline": sum(1 for it in visible if it["borderline"]),
             "borderline_open": sum(1 for it in visible if it["borderline"] and status_of(it) == "open"),
             "no_abstract": sum(1 for it in items if it["no_abstract"]),
-            "in_zotero": sum(1 for it in items if it["zotero_key"]),
+            "in_zotero": sum(1 for it in items if it["zotero_key"] and it["zotero_lib"] == lib),
+            # noch mit einer früheren Zielbibliothek abgeglichen: Der Pool bittet um einen neuen Abgleich
+            "in_zotero_other": sum(1 for it in items if it["zotero_key"] and it["zotero_lib"] != lib and it["id"] not in handed_over),
             "by_folder": {str(k): v for k, v in Counter(it["decision"]["folder"] for it in items
                                                           if status_of(it) == "include").items()},
-            "queries": len(self.store.queries(pid)),
+            "queries": len(queries),
+            "queries_open": sum(1 for q in queries if q["source"] in LIVE_SOURCES and not q["current_run"]),  # noch nicht in dieser Fassung gesucht
             "runs": len(self.store.runs(pid)),
+            "handover_open": sum(1 for it in included if it["id"] not in handed_over),
+            "fulltext_done": sum(1 for it in included if (fulltexts.get(it["id"]) or {}).get("status") in ("include", "exclude", "not_retrieved")),
             "key_papers": len(recall),
             "recall_warnings": sum(1 for r in recall if r["warn"]),
         }
@@ -739,8 +749,7 @@ class ResearchService:
             schema = ai_mod.BLOCKS_SCHEMA
         elif kind == "folders":
             items, _ = self._pool_items(pid, p)
-            titles = [it["title"] for it in items if it["decision"] and it["decision"]["status"] == "include" and it["title"]][:60]
-            text, schema = ai_mod.folders_system() + ai_mod.folders_prompt(p, export_mod.norm_path(parent), [], titles), ai_mod.FOLDERS_SCHEMA
+            text, schema = ai_mod.folders_system() + ai_mod.folders_prompt(p, export_mod.norm_path(parent), [], *self._folder_titles(items)), ai_mod.FOLDERS_SCHEMA
         elif kind == "report":
             text, schema = ai_mod.report_system("Deutsch") + protocol.report_facts(self, pid), ai_mod.REPORT_SCHEMA
         else:
@@ -832,12 +841,21 @@ class ResearchService:
         return {"processed": len(rows), "remaining": remaining, "counts": counts, "since": since, "used": spent,
                 **self.ai_status()}
 
+    @staticmethod
+    def _folder_titles(items: list[dict], limit: int = 60) -> tuple[list[str], list[str]]:
+        """Titel für den Ordner-Vorschlag: aufgenommene Arbeiten, den Rest bis ``limit`` als gleichmässig über den Pool
+        verteilte Auswahl der noch offenen Treffer."""
+        included = [it["title"] for it in items if status_of(it) == "include" and it["title"]][:limit]
+        rest = [it["title"] for it in items if status_of(it) == "open" and not it["hidden_by"] and it["title"]]
+        n = min(limit - len(included), len(rest))
+        return included, [rest[i * len(rest) // n] for i in range(n)] if n else []
+
     def ai_sources(self, pid: int) -> dict:
         """Vorschlag für Disziplinen und Datenbanken aus dem Projekttext – wird nicht gespeichert."""
         chat = self._require_chat()
         p = self.store.project(pid)
         if not (p.get("question") or p.get("description") or "").strip():
-            raise ResearchError("Für einen Vorschlag braucht es eine Fragestellung oder Kurzbeschreibung (Projekt).")
+            raise ResearchError("Für einen Vorschlag braucht es eine Fragestellung oder Kurzbeschreibung.")
         before = self._snapshot()
         out = ai_mod.parse_sources(chat.complete_json(ai_mod.sources_system(), ai_mod.sources_prompt(p),
                                                       ai_mod.sources_schema()))
@@ -852,7 +870,7 @@ class ResearchService:
         chat = self._require_chat()
         p = self.store.project(pid)
         if not (p.get("question") or p.get("description") or "").strip():
-            raise ResearchError("Für einen Vorschlag braucht es eine Fragestellung oder Kurzbeschreibung (Projekt).")
+            raise ResearchError("Für einen Vorschlag braucht es eine Fragestellung oder Kurzbeschreibung.")
         existing = blocks if blocks is not None else self.store.blocks(pid)
         before = self._snapshot()
         prompt = ai_mod.blocks_prompt(p, existing) + (ai_mod.blocks_focus(focus) if focus else "")
@@ -870,7 +888,7 @@ class ResearchService:
         chat = self._require_chat()
         p = self.store.project(pid)
         if not (p.get("question") or p.get("description") or "").strip():
-            raise ResearchError("Für einen Vorschlag braucht es eine Fragestellung oder Kurzbeschreibung (Projekt).")
+            raise ResearchError("Für einen Vorschlag braucht es eine Fragestellung oder Kurzbeschreibung.")
         parent = export_mod.norm_path(parent)
         children: list[str] = []
         try:
@@ -880,9 +898,8 @@ class ResearchService:
         except ResearchError:
             pass  # Zotero nicht erreichbar: Vorschlag ohne Kenntnis der vorhandenen Sammlungen
         items, _ = self._pool_items(pid, p)
-        titles = [it["title"] for it in items if it["decision"] and it["decision"]["status"] == "include" and it["title"]][:60]
         before = self._snapshot()
-        out = ai_mod.parse_folders(chat.complete_json(ai_mod.folders_system(), ai_mod.folders_prompt(p, parent, children, titles),
+        out = ai_mod.parse_folders(chat.complete_json(ai_mod.folders_system(), ai_mod.folders_prompt(p, parent, children, *self._folder_titles(items)),
                                                       ai_mod.FOLDERS_SCHEMA), children)
         spent = self._used_since(before)
         self.store.log(pid, "ai_folders", model=self._model(), parent=parent, folders=[f["name"] for f in out["folders"]], used=spent)

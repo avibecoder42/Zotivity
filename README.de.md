@@ -35,7 +35,7 @@ die Texte des Projekts. Die **Anleitung** im Programm führt durch diese Schritt
   </tr>
 </table>
 
-Die Sprachmodelle sind frei wählbar: **Claude, ChatGPT (OpenAI), Gemini, DeepSeek** per API oder lokale Modelle über
+Die Sprachmodelle sind frei wählbar: **Claude, ChatGPT (OpenAI), Gemini, DeepSeek, Mistral** per API oder lokale Modelle über
 **Ollama**. Embedding-Modelle laufen zudem **eingebaut** (llama.cpp), ganz auf dem eigenen Rechner, mit einem geprüften
 Modellkatalog. API-Schlüssel liegen verschlüsselt im Schlüsselspeicher des Betriebssystems. Läuft unter Windows; Pfade,
 Schlüsselspeicher und Startskripte sind für macOS und Linux angelegt.
@@ -46,6 +46,9 @@ Zotero installieren. Er ist eine erste Version und noch in Entwicklung – Hinwe
 
 Neu in 1.1: **Recherche**, der Schritt vor dem Forschungsstand, mit freiwilligen KI-Vorschlägen; entscheiden tust du.
 Siehe [Recherche](#recherche).
+
+Neu in 1.2: **Mistral** als Sprachmodell; die Recherche zeigt den Stand und den nächsten Schritt; **Suchen** gilt für alle
+Projekte.
 
 <p align="center"><img src="docs/screenshots/de/ask.png" alt="Fragen: Antwort mit nummerierten Belegen und der zitierten Textstelle"></p>
 <p align="center"><sub>Antworten mit Belegen; ein Klick zeigt die Textstelle mit Seite. Demo-Bibliothek mit erfundenen Quellen.</sub></p>
@@ -103,7 +106,7 @@ schreiben. Je mehr davon man abgibt, desto weniger übt man es.
 ```
 Zotero 10 (lokale API)  ←→  Zotivity-Dienst (Python, 127.0.0.1:23120)   ←→  LLM nach Wahl
   + schlankes Plugin           – Text + Seitenzahlen aus PDF/EPUB/HTML/Word   Claude · GPT · Gemini
-    (Rechtsklick, Autostart)   – Zerlegung, Literaturverzeichnisse erkennen   DeepSeek · lokal (Ollama)
+    (Rechtsklick, Autostart)   – Zerlegung, Literaturverzeichnisse erkennen   DeepSeek · Mistral · lokal (Ollama)
                                – Embedding: eingebaut (llama.cpp), Ollama, OpenAI …
 Browser / Programmfenster ←→   – SQLite-Index: Volltextsuche + Vektoren
                                – Notizen & Sammlungen zurück nach Zotero
@@ -170,13 +173,13 @@ macOS/Linux: `./install.sh`, danach `./start.sh`.
 ## Projekte
 
 Ein **Projekt** bündelt Wissenskorpora, Chats und Forschungsstände. Der Umschalter oben in der linken Leiste (Strg+P)
-zeigt das aktive Projekt; *Projekt*, *Fragen*, *Forschungsstand* und *Korpora* beziehen sich darauf. *Index* und
+zeigt das aktive Projekt; *Projekt*, *Recherche*, *Korpora*, *Fragen* und *Forschungsstand* beziehen sich darauf. *Suchen*, *CSL-Editor*, *Index* und
 *Einstellungen* gelten für alle Projekte.
 
 - **Korpora werden geteilt:** Ein Korpus kann in mehreren Projekten vorkommen; der Index ist gemeinsam, jeder Text wird
   nur einmal eingebettet.
 - **Speichern geschieht laufend.** «Als Datei speichern» exportiert ein Projekt als `.zoty` (Korpus-Definitionen, Chats,
-  Forschungsstände, Auswertungsblätter, Suchverlauf – ohne Index und ohne Schlüssel); «Projekt importieren» lädt es
+  Forschungsstände, Auswertungsblätter – ohne Index und ohne Schlüssel); «Projekt importieren» lädt es
   wieder, auch auf einem anderen Rechner.
 - **Reihenfolge und Archiv:** Projektkacheln lassen sich ziehen; abgeschlossene Projekte lassen sich archivieren (nichts
   wird gelöscht) und jederzeit zurückholen.
@@ -205,7 +208,7 @@ der Breite ziehen (Doppelklick: Standardbreite), und im Programmfenster lässt s
 5. **Fragen:** Antwort mit anklickbaren Belegen `[3]` (Vorschau mit «PDF öffnen (S. x)» und «In Zotero zeigen»);
    die Textstellen stehen darunter, jeweils mit **Relevanz**. «Nur Textstellen» sucht ohne LLM.
 
-Tastatur: Strg+1–6 Ansichten des Projekts, Strg+7 CSL-Editor, Strg+8 Index, Strg+, Einstellungen, F1 Hilfe, Strg+P Projekt wechseln.
+Tastatur: Strg+1–5 Ansichten des Projekts, Strg+6 Suchen, Strg+7 CSL-Editor, Strg+8 Index, Strg+, Einstellungen, F1 Hilfe, Strg+P Projekt wechseln.
 Darstellung: System, Hell, Grau, Dunkel (die Titelleiste des Fensters passt sich an).
 
 ### Suchen (ohne Sprachmodell)
@@ -217,7 +220,7 @@ ist ein lokaler Katalog der Metadaten aller Bibliotheken, der Änderungen in Zot
   (`digit` → «digital»), `"genaue Phrase"`, `-ausschliessen`, `ODER`/`OR`.
 - **Mehrfeld:** einzelne Felder, Volltext der indexierten Texte (mit Fundstelle), Jahr von–bis, Eintragsart,
   Bibliotheken, Sammlung inkl. Untersammlungen, «nur mit PDF», «nur indexierte Texte».
-- **Treffer** zeigen ihren Ort in Zotero, den Indexierstand und die Korpora des Projekts, in denen sie schon sind.
+- **Treffer** zeigen ihren Ort in Zotero, den Indexierstand und die Korpora, in denen sie schon sind.
   Aktionen: in Zotero zeigen, PDF öffnen, **Literaturnachweis kopieren** (im eingestellten Zitierstil, formatiert für
   Word), in Korpus aufnehmen und weitere im Menü ⋯.
 - **Auswahl** (bleibt über mehrere Suchen erhalten; Shift+Klick, Strg+A, Esc): Literaturliste und Kurzbelege kopieren,
@@ -284,16 +287,18 @@ Zotero. Jede Recherche gehört zu einem Zotivity-Projekt (die Projektseite zeigt
 
 | Reiter | Was geschieht |
 |---|---|
-| Projekt | Fragestellung, Kurzbeschreibung, Ein- und Ausschlusskriterien, bis zu drei Reviewende, Zielbibliothek in Zotero |
+| Fragestellung | Fragestellung, Kurzbeschreibung, Ein- und Ausschlusskriterien, bis zu drei Reviewende |
 | Datenbanken | Disziplinen wählen; die App schlägt Datenbanken aus ihrem Katalog vor (Zugang, Bedingungen, Schlüssel) |
 | Suchstrategie | Konzeptblöcke → Suchstrings je Datenbank, mit Trefferzahl live |
 | Suche & Import | versionierte Suchstrings; Suche in PubMed, OpenAlex, Europe PMC, ERIC, EconBiz, Semantic Scholar, arXiv, OSF-Preprints und swisscovery; RIS-Import aus Ovid, EBSCO oder Web of Science |
 | Pool | Treffer ohne Duplikate (DOI, PMID, OpenAlex-ID, Titel), Abgleich mit der Zotero-Zielbibliothek, Vorfilter, Grenzfälle, fehlende Abstracts nachladen, Recall-Check mit Schlüsselarbeiten |
-| Ordner | Ordner 1–20 (Kürzel 1–9), je einer Zotero-Sammlung zugeordnet |
+| Ziel & Ordner | Zielbibliothek in Zotero; Ordner 1–20 (Kürzel 1–9), je einer Zotero-Sammlung zugeordnet |
 | Screening | Karten (J/K blättern, 1–9 Ordner, X ausschliessen, ? unsicher, G Grenzfall, A KI-Vorschlag übernehmen, Z rückgängig) oder Liste mit Sammel-Übernahme |
 | Übergabe | Plan je Ordner, dann nach Zotero – nur nach ausdrücklicher Bestätigung; Flussdiagramm und Suchprotokoll als Markdown/CSV im Stil von PRISMA-S; auf Wunsch ein KI-Entwurf für den Methodenteil |
 | Volltexte | freiwillig: Stand je Text (fehlt noch, vorhanden, nicht beschaffbar, eingeschlossen, ausgeschlossen mit Grund); fehlende PDFs halten nichts auf |
 
+- **Stand und nächster Schritt:** Die Reiter zeigen, was erledigt ist (ein Häkchen, Zahlen bei Pool und Screening), die Zeile
+  darunter sagt, was als Nächstes zu tun ist. **Weiter** wird blau, sobald im aktuellen Reiter nichts mehr offen ist; gesperrt ist nichts.
 - **Nichts verschwindet still:** Vorfilter markieren nur; Treffer mit einem Ausnahmebegriff werden Grenzfälle,
   Ausgeblendete lassen sich prüfen und zurückholen.
 - **KI-Vorschläge sind freiwillig** (Screening, Datenbanken, Konzeptblöcke, Unterordner) und nutzen das Modell der
@@ -335,7 +340,7 @@ endgültige Text bleiben deine Arbeit (siehe [die Gefahr des Deskilling](#werkze
 - **API-Schlüssel** liegen im Schlüsselspeicher des Systems: Windows-Anmeldeinformationsverwaltung (DPAPI, an das
   Benutzerkonto gebunden), macOS-Schlüsselbund, Linux Secret Service. Sie erscheinen nie in Dateien, Logs oder der
   Oberfläche (nur maskiert). Ohne sicheren Speicher werden sie nicht gespeichert; dann Umgebungsvariablen nutzen
-  (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`).
+  (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`, `MISTRAL_API_KEY`).
 - **Der Dienst lauscht nur auf 127.0.0.1**, prüft den Host gegen DNS-Rebinding und verlangt für schreibende Anfragen
   einen eigenen Header (Schutz gegen CSRF).
 - **Was das Gerät verlässt:** Bei Cloud-LLMs die gefundenen Textstellen (beim Forschungsstand die Texte der
@@ -406,7 +411,7 @@ src/zotivity/
   zotero/      Client für die lokale API (Lesen, Schreiben, Autorisierung)
   extract/     PDF/EPUB/HTML/Word/ODT-Text mit Seitenzahlen, Chunking, Literaturverzeichnis-Erkennung
   embeddings/  eingebaut (llama.cpp: Laufzeit, Katalog, Download, Kurztest, Namenssuche), Ollama, OpenAI, Gemini, …
-  llm/         Anthropic, OpenAI/DeepSeek/Ollama, Gemini – gemeinsame Schnittstelle
+  llm/         Anthropic, OpenAI/DeepSeek/Mistral/Ollama, Gemini – gemeinsame Schnittstelle
   index/       SQLite (FTS5 + Vektoren je Embedding-Raum), Indexierer, Dubletten
   retrieval/   Hybride Suche (RRF), MMR, Reranking
   rag/         Fragen, Forschungsstand, Quellen

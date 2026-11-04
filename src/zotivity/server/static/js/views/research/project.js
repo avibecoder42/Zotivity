@@ -1,14 +1,14 @@
-// Projekte: Liste, neues Projekt; Tabs „Projekt“ (Fragestellung, Kriterien, Reviewende, Ziel in Zotero) und „Datenbanken“.
-// Der Entwurf des Formulars gilt auch für den Tab „Ordner“ (folders.js) und wird automatisch gespeichert.
+// Recherchen: Liste, neue Recherche; Reiter „Fragestellung“ (Fragestellung, Kriterien, Reviewende) und „Datenbanken“.
+// Der Entwurf des Formulars gilt auch für den Reiter „Ziel & Ordner“ (folders.js) und wird automatisch gespeichert.
 import { h } from '../../core/vdom.js';
 import { update, ui, run, toast, confirmDialog } from '../../core/store.js';
 import * as api from '../../core/api.js';
 import { t } from '../../core/i18n.js';
 import { fmtDate } from '../../core/util.js';
-import { btn, iconBtn, card, field, textInput, textArea, select, segmented, checkbox, notice, emptyState, badge } from '../../ui/components.js';
+import { btn, card, field, textInput, textArea, checkbox, notice, emptyState, badge } from '../../ui/components.js';
 import { icon } from '../../ui/icons.js';
-import { R, rs, enc, loadProjects, openProject, closeProject, summaryLine, busy, isBusy, aiInfo, aiEstimate, tokenText,
-  noteUsage, zotivityProject, assignProject, saveLater, savePending, saveState, loadInfo, targetName } from './common.js';
+import { R, rs, enc, loadProjects, openProject, closeProject, openTab, summaryLine, busy, isBusy, aiInfo, aiEstimate, tokenText,
+  noteUsage, zotivityProject, assignProject, saveLater, savePending, saveState, loadInfo } from './common.js';
 import { navigate } from '../shell.js';
 
 // ------------------------------------------------------------------ Liste
@@ -16,7 +16,7 @@ export function projectList() {
   const s = rs();
   if (s.projects == null) {
     loadProjects().catch(err => toast(err.message, 'error'));
-    return h('div', { class: 'center-pad muted' }, t('Lade Projekte …'));
+    return h('div', { class: 'center-pad muted' }, t('Lade Recherchen …'));
   }
   if (!zotivityProject()) return emptyState('search', t('Kein Projekt geöffnet'), t('Eine Recherche gehört zu einem Projekt – zuerst unter Einrichtung ein Projekt öffnen oder anlegen.'));
   const create = () => busy('create', async () => {
@@ -83,7 +83,7 @@ export function collectionPaths(backend, lib) {
   return z.collections[lib] || [];
 }
 
-// Entwurf speichern; „Projekt“ und „Ordner“ teilen ihn sich (auch nach dem Verschieben aus einem gelöschten Ordner)
+// Entwurf speichern; „Fragestellung“ und „Ziel & Ordner“ teilen ihn sich (auch nach dem Verschieben aus einem gelöschten Ordner)
 export async function saveDraft(opts) {
   const s = rs();
   const pid = s.pid;
@@ -107,45 +107,14 @@ export function touchDraft() {
 export function draftBar({ withDelete = false } = {}) {
   const s = rs();
   const remove = async () => {
-    if (!(await confirmDialog(t('Projekt löschen?'), t('„{t}“ mit allen Suchstrings, Treffern und Entscheiden löschen? In Zotero bleibt alles, wie es ist.', { t: s.project.title }), { ok: t('Löschen'), danger: true }))) return;
+    if (!(await confirmDialog(t('Recherche löschen?'), t('„{t}“ mit allen Suchstrings, Treffern und Entscheiden löschen? In Zotero bleibt alles, wie es ist.', { t: s.project.title }), { ok: t('Löschen'), danger: true }))) return;
     await run(() => api.del(`${R}/projects/${s.pid}`));
     closeProject();
   };
   return h('div', { class: 'row rs-draft-bar' },
-    withDelete ? btn(t('Projekt löschen'), { kind: 'ghost', icon: 'trash', onClick: remove }) : null,
+    withDelete ? btn(t('Recherche löschen'), { kind: 'ghost', icon: 'trash', onClick: remove }) : null,
     h('span', { class: 'spacer' }),
     saveState());
-}
-
-// ------------------------------------------------------------------ Ziel in Zotero
-const isGroup = lib => String(lib).startsWith('groups/');
-
-function targetCard() {
-  const s = rs();
-  const st = draft();
-  const d = st.d;
-  const set = (k, v) => { d[k] = v; touchDraft(); };
-  const backend = d.zotero_backend || 'local';
-  const z = zoteroLibraries(backend);
-  const libs = z.libraries || [];
-  const hasWebKey = !!(s.info && s.info.keys && s.info.keys['zotero-web']);
-  const reload = () => { delete s.zotero[backend]; update(); };
-  return card(t('Ziel in Zotero'), 'zotero', h('div', { class: 'stack' },
-    hasWebKey || backend === 'web' ? field(t('Zugang'), segmented({ value: backend, options: [
-      { value: 'local', label: t('Zotero auf diesem Computer') }, { value: 'web', label: t('Zotero-Server (Web-API)') }],
-    onChange: v => set('zotero_backend', v) }), { hint: backend === 'local'
-      ? t('Lokale API von Zotero: Zotero muss laufen; Schreiben braucht eine Freigabe in Zotero (unter Übergabe).')
-      : t('Schreibt über zotero.org; die Zotero-App übernimmt die Einträge beim nächsten Sync.') }) : null,
-    z.error ? notice('warning', z.error, backend === 'web' ? h('div', { class: 'notice-actions' },
-      btn(t('Schlüssel eingeben'), { size: 'sm', onClick: () => { ui('settings', {}).tab = 'zotero'; navigate('settings'); } }),
-      btn(t('Zotero auf diesem Computer'), { size: 'sm', kind: 'ghost', onClick: () => set('zotero_backend', 'local') })) : null) : null,
-    h('div', { class: 'row rs-target-row' },
-      h('div', { class: 'grow' }, field(t('Zielbibliothek'), select({ value: d.target_library, options: [
-        ...(libs.some(l => l.lib === d.target_library) ? [] : [{ value: d.target_library, label: targetName(d) }]),
-        ...libs.map(l => ({ value: l.lib, label: isGroup(l.lib) ? t('Gruppe: {n}', { n: l.name }) : l.name }))],
-      onChange: v => { d.target_name = (libs.find(l => l.lib === v) || {}).name || v; set('target_library', v); } }),
-      { hint: z.libraries == null ? t('Lade Bibliotheken …') : t('Eigene Bibliothek oder eine Gruppe. Der Pool gleicht damit ab, die Ordner beziehen sich darauf.') })),
-      iconBtn('refresh', t('Bibliotheken neu laden'), reload))));
 }
 
 // ------------------------------------------------------------------ Reviewende und Vorgehen beim Sichten
@@ -184,8 +153,7 @@ export function projectTab() {
           field(t('Ausschlusskriterien'), textArea({ value: d.criteria_out, rows: 5, onInput: v => set('criteria_out', v) }),
             { hint: t('Eine Zeile je Grund – im Screening als Ausschlussgründe zur Wahl.') })))),
       selectionCard(),
-      targetCard(),
-      h('p', { class: 'muted small' }, t('Weiter: Datenbanken wählen, Suchstrategie aufbauen. Änderungen werden automatisch gespeichert.')),
+      h('p', { class: 'muted small' }, t('Änderungen werden automatisch gespeichert.')),
       draftBar({ withDelete: true })));
 }
 
@@ -219,6 +187,24 @@ function suggestionFor(disciplines) {
   return st.list;
 }
 
+// KI-Vorschläge bauen auf der Fragestellung auf: Fehlt sie, steht das sichtbar beim Knopf, nicht erst im Tooltip
+export const hasQuestion = () => !!((rs().project.question || rs().project.description || '').trim());
+export const NO_QUESTION = () => t('Zuerst unter „Fragestellung“ eine Fragestellung oder Kurzbeschreibung eintragen.');
+export function questionHint() {
+  if (!aiInfo().available || hasQuestion()) return null;
+  return h('button', { type: 'button', class: 'rs-link small', onclick: () => openTab('project') }, t('Für KI-Vorschläge: {x}', { x: NO_QUESTION() }));
+}
+
+// Ist ein KI-Vorschlag für Datenbanken offen, der noch etwas Neues enthält?
+export function suggestionOpen() {
+  const s = rs();
+  const st = ui('rs-dbs-ai', { pid: null, result: null });
+  const r = st.pid === s.pid ? st.result : null;
+  if (!r) return false;
+  const settings = s.project.settings || {};
+  return r.sources.some(x => !(settings.sources || []).includes(x.id)) || r.disciplines.some(d => !(settings.disciplines || []).includes(d));
+}
+
 // KI-Vorschlag: gilt für das Projekt, bis er verworfen wird (nicht gespeichert – beim Neuladen der Seite weg)
 function aiSourcesBox(chosen, disciplines) {
   const s = rs();
@@ -231,7 +217,7 @@ function aiSourcesBox(chosen, disciplines) {
   const newDisc = r.disciplines.filter(d => !disciplines.includes(d));
   const newSources = r.sources.filter(x => !chosen.has(x.id)).map(x => x.id);
   const adopt = (sources, discs) => saveSettings({ sources: [...new Set([...chosen, ...sources])], disciplines: [...new Set([...disciplines, ...discs])] });
-  return notice('info', h('div', { class: 'stack-sm' },
+  return notice('ai', h('div', { class: 'stack-sm' },
     h('b', null, t('KI-Vorschlag aus der Fragestellung ({m})', { m: r.model || r.label })),
     r.disciplines.length ? h('div', { class: 'row wrap small' }, t('Disziplinen: {d}', { d: r.disciplines.map(d => info.disciplines[d] || d).join(', ') }),
       newDisc.length ? btn(t('übernehmen'), { size: 'sm', kind: 'ghost', onClick: () => adopt([], newDisc) }) : badge(t('gewählt'), 'success')) : null,
@@ -244,7 +230,7 @@ function aiSourcesBox(chosen, disciplines) {
     r.note ? h('div', { class: 'muted small' }, r.note) : null,
     r.used ? h('div', { class: 'muted small' }, t('Verbrauch: {u}', { u: tokenText(r.used, false) })) : null,
     h('div', { class: 'notice-actions' },
-      newSources.length || newDisc.length ? btn(t('Alle übernehmen'), { size: 'sm', icon: 'plus', onClick: () => adopt(newSources, newDisc) }) : null,
+      newSources.length || newDisc.length ? btn(t('Alle übernehmen'), { size: 'sm', kind: 'primary', icon: 'plus', onClick: () => adopt(newSources, newDisc) }) : null,
       btn(t('Verwerfen'), { size: 'sm', kind: 'ghost', onClick: () => { st.result = null; update(); } }))));
 }
 
@@ -290,12 +276,12 @@ function databasesCard() {
     : null);
   const aiButton = aiInfo().available
     ? btn(t('KI-Vorschlag aus der Fragestellung'), { size: 'sm', kind: 'ai', icon: 'ai', busy: isBusy('ai-sources'), onClick: askAiSources,
-      disabled: !((s.project.question || s.project.description || '').trim()),
+      disabled: !hasQuestion(), why: NO_QUESTION(),
       title: t('Sendet Titel, Fragestellung, Kurzbeschreibung und Kriterien an {m} ({v}). Übernommen wird nur, was du anklickst.',
         { m: aiInfo().label, v: aiInfo().vendor }) })
     : h('span', { class: 'muted small', title: aiInfo().message || '' }, t('KI-Vorschlag: unter Einstellungen › Sprachmodelle einen Schlüssel speichern'));
   return card(t('Datenbanken'), 'library', h('div', { class: 'stack' },
-    aiInfo().available ? h('div', { class: 'row' }, h('span', { class: 'spacer' }), estimateLine('sources')) : null,
+    aiInfo().available ? h('div', { class: 'row wrap' }, questionHint(), h('span', { class: 'spacer' }), estimateLine('sources')) : null,
     h('p', { class: 'muted small' }, t('Disziplinen wählen – die App schlägt passende Datenbanken vor; welche du durchsuchst, entscheidest du. Direkt in der App laufen die offenen Datenbanken; aus den anderen importierst du RIS-Dateien (unter Suche & Import).')),
     field(t('Disziplinen'), h('div', { class: 'chips' }, Object.entries(info.disciplines).map(([id, label]) =>
       h('button', { type: 'button', key: id, class: ['chip', disciplines.includes(id) && 'chip-accent'], onclick: () => toggleDiscipline(id) },

@@ -25,7 +25,7 @@ def base_url_for(provider: str, cfg: LLMSettings) -> str | None:
     if not url:
         return None
     url = url.rstrip("/")
-    if provider == "ollama" and not url.endswith("/v1"):
+    if provider in ("ollama", "mistral") and not url.endswith("/v1"):
         url += "/v1"
     return url
 
@@ -41,7 +41,7 @@ def make_chat_model(provider: str, model: str, cfg: LLMSettings, meter: UsageMet
         from zotivity.llm.gemini_provider import GeminiChat
 
         return GeminiChat(model, key, timeout=timeout, meter=meter)
-    if provider in ("openai", "deepseek", "ollama", "openai_compatible"):
+    if provider in ("openai", "deepseek", "mistral", "ollama", "openai_compatible"):
         from zotivity.llm.openai_provider import OpenAIChat
 
         return OpenAIChat(model, key, provider=provider, base_url=base_url_for(provider, cfg), timeout=timeout,

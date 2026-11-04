@@ -559,6 +559,9 @@ class Store:
     def set_zotero_matches(self, pid: int, library: str, matches: dict[int, str]) -> None:
         with self.tx() as db:
             db.execute("UPDATE record SET zotero_key = '', zotero_lib = '' WHERE project_id = ? AND zotero_lib = ?", (pid, library))
+            # Der Abgleich mit einer früheren Zielbibliothek gilt nicht mehr; was dorthin übergeben wurde, bleibt verknüpft
+            db.execute("UPDATE record SET zotero_key = '', zotero_lib = '' WHERE project_id = ? AND zotero_lib NOT IN ('', ?) "
+                       "AND id NOT IN (SELECT record_id FROM zotero_link WHERE project_id = ?)", (pid, library, pid))
             db.executemany("UPDATE record SET zotero_key = ?, zotero_lib = ? WHERE id = ? AND project_id = ?",
                            [(key, library, rid, pid) for rid, key in matches.items()])
 

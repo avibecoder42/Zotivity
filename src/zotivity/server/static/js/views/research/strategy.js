@@ -9,8 +9,8 @@ import { t } from '../../core/i18n.js';
 import { fmtInt, debounce, copyToClipboard } from '../../core/util.js';
 import { btn, iconBtn, card, field, textInput, textArea, segmented, notice, emptyState, spinner, badge } from '../../ui/components.js';
 import { icon } from '../../ui/icons.js';
-import { R, rs, busy, isBusy, invalidate, sourceLabel, isLive, aiInfo, tokenText, noteUsage, addUsed, workspace, saveLater, saveState, serverText } from './common.js';
-import { estimateLine } from './project.js';
+import { R, rs, lazy, busy, isBusy, invalidate, refreshSummary, sourceLabel, isLive, aiInfo, tokenText, noteUsage, addUsed, workspace, saveLater, saveState, serverText } from './common.js';
+import { estimateLine, hasQuestion, questionHint, NO_QUESTION } from './project.js';
 
 const blank = (name = '') => ({ name, kind: 'include', field: 'tiab', terms: [], mesh: [], psycinfo: [] });
 // Neue Blöcke heissen der Reihe nach wie die typischen Konzepte (Population, Phänomen, Kontext), danach leer
@@ -193,7 +193,7 @@ function suggestion(st, sb, same) {
       h('span', { class: 'rs-suggest-label' }, icon('ai', 13), t('Vorschlag')),
       same ? null : sb.kind === 'exclude' ? badge(t('ausschliessen, nur Titel'), 'danger') : badge(sb.field === 'ti' ? t('nur Titel') : t('Titel + Abstract'), 'neutral'),
       h('span', { class: 'spacer' }),
-      btn(same ? t('{n} ergänzen', { n }) : t('Übernehmen'), { size: 'sm', kind: 'primary', icon: 'plus', onClick: () => { adoptBlock(st, sb); changed(); },
+      btn(same ? t('{n} ergänzen', { n }) : t('Übernehmen'), { size: 'sm', icon: 'plus', onClick: () => { adoptBlock(st, sb); changed(); },
         title: same ? t('Fehlende Begriffe in den Block „{b}“ übernehmen', { b: same.name }) : t('Als neuen Block übernehmen') }),
       iconBtn('refresh', t('Diesen Block neu vorschlagen lassen'), () => { sb.asking = !sb.asking; update(); }, { disabled: isBusy(busyKey) }),
       iconBtn('x', t('Diesen Vorschlag verwerfen'), () => { r.blocks = r.blocks.filter(x => x !== sb); update(); })),
@@ -210,11 +210,26 @@ function suggestion(st, sb, same) {
 function aiButton(st, opts = {}) {
   const ai = aiInfo();
   if (!ai.available) return null;
-  const p = rs().project || {};
-  const ready = !!(p.question || p.description || '').trim();
+  const ready = hasQuestion();
   return btn(t('KI-Vorschlag'), { icon: 'ai', size: 'sm', kind: 'ai', ...opts, busy: isBusy('ai-blocks'), disabled: !ready, onClick: () => askAi(st),
     title: ready ? t('Schlägt aus Fragestellung und Kriterien Blöcke mit Begriffen, MeSH und PsycInfo-Schlagwörtern vor ({m}, {v}). Gesendet werden Projekttext und die Blöcke hier.',
-      { m: ai.label, v: ai.vendor }) : t('Zuerst unter Projekt eine Fragestellung eintragen.') });
+      { m: ai.label, v: ai.vendor }) : NO_QUESTION() });
+}
+
+// Welche der fertigen Suchstrings sind noch nicht übernommen? Gleicher String derselben Quelle gilt als übernommen.
+function adoption(st) {
+  const b = st.built || {};
+  const live = Object.keys(b).filter(src => isLive(src) && b[src].string).map(src => ({ src, string: b[src].string }));
+  const queries = lazy('queries', `${R}/projects/${rs().pid}/queries`, r => r.queries) || [];
+  return { live, open: live.filter(x => !queries.some(q => q.source === x.src && q.string === x.string.trim())) };
+}
+
+// Für die Kopfzeile: Was ist in der Suchstrategie noch offen?
+export function strategyState() {
+  const st = bst();
+  const { live, open } = adoption(st);
+  return { ai: !!st.ai && st.ai.blocks.some(sb => fresh(st, sb).n), blocks: st.blocks.length, built: Object.values(st.built || {}).some(x => x.string),
+    live: live.length, open: open.length };
 }
 
 function countText(c) {
@@ -248,6 +263,7 @@ function adopt(items) {
     if (!ok) return;
     closeModal();
     invalidate('queries');
+    refreshSummary();
     toast(t('Als Suchstring „{n}“ gespeichert für {s} (unter Suche & Import).', { n: name, s: items.map(x => sourceLabel(x.src)).join(', ') }), 'success', 5000);
   };
   openModal({ title: items.length > 1 ? t('Als Suchstrings übernehmen ({n} Quellen)', { n: items.length }) : t('Als Suchstring für {s} übernehmen', { s: sourceLabel(items[0].src) }),
@@ -263,6 +279,7 @@ function adopt(items) {
 function builtCard(st) {
   const b = st.built;
   if (!b) return null;
+  const { live, open } = adoption(st);
   const row = src => {
     const x = b[src];
     return h('div', { class: 'rs-built', key: src },
@@ -271,23 +288,23 @@ function builtCard(st) {
           { disabled: !!(st.counts[src] && st.counts[src].loading) }) : null,
         h('span', { class: 'spacer' }),
         x.string && iconBtn('copy', t('Kopieren'), async () => { await copyToClipboard(x.string); toast(t('Kopiert.'), 'success', 1500); }),
-        x.string && isLive(src) && btn(t('Als Suchstring übernehmen'), { size: 'sm', icon: 'plus', onClick: () => adopt([{ src, string: x.string }]) })),
+        x.string && isLive(src) && btn(t('Als Suchstring übernehmen'), { size: 'sm', icon: 'plus', kind: live.length === 1 && open.length ? 'primary' : 'secondary', onClick: () => adopt([{ src, string: x.string }]) })),
       x.string ? h('pre', { class: 'rs-string' }, x.string) : h('div', { class: 'muted small' }, t('Noch leer.')),
       st.counts[src] && st.counts[src].upper_bound ? h('div', { class: 'muted small' }, '· ', serverText((st.counts[src].warnings || [])[0])) : null,
       (x.notes || []).map((n, i) => h('div', { class: 'muted small', key: i }, '· ', serverText(n))));
   };
-  const live = Object.keys(b).filter(src => isLive(src) && b[src].string).map(src => ({ src, string: b[src].string }));
   return card(t('Suchstrings je Quelle'), 'layers', h('div', { class: 'stack' },
     h('div', { class: 'muted small' }, t('Quellen wählen im Tab „Datenbanken“.')),
     Object.keys(b).map(row)),
-    { actions: [live.length > 1 ? btn(t('Alle übernehmen ({n})', { n: live.length }), { size: 'sm', icon: 'plus', onClick: () => adopt(live),
+    { actions: [live.length > 1 ? btn(t('Alle als Suchstrings übernehmen ({n})', { n: live.length }), { size: 'sm', kind: open.length ? 'primary' : 'secondary', icon: 'plus', onClick: () => adopt(live),
       title: t('Für alle direkt durchsuchbaren Quellen als Suchstrings übernehmen') }) : null] });
 }
 
 export function strategyTab() {
   const st = bst();
   const main = h('div', { class: 'stack' },
-    h('div', { class: 'row' }, h('h2', { class: 'grow' }, t('Konzeptblöcke')),
+    h('div', { class: 'row wrap' }, h('h2', { class: 'grow' }, t('Konzeptblöcke')),
+      questionHint(),
       saveState(),
       st.blocks.length || st.ai ? aiButton(st) : null,  // ohne Blöcke steht der Knopf in der Mitte
       aiInfo().available ? estimateLine('blocks', { blocks: st.blocks }, JSON.stringify(st.blocks).length + ':' + st.blocks.length) : null),

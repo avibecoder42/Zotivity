@@ -56,6 +56,53 @@ def test_keys():
     assert k == {"doi:10.1/abc", "pmid:1", "oa:W5", "title:asufficientlylongtitle"}
 
 
+def test_changed_target_library_asks_for_new_match(service, zotero):
+    pid = make_project(service)["id"]
+    run = service.store.add_run(pid, kind="import", source="ris")
+    service.store.add_records(pid, run, [{"title": "Teasing and banter in WhatsApp groups", "abstract": "y" * 80, "doi": "10.5/known"},
+                                         {"title": "Exclusion from group chats among adolescents", "abstract": "z" * 80, "doi": "10.5/given"}])
+    known, given = sorted(service.store.records(pid), key=lambda r: r["title"], reverse=True)
+    zotero.items = {"K1": {"key": "K1", "version": 1, "data": {"title": "Something else", "DOI": "10.5/KNOWN"}}}
+    service.zotero_match(pid)
+    service.store.add_link(pid, given["id"], "users/0", "K9", "Rollen/neu", "new")
+    s = service.summary(pid)
+    assert (s["in_zotero"], s["in_zotero_other"]) == (2, 0)
+
+    service.update_project(pid, {"target_library": "groups/4755508", "target_name": "Gruppe"})
+    s = service.summary(pid)
+    assert (s["in_zotero"], s["in_zotero_other"]) == (0, 1)  # was dorthin übergeben wurde, zählt nicht als alter Abgleich
+
+    zotero.items = {}
+    service.zotero_match(pid)
+    s = service.summary(pid)
+    assert (s["in_zotero"], s["in_zotero_other"]) == (0, 0)
+    recs = {r["id"]: r for r in service.store.records(pid)}
+    assert recs[known["id"]]["zotero_key"] == "" and recs[given["id"]]["zotero_key"] == "K9"
+
+
+def test_summary_tells_what_is_open(service, sim):
+    pid = make_project(service)["id"]
+    s = service.summary(pid)
+    assert (s["queries"], s["queries_open"], s["handover_open"], s["fulltext_done"]) == (0, 0, 0, 0)
+    q = service.add_query(pid, "T", "pubmed", "teasing[tiab]")
+    service.add_query(pid, "T", "psycinfo", "teasing")  # läuft über den RIS-Weg, zählt nicht als ungesucht
+    s = service.summary(pid)
+    assert (s["queries"], s["queries_open"]) == (2, 1)
+    service.run_query(q["id"])
+    assert service.summary(pid)["queries_open"] == 0
+    service.update_query(q["id"], {"string": "banter[tiab]"})  # neue Fassung: wieder ungesucht
+    assert service.summary(pid)["queries_open"] == 1
+    a, b = [r["id"] for r in service.store.records(pid)][:2]
+    service.decide(pid, a, "include", folder=1)
+    service.decide(pid, b, "include", folder=2)
+    s = service.summary(pid)
+    assert (s["included"], s["handover_open"]) == (2, 2)
+    service.store.add_link(pid, a, "users/0", "K1", "Teasing/neu", "new")
+    assert service.summary(pid)["handover_open"] == 1
+    service.store.set_fulltext(pid, [a], "include")
+    assert service.summary(pid)["fulltext_done"] == 1
+
+
 def test_prefilters_and_zotero_match(service, zotero):
     pid = make_project(service)["id"]
     run = service.store.add_run(pid, kind="import", source="ris")

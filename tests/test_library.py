@@ -47,11 +47,11 @@ def test_add_search_hits_to_corpus_and_documents_panel(client):
     docs = client.get(f"/api/corpora/{cid}/documents").json()
     assert {d["item_key"] for d in docs["indexed"]} == {"ITEMA001", "ITEMB001"} and docs["pending"] == []
     assert docs["indexed"][0]["select"].startswith("zotero://select/")
-    # Treffer zeigen, in welchen Korpora des Projekts sie sind
-    pid = client.get("/api/projects").json()["projects"][0]["id"]
-    client.put(f"/api/projects/{pid}/corpora/{cid}", json={"assigned": True}, headers=H)
-    r = client.post("/api/library/search", json={"query": {"q": "information"}, "project_id": pid}, headers=H).json()
-    assert r["results"][0]["corpora"] == [cid]
+    # Treffer zeigen, in welchen Korpora sie sind, auch ohne Projekt; Nachschlagen aus anderen Ansichten braucht das nicht
+    r = client.post("/api/library/search", json={"query": {"q": "information"}, "remember": True}, headers=H).json()
+    assert cid in r["results"][0]["corpora"]
+    r = client.post("/api/library/search", json={"query": {"q": "information"}}, headers=H).json()
+    assert "corpora" not in r["results"][0]
 
 
 def test_corpus_preview_counts_texts_before_indexing(client):

@@ -119,6 +119,9 @@ CREATE TABLE IF NOT EXISTS searches(
     id INTEGER PRIMARY KEY, project_id INTEGER, signature TEXT, query TEXT, sort TEXT, total INTEGER,
     created_at REAL, used_at REAL, UNIQUE(project_id, signature)
 );
+CREATE TABLE IF NOT EXISTS search_history(
+    id INTEGER PRIMARY KEY, signature TEXT UNIQUE, query TEXT, sort TEXT, total INTEGER, created_at REAL, used_at REAL
+);
 CREATE TABLE IF NOT EXISTS review_pages(
     review_id INTEGER, ref TEXT, page INTEGER, PRIMARY KEY(review_id, ref)
 );
@@ -282,6 +285,13 @@ class Store:
         if not con.execute("SELECT 1 FROM meta WHERE key='hex_labels_fixed'").fetchone():
             Store._fix_hex_labels(con)
             con.execute("INSERT OR REPLACE INTO meta VALUES('hex_labels_fixed', '1')")
+        # Der Suchverlauf gilt nicht mehr je Projekt: einmal zusammenführen (gleiche Suche nur einmal, mit dem letzten Stand).
+        # Die alte Tabelle bleibt stehen, damit eine frühere Version ihren Verlauf behält.
+        if not con.execute("SELECT 1 FROM meta WHERE key='search_history_merged'").fetchone():
+            con.execute("INSERT INTO search_history(signature, query, sort, total, created_at, used_at)"
+                        " SELECT signature, query, sort, total, created_at, used_at FROM searches WHERE 1 ORDER BY used_at"
+                        " ON CONFLICT(signature) DO UPDATE SET sort=excluded.sort, total=excluded.total, used_at=excluded.used_at")
+            con.execute("INSERT OR REPLACE INTO meta VALUES('search_history_merged', '1')")
 
     @staticmethod
     def _fix_hex_labels(con: sqlite3.Connection) -> None:
@@ -1133,37 +1143,34 @@ class Store:
                         (time.time() if archived else None, project_id))
 
     # -- Suchverlauf (je Projekt) ---------------------------------------------------------------
-    def searches(self, project_id: int) -> list[dict]:
+    def searches(self) -> list[dict]:
         out = []
-        for r in self.con.execute("SELECT * FROM searches WHERE project_id=? ORDER BY used_at DESC, id DESC",
-                                  (project_id,)):
+        for r in self.con.execute("SELECT * FROM search_history ORDER BY used_at DESC, id DESC"):
             d = dict(r)
             d["query"] = json.loads(d["query"] or "{}")
             del d["signature"]
             out.append(d)
         return out
 
-    def remember_search(self, project_id: int, query: dict, sort: str, total: int,
-                        used_at: float | None = None) -> int:
-        """Suche in den Verlauf des Projekts; dieselbe Suche erneut ausgeführt rückt nur nach oben."""
+    def remember_search(self, query: dict, sort: str, total: int, used_at: float | None = None) -> int:
+        """Suche in den Verlauf; dieselbe Suche erneut ausgeführt rückt nur nach oben."""
         now = used_at or time.time()
         signature = json.dumps(query, ensure_ascii=False, sort_keys=True)
         with self.write() as con:
             con.execute(
-                "INSERT INTO searches(project_id, signature, query, sort, total, created_at, used_at)"
-                " VALUES(?,?,?,?,?,?,?) ON CONFLICT(project_id, signature)"
+                "INSERT INTO search_history(signature, query, sort, total, created_at, used_at)"
+                " VALUES(?,?,?,?,?,?) ON CONFLICT(signature)"
                 " DO UPDATE SET sort=excluded.sort, total=excluded.total, used_at=excluded.used_at",
-                (project_id, signature, json.dumps(query, ensure_ascii=False), sort, int(total), now, now))
-            return con.execute("SELECT id FROM searches WHERE project_id=? AND signature=?",
-                               (project_id, signature)).fetchone()[0]
+                (signature, json.dumps(query, ensure_ascii=False), sort, int(total), now, now))
+            return con.execute("SELECT id FROM search_history WHERE signature=?", (signature,)).fetchone()[0]
 
-    def forget_searches(self, project_id: int, search_id: int | None = None) -> None:
-        """Eine Suche aus dem Verlauf entfernen oder (ohne ID) den ganzen Verlauf des Projekts."""
+    def forget_searches(self, search_id: int | None = None) -> None:
+        """Eine Suche aus dem Verlauf entfernen oder (ohne ID) den ganzen Verlauf."""
         with self.write() as con:
             if search_id is None:
-                con.execute("DELETE FROM searches WHERE project_id=?", (project_id,))
+                con.execute("DELETE FROM search_history")
             else:
-                con.execute("DELETE FROM searches WHERE project_id=? AND id=?", (project_id, search_id))
+                con.execute("DELETE FROM search_history WHERE id=?", (search_id,))
 
     def project_corpus_ids(self, project_id: int) -> list[int]:
         return [r[0] for r in self.con.execute(

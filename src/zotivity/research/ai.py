@@ -345,12 +345,14 @@ def folders_system() -> str:
         "- die Ordner sollen sich gegenseitig ausschliessen und zusammen die Fragestellung abdecken (z. B. Phänomene, "
         "Rollen, Bewältigung, Prävention);",
         "- keine Namen, die es unter der Sammlung schon gibt; vorhandene Ordner-Zuordnungen berücksichtigen;",
-        "- sind schon Titel aufgenommener Arbeiten angegeben, richte die Ordner danach aus.",
+        "- sind Titel angegeben, richte die Ordner danach aus: Aufgenommene Arbeiten zählen am meisten; die Titel aus dem "
+        "Pool zeigen, was die Suche gefunden hat, aber nicht alles davon passt zur Fragestellung.",
         "In note höchstens ein Satz, falls die Gliederung eine Schwäche hat.",
     ])
 
 
-def folders_prompt(project: dict, parent: str, existing_children: list[str], titles: list[str]) -> str:
+def folders_prompt(project: dict, parent: str, existing_children: list[str], titles: list[str],
+                   pool_titles: list[str] | None = None) -> str:
     current = [f"{f['slot']}: {f.get('label') or f.get('path')}" for f in project.get("folder_map") or []
                if f.get("label") or f.get("path")]
     lines = [
@@ -364,6 +366,8 @@ def folders_prompt(project: dict, parent: str, existing_children: list[str], tit
     ]
     if titles:
         lines += ["", f"Titel bereits aufgenommener Arbeiten ({len(titles)}):", *(f"- {x}" for x in titles)]
+    if pool_titles:
+        lines += ["", f"Titel aus dem Pool, noch nicht gesichtet (Auswahl, {len(pool_titles)}):", *(f"- {x}" for x in pool_titles)]
     return "\n".join(lines)
 
 
@@ -476,7 +480,8 @@ def estimate(model: str, input_tokens: int, output_tokens: int) -> dict:
 # USD je 1 Mio. Token (Anthropic-Preisliste, Stand Oktober 2026); unbekanntes Modell → keine Kostenangabe
 # Richtwert je Treffer: Titel, Angaben und Abstract (~380 Token) hinein, ein Eintrag mit Begründung (~90) hinaus
 PER_RECORD = {"input_tokens": 380, "output_tokens": OUT_PER_RECORD}
-PRICES = {"claude-opus-5-5": (4.0, 20.0, 0.2), "claude-sonnet-5-5": (2.0, 10.0, 0.2), "claude-haiku-5-5": (0.1, 0.5, 0.01)}
+PRICES = {"claude-opus-5-5": (4.0, 20.0, 0.2), "claude-sonnet-5-5": (2.0, 10.0, 0.2), "claude-haiku-5-5": (0.1, 0.5, 0.01),
+          "mistral-large-4": (0.7, 2.1, 0.07), "mistral-small-2603": (0.15, 0.6, 0.015)}
 
 
 def estimate_cost(model: str, usage: dict) -> float | None:

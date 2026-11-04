@@ -36,7 +36,7 @@ of the active project.
   </tr>
 </table>
 
-Language models are your choice: **Claude, ChatGPT (OpenAI), Gemini, DeepSeek** via API, or local models via
+Language models are your choice: **Claude, ChatGPT (OpenAI), Gemini, DeepSeek, Mistral** via API, or local models via
 **Ollama**. Embedding models also run **built in** (llama.cpp), entirely on your computer, with a curated model catalog.
 API keys are stored encrypted in the operating system's key store. Runs on Windows; paths, key storage and start
 scripts are prepared for macOS and Linux.
@@ -47,6 +47,9 @@ it directly in Zotero. It is a first version and still in development – feedba
 
 New in 1.1: **Database search**, the step before the literature review, with optional AI suggestions; the decisions are
 always yours. See [Database search](#database-search).
+
+New in 1.2: **Mistral** as a language model; database search shows the status and the next step; **Search** applies to all
+projects.
 
 <p align="center"><img src="docs/screenshots/en/ask.png" alt="Ask: answer with numbered citations and the cited passage"></p>
 <p align="center"><sub>Answers with citations; a click shows the passage and its page. Demo library with fictitious sources.</sub></p>
@@ -102,7 +105,7 @@ over, the less of it you practise.
 ```
 Zotero 10 (local API)  ←→  Zotivity service (Python, 127.0.0.1:23120)  ←→  LLM of your choice
   + slim plugin               – text + page numbers from PDF/EPUB/HTML/Word   Claude · GPT · Gemini
-    (context menu, autostart) – chunking, reference-list detection            DeepSeek · local (Ollama)
+    (context menu, autostart) – chunking, reference-list detection            DeepSeek · Mistral · local (Ollama)
                               – embedding: built in (llama.cpp), Ollama, OpenAI …
 Browser / app window  ←→      – SQLite index: full-text search + vectors
                               – notes & collections back to Zotero
@@ -164,13 +167,13 @@ Development without an installer: `install.bat`, then `start.bat` (browser) or `
 ## Projects
 
 A **project** bundles knowledge corpora, chats and literature reviews. The switcher at the top of the left bar
-(Ctrl+P) shows the active project; *Project*, *Ask*, *Literature review* and *Corpora* refer to it. *Index* and
-*Settings* apply to all projects.
+(Ctrl+P) shows the active project; *Project*, *Database search*, *Corpora*, *Ask* and *Literature review* refer to it.
+*Search*, *CSL editor*, *Index* and *Settings* apply to all projects.
 
 - **Corpora are shared:** a corpus can belong to several projects; the index is shared and every text is embedded only
   once.
 - **Saving is continuous.** "Save as file" exports a project as `.zoty` (corpus definitions, chats, literature reviews,
-  evaluation sheets, search history – without index and without keys); "Import project" loads it again, also on another
+  evaluation sheets – without index and without keys); "Import project" loads it again, also on another
   computer.
 - **Manual order and archive:** project tiles can be dragged into order; finished projects can be archived (nothing is
   deleted) and restored at any time.
@@ -197,7 +200,7 @@ whole interface can be zoomed.
 5. **Ask:** answers with clickable citations `[3]` (preview with "Open PDF (p. x)" and "Show in Zotero"); the retrieved
    passages are listed below, each with a **relevance** indicator. "Passages only" searches without an LLM.
 
-Keyboard: Ctrl+1–6 project views, Ctrl+7 CSL editor, Ctrl+8 index, Ctrl+, settings, F1 help, Ctrl+P switch project. Appearance: system,
+Keyboard: Ctrl+1–5 project views, Ctrl+6 search, Ctrl+7 CSL editor, Ctrl+8 index, Ctrl+, settings, F1 help, Ctrl+P switch project. Appearance: system,
 light, grey, dark (the window title bar follows).
 
 ### Search (without a language model)
@@ -209,7 +212,7 @@ catalog of the metadata of all libraries, which follows changes in Zotero automa
   `"exact phrase"`, `-exclude`, `OR`.
 - **Advanced:** individual fields, full text of indexed texts (with the matching passage), year range, item type,
   libraries, collection incl. sub-collections, "PDF only", "indexed only".
-- **Results** show where they are in Zotero, their indexing status and the project corpora containing them. Actions:
+- **Results** show where they are in Zotero, their indexing status and the corpora containing them. Actions:
   show in Zotero, open the PDF, **copy the reference** in your citation style (formatted for Word), add to a corpus, and
   more in the ⋯ menu.
 - **Selection** (kept across searches; Shift+click, Ctrl+A, Esc): copy a reference list or in-text citations, export as
@@ -274,16 +277,18 @@ Zotero. Every database search belongs to a Zotivity project (the project page sh
 
 | Tab | What happens |
 |---|---|
-| Project | research question, short description, inclusion and exclusion criteria, up to three reviewers, target library in Zotero |
+| Research question | research question, short description, inclusion and exclusion criteria, up to three reviewers |
 | Databases | choose disciplines; the app suggests databases from its catalog (access, terms of use, keys) |
 | Search strategy | concept blocks → search strings for each database, with live hit counts |
 | Search & import | versioned search strings; searches in PubMed, OpenAlex, Europe PMC, ERIC, EconBiz, Semantic Scholar, arXiv, OSF Preprints and swisscovery; RIS import from Ovid, EBSCO or Web of Science |
 | Pool | de-duplicated records (DOI, PMID, OpenAlex ID, title), check against the Zotero target library, prefilters, borderline cases, missing abstracts fetched, recall check with key papers |
-| Folders | folders 1–20 (shortcuts 1–9), each mapped to a Zotero collection |
+| Target & folders | target library in Zotero; folders 1–20 (shortcuts 1–9), each mapped to a Zotero collection |
 | Screening | cards (J/K browse, 1–9 folder, X exclude, ? unsure, G borderline, A accept AI suggestion, Z undo) or a list with bulk apply |
 | Handover | plan per folder, then write to Zotero – only after explicit confirmation; flow diagram and search log as Markdown/CSV in the style of PRISMA-S; on request an AI draft for the methods section |
 | Full texts | optional: status per text (still missing, available, not retrievable, included, excluded with reason); missing PDFs hold nothing up |
 
+- **Status and next step:** the tabs show what is done (a tick, numbers for the pool and screening), and the line below says
+  what to do next. **Next** turns blue once nothing is open in the current tab; nothing is locked.
 - **Nothing disappears silently:** prefilters only mark records; records with an exception term become borderline
   cases, and hidden records can be reviewed and restored.
 - **AI suggestions are optional** (screening, databases, concept blocks, subfolders) and use the model of the
@@ -324,7 +329,7 @@ work (see [the risk of deskilling](#use-it-as-a-tool--the-risk-of-deskilling)).
 - **API keys** live in the system key store: Windows Credential Manager (DPAPI, bound to your user account), macOS
   Keychain, Linux Secret Service. They never appear in files, logs or the interface (only masked). Without a secure
   store they are not saved; use environment variables instead (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`,
-  `DEEPSEEK_API_KEY`).
+  `DEEPSEEK_API_KEY`, `MISTRAL_API_KEY`).
 - **The service listens on 127.0.0.1 only**, checks the host header against DNS rebinding and requires a custom header
   for writing requests (CSRF protection).
 - **What leaves your computer:** with cloud LLMs, the retrieved passages (for literature reviews, the texts of the
@@ -378,7 +383,7 @@ src/zotivity/
   zotero/      client for the local API (read, write, authorisation)
   extract/     PDF/EPUB/HTML/Word/ODT text with page numbers, chunking, reference-list detection
   embeddings/  built in (llama.cpp: runtime, catalog, download, short test, name search), Ollama, OpenAI, Gemini, …
-  llm/         Anthropic, OpenAI/DeepSeek/Ollama, Gemini – one interface
+  llm/         Anthropic, OpenAI/DeepSeek/Mistral/Ollama, Gemini – one interface
   index/       SQLite (FTS5 + vectors per embedding space), indexer, duplicates
   retrieval/   hybrid search (RRF), MMR, reranking
   rag/         questions, literature review, sources

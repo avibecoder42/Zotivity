@@ -78,7 +78,7 @@ def truncation(stop_reason: str) -> str:
     "recitation": der Anbieter hat abgebrochen, weil die Ausgabe eine längere Passage wörtlich wiedergab (Gemini);
     "" sonst. Die Anbieter melden das unterschiedlich (Gross-/Kleinschreibung, eigene Namen)."""
     s = (stop_reason or "").lower()
-    if s in ("length", "max_tokens", "model_context_window_exceeded"):
+    if s in ("length", "max_tokens", "model_length", "model_context_window_exceeded"):
         return "length"
     if s == "recitation":
         return "recitation"

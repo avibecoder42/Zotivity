@@ -1,8 +1,8 @@
 // Suchen: Such-Engine ohne Sprachmodell über alle Zotero-Bibliotheken (eigene und Gruppen).
 // Einfeld- und Mehrfeldsuche, Filter (Jahr, Eintragsart, Bibliothek, Sammlung, PDF, Index), Volltext der
-// indexierten Texte. Treffer zeigen ihren Ort in Zotero und lassen sich in Korpora des Projekts aufnehmen.
-// Links der Suchverlauf des aktiven Projekts: ein Klick füllt die Suchfelder (ohne zu suchen).
-// Auswahl: bleibt über mehrere Suchen erhalten (je Projekt); die Leiste darüber kopiert Literaturliste und
+// indexierten Texte. Gilt für alle Projekte: Treffer zeigen ihren Ort in Zotero und lassen sich in beliebige Korpora aufnehmen.
+// Links der Suchverlauf: ein Klick füllt die Suchfelder (ohne zu suchen).
+// Auswahl: bleibt über mehrere Suchen und beim Projektwechsel erhalten; die Leiste darüber kopiert Literaturliste und
 // Kurzbelege im eingestellten Zitierstil, exportiert (Word, BibTeX, RIS, Markdown), nimmt in Korpora oder eine
 // Zotero-Sammlung auf und öffnet „Fragen“ mit genau diesen Einträgen. Shift+Klick: Bereich, Strg+A: alle, Esc: aufheben.
 import { h } from '../core/vdom.js';
@@ -25,17 +25,15 @@ function st() {
   return ui('search', { query: { ...EMPTY_QUERY }, advanced: false, results: null, total: 0, busy: false,
     picked: new Map(), showPicked: false, lastIdx: null,
     status: null, statusLoading: false, offset: 0, autoSynced: false, error: null,
-    history: null, historyFor: null, historyBusy: false, historyFilter: '', activeId: null, fromHistory: null });
+    history: null, historyBusy: false, historyFilter: '', activeId: null, fromHistory: null });
 }
 
-// ------------------------------------------------------------------ Suchverlauf (je Projekt)
+// ------------------------------------------------------------------ Suchverlauf (für alle Projekte)
 async function loadHistory() {
   const s = st();
-  const pid = state.projectId;
-  if (pid == null || s.historyBusy) return;
+  if (s.historyBusy) return;
   s.historyBusy = true;
-  try { s.history = (await api.get(`/api/library/searches?project=${pid}`)).searches; } catch { s.history = s.history || []; }
-  s.historyFor = pid;
+  try { s.history = (await api.get('/api/library/searches')).searches; } catch { s.history = s.history || []; }
   s.historyBusy = false;
   update();
 }
@@ -54,7 +52,7 @@ function applySearch(entry) {
 
 async function forgetSearch(entry) {
   const s = st();
-  const r = await run(() => api.del(`/api/library/searches?project=${state.projectId}&id=${entry.id}`));
+  const r = await run(() => api.del(`/api/library/searches?id=${entry.id}`));
   s.history = r.searches;
   if (s.activeId === entry.id) s.activeId = null;
   update();
@@ -62,12 +60,10 @@ async function forgetSearch(entry) {
 
 async function clearHistory() {
   const s = st();
-  const p = project();
-  const ok = await confirmDialog(t('Suchverlauf leeren?'),
-    t('Alle {n} gespeicherten Suchen des Projekts „{name}“ werden entfernt.', { n: (s.history || []).length, name: p ? p.name : '' }),
+  const ok = await confirmDialog(t('Suchverlauf leeren?'), t('Alle {n} gespeicherten Suchen werden entfernt.', { n: (s.history || []).length }),
     { ok: t('Leeren'), danger: true });
   if (!ok) return;
-  const r = await run(() => api.del(`/api/library/searches?project=${state.projectId}`));
+  const r = await run(() => api.del('/api/library/searches'));
   s.history = r.searches;
   s.activeId = null;
   update();
@@ -99,16 +95,15 @@ function historyPanel() {
   const labeled = items.map(e => ({ e, ...historyLabel(e.query, libNames, collNames) }));
   const f = s.historyFilter.trim().toLowerCase();
   const shown = f ? labeled.filter(x => `${x.head} ${x.sub}`.toLowerCase().includes(f)) : labeled;
-  const p = project();
   return h('aside', { class: 'search-side', ...paneProps('search', 250) },
     h('div', { class: 'search-side-head' },
       h('div', { class: 'eyebrow' }, t('Bisherige Suchen')),
       items.length ? h('span', { class: 'muted small' }, fmtInt(items.length)) : null,
-      items.length ? iconBtn('trash', t('Suchverlauf dieses Projekts leeren'), clearHistory) : null),
+      items.length ? iconBtn('trash', t('Suchverlauf leeren'), clearHistory) : null),
     items.length > 5 ? textInput({ value: s.historyFilter, placeholder: t('Verlauf filtern …'), label: t('Verlauf filtern'),
       onInput: v => { s.historyFilter = v; update(); } }) : null,
     s.history === null ? h('div', { class: 'pad' }, spinner(14))
-      : !items.length ? h('p', { class: 'muted small' }, t('Noch keine Suchen in diesem Projekt. Jede ausgeführte Suche erscheint hier; ein Klick übernimmt sie in die Suchfelder.'))
+      : !items.length ? h('p', { class: 'muted small' }, t('Noch keine Suchen. Jede ausgeführte Suche erscheint hier; ein Klick übernimmt sie in die Suchfelder.'))
         : h('div', { class: 'recent-searches' },
           shown.map(x => h('div', { key: x.e.id, class: ['recent-search', s.activeId === x.e.id && 'active'], role: 'button', tabindex: 0,
             title: `${x.head}${x.sub ? '\n' + x.sub : ''}\n${t('Klicken: in die Suchfelder übernehmen')}`,
@@ -119,7 +114,6 @@ function historyPanel() {
             h('div', { class: 'recent-search-meta' }, `${t('{n} Treffer', { n: fmtInt(x.e.total) })} · ${fmtAgo(x.e.used_at)}`)),
           iconBtn('x', t('Aus dem Verlauf entfernen'), e => { e.stopPropagation(); forgetSearch(x.e); }))),
           f && !shown.length ? h('p', { class: 'muted small' }, t('Keine passende Suche.')) : null),
-    p ? h('p', { class: 'muted small search-side-hint' }, t('Verlauf des Projekts „{name}“', { name: p.name })) : null,
     splitter('search', { def: 250, max: 480 }));
 }
 
@@ -165,14 +159,14 @@ async function doSearch(offset = 0) {
   if (!hasQuery(s.query)) { toast(t('Bitte einen Suchbegriff oder Filter angeben.'), 'warning'); return; }
   s.busy = true; s.error = null; update();
   try {
-    const r = await api.post('/api/library/search', { query: { ...s.query, offset, limit: 100 }, project_id: state.projectId });
+    const r = await api.post('/api/library/search', { query: { ...s.query, offset, limit: 100 }, remember: true });
     s.total = r.total;
     s.fulltextDocs = r.fulltext_documents;
     s.results = offset ? [...(s.results || []), ...r.results] : r.results;
     s.offset = offset;
     // Die Auswahl bleibt: Einträge aus mehreren Suchen lassen sich zusammen kopieren oder exportieren
     if (!offset) { s.fromHistory = null; s.showPicked = false; s.lastIdx = null; }
-    if (r.searches) { s.history = r.searches; s.historyFor = state.projectId; }
+    if (r.searches) s.history = r.searches;
     if (r.search_id) s.activeId = r.search_id;
   } catch (err) { s.error = err.message; }
   s.busy = false; update();
@@ -186,9 +180,23 @@ async function addToCorpus(corpus, items) {
   const pending = r.stats.pending;
   toast(t('{n} Einträge in „{name}“ aufgenommen.', { n: items.length, name: corpus.name }), 'success', 6000,
     pending ? { label: t('Jetzt indexieren'), onClick: () => navigate('index') } : null);
+  // Korpus ohne Projekt: anbieten, ihn dem aktiven Projekt zuzuordnen
+  if (!(corpus.project_ids || []).length && state.projectId != null) {
+    toast(t('„{name}“ gehört zu keinem Projekt.', { name: corpus.name }), 'info', 9000, { label: t('Diesem Projekt zuordnen'), onClick: async () => {
+      await run(() => api.put(`/api/projects/${state.projectId}/corpora/${corpus.id}`, { assigned: true }));
+      await Promise.all([loadCorpora(), loadProjects()]);
+      update();
+    } });
+  }
 }
 
+// Korpora gehören oft zu mehreren Projekten: Wer aus einem Korpus eines anderen Projekts entfernt, soll das wissen
+const projectNames = c => (state.projects || []).filter(p => (c.project_ids || []).includes(p.id)).map(p => p.name).join(', ');
+
 async function removeFromCorpus(corpus, item) {
+  const elsewhere = (corpus.project_ids || []).some(id => id !== state.projectId);
+  if (elsewhere && !await confirmDialog(t('Aus „{name}“ entfernen?', { name: corpus.name }),
+    t('Dieser Korpus gehört zu: {list}. Der Eintrag verschwindet dort ebenfalls aus dem Korpus.', { list: projectNames(corpus) }), { ok: t('Entfernen'), danger: true })) return;
   await run(() => api.post(`/api/corpora/${corpus.id}/items`, { items: [{ lib: item.lib, key: item.key }], remove: true }));
   item.corpora = (item.corpora || []).filter(id => id !== corpus.id);
   await loadCorpora();
@@ -196,15 +204,18 @@ async function removeFromCorpus(corpus, item) {
 }
 
 function newCorpusFromItems(items) {
-  const v = { name: '' };
+  const v = { name: '', project: state.projectId ?? '' };
+  const projects = (state.projects || []).filter(p => !p.archived_at);
   openModal({
     title: t('Neuer Korpus aus {n} Einträgen', { n: items.length }),
     body: () => h('div', { class: 'stack' },
       field(t('Name'), textInput({ value: v.name, id: 'new-corpus-name', onInput: x => { v.name = x; } })),
-      h('p', { class: 'muted small' }, t('Der Korpus enthält genau diese Einträge und gehört zum aktiven Projekt. Sammlungen lassen sich später unter „Korpora“ ergänzen.'))),
+      field(t('Gehört zu'), select({ value: v.project, onChange: x => { v.project = x; }, options: [
+        ...projects.map(p => ({ value: p.id, label: p.name })), { value: '', label: t('kein Projekt') }] })),
+      h('p', { class: 'muted small' }, t('Der Korpus enthält genau diese Einträge. Sammlungen lassen sich später unter „Korpora“ ergänzen.'))),
     actions: [{ label: t('Abbrechen'), onClick: closeModal }, { label: t('Anlegen'), kind: 'primary', onClick: async () => {
       if (!v.name.trim()) { toast(t('Bitte einen Namen eingeben.'), 'warning'); return; }
-      const c = await run(() => api.post('/api/corpora', { name: v.name.trim(), project_id: state.projectId,
+      const c = await run(() => api.post('/api/corpora', { name: v.name.trim(), project_id: v.project || null,
         sources: items.map(x => `${x.lib}:@${x.key}`) }));
       closeModal();
       await Promise.all([loadCorpora(), loadProjects()]);
@@ -216,21 +227,36 @@ function newCorpusFromItems(items) {
   requestAnimationFrame(() => document.getElementById('new-corpus-name')?.focus());
 }
 
-function corpusMenu(e, items) {
-  const r = e.currentTarget.getBoundingClientRect();
-  const corpora = projectCorpora();
+// Alle Korpora, das aktive Projekt zuerst. Ein Eintrag allein zeigt, wo er schon ist, und lässt sich dort wieder entfernen.
+function corpusDialog(items) {
+  const v = { filter: '' };
+  const p = project();
   const single = items.length === 1 ? items[0] : null;
-  openMenu(r.left, r.bottom + 4, [
-    { heading: t('In Korpus aufnehmen ({project})', { project: (project() || {}).name || '' }) },
-    ...corpora.map(c => {
-      const inside = single && (single.corpora || []).includes(c.id);
-      return { label: c.name, icon: inside ? 'check' : 'corpus', hint: inside ? t('enthalten – entfernen') : '',
-        onClick: () => inside ? removeFromCorpus(c, single) : addToCorpus(c, items) };
-    }),
-    !corpora.length && { label: t('Dieses Projekt hat noch keinen Korpus'), disabled: true },
-    '-',
-    { label: t('Neuer Korpus aus Auswahl …'), icon: 'plus', onClick: () => newCorpusFromItems(items) },
-  ], { width: 300 });
+  const groups = () => {
+    const f = v.filter.trim().toLowerCase();
+    const all = (state.corpora || []).filter(c => !f || c.name.toLowerCase().includes(f));
+    const own = c => p && (c.project_ids || []).includes(p.id);
+    return [[p ? t('Projekt „{name}“', { name: p.name }) : t('Aktives Projekt'), all.filter(own)],
+      [t('Andere Projekte'), all.filter(c => !own(c) && (c.project_ids || []).length)],
+      [t('Ohne Projekt'), all.filter(c => !(c.project_ids || []).length)]].filter(([, list]) => list.length);
+  };
+  const row = c => {
+    const inside = single && (single.corpora || []).includes(c.id);
+    return h('button', { type: 'button', key: c.id, class: 'menu-item corpus-pick', onclick: () => { closeModal(); inside ? removeFromCorpus(c, single) : addToCorpus(c, items); } },
+      icon(inside ? 'check' : 'corpus', 15),
+      h('span', { class: 'menu-label' }, h('span', null, c.name),
+        (c.project_ids || []).some(id => !p || id !== p.id) ? h('span', { class: 'muted small' }, projectNames(c)) : null),
+      inside ? h('span', { class: 'menu-hint' }, t('enthalten – entfernen')) : null);
+  };
+  openModal({
+    title: single ? t('In Korpus aufnehmen') : t('{n} Einträge in Korpus aufnehmen', { n: fmtInt(items.length) }),
+    body: () => h('div', { class: 'stack' },
+      (state.corpora || []).length > 6 ? textInput({ value: v.filter, placeholder: t('Korpus filtern …'), label: t('Korpus filtern'), onInput: x => { v.filter = x; update(); } }) : null,
+      (state.corpora || []).length ? groups().map(([title, list]) => h('div', { key: title, class: 'corpus-pick-group' }, h('div', { class: 'eyebrow' }, title), list.map(row)))
+        : h('p', { class: 'muted small' }, t('Noch kein Korpus.'))),
+    actions: () => [{ label: t('Abbrechen'), onClick: closeModal },
+      { label: t('Neuer Korpus aus Auswahl …'), icon: 'plus', onClick: () => { closeModal(); newCorpusFromItems(items); } }],
+  });
 }
 
 function locationsMenu(e, item) {
@@ -453,6 +479,13 @@ function selectionMenu(e, items) {
   ], { width: 280 });
 }
 
+// Fragen landen im aktiven Projekt: Der Knopf nennt es
+function askLabel() {
+  const p = project();
+  if (!p) return t('Fragen stellen');
+  return t('Fragen in „{name}“', { name: p.name.length > 24 ? `${p.name.slice(0, 23)}…` : p.name });
+}
+
 // Leiste über den Treffern, sobald etwas ausgewählt ist (bleibt beim Scrollen oben)
 function selectionBar() {
   const s = st();
@@ -468,8 +501,8 @@ function selectionBar() {
       btn(sel.length === 1 ? t('Literaturnachweis kopieren') : t('Literaturliste kopieren'), { size: 'sm', kind: 'primary', icon: 'quote', onClick: () => copyReferences(sel) }),
       btn(t('Kurzbelege kopieren'), { size: 'sm', icon: 'copy', onClick: () => copyShorts(sel) }),
       btn(t('Exportieren'), { size: 'sm', icon: 'download', onClick: e => exportMenu(e, sel) }),
-      btn(t('In Korpus'), { size: 'sm', icon: 'corpus', onClick: e => corpusMenu(e, sel) }),
-      btn(t('Fragen stellen'), { size: 'sm', icon: 'chat', onClick: () => askAbout(sel) }),
+      btn(t('In Korpus'), { size: 'sm', icon: 'corpus', onClick: () => corpusDialog(sel) }),
+      btn(askLabel(), { size: 'sm', icon: 'chat', title: t('Die Fragen gehören zum aktiven Projekt. Für ein anderes zuerst wechseln (Strg+P); die Auswahl bleibt.'), onClick: () => askAbout(sel) }),
       iconBtn('more', t('Weitere Aktionen'), e => selectionMenu(e, sel))),
     h('div', { class: 'selection-right' },
       btn(s.showPicked ? t('Alle Treffer zeigen') : t('Nur Auswahl zeigen'), { size: 'sm', kind: 'ghost', icon: s.showPicked ? 'search' : 'filter',
@@ -589,8 +622,8 @@ function resultRow(x, i, list) {
   const s = st();
   const id = rid(x);
   const [label, kind] = STATUS[x.index_status]();
-  const corpora = projectCorpora();
-  const inCorpora = (x.corpora || []).map(cid => corpora.find(c => c.id === cid)).filter(Boolean);
+  const inCorpora = (x.corpora || []).map(cid => (state.corpora || []).find(c => c.id === cid)).filter(Boolean);
+  const own = new Set(projectCorpora().map(c => c.id));
   const on = s.picked.has(id);
   return h('div', { key: id, class: ['result', on && 'selected'] },
     // Eigenes Häkchen statt checkbox(): der Klick braucht die Shift-Taste (Bereich auswählen)
@@ -607,14 +640,14 @@ function resultRow(x, i, list) {
         icon(loc.kind === 'library' ? (x.group ? 'users' : 'library') : 'folder', 12), h('span', null, loc.kind === 'library' ? loc.label : loc.path.split(' › ').slice(1).join(' › ')))))),
     h('div', { class: 'result-side' },
       badge(label, kind),
-      inCorpora.length ? h('div', { class: 'result-corpora' }, inCorpora.map(c => h('span', { key: c.id, class: 'chip chip-accent', title: t('Im Korpus „{name}“', { name: c.name }) },
+      inCorpora.length ? h('div', { class: 'result-corpora' }, inCorpora.map(c => h('span', { key: c.id, class: ['chip', own.has(c.id) && 'chip-accent'], title: t('Im Korpus „{name}“', { name: c.name }) },
         icon('corpus', 11), h('span', null, c.name)))) : null,
       h('div', { class: 'row nowrap' },
         x.locations.length > 1 ? btn(t('In Zotero zeigen'), { size: 'sm', kind: 'ghost', icon: 'zotero', onClick: e => locationsMenu(e, x) })
           : btn(t('In Zotero zeigen'), { size: 'sm', kind: 'ghost', icon: 'zotero', onClick: () => api.openExternal(x.select) }),
         x.pdf && iconBtn('pdf', t('PDF in Zotero öffnen'), () => api.openExternal(x.pdf)),
         iconBtn('quote', t('Literaturnachweis kopieren (im Zitierstil der Einstellungen)'), () => copyReferences([x])),
-        iconBtn('corpus', t('In Korpus aufnehmen …'), e => corpusMenu(e, [x])),
+        iconBtn('corpus', t('In Korpus aufnehmen …'), () => corpusDialog([x])),
         iconBtn('more', t('Weitere Aktionen'), e => rowMenu(e, x)))));
 }
 
@@ -655,14 +688,7 @@ export function searchView() {
   const s = st();
   if (!s.status) loadStatus();
   if (!state.tree && !s.treeRequested) { s.treeRequested = true; api.get('/api/zotero/tree').then(tr => { state.tree = tr; update(); }).catch(() => {}); }
-  // Anderes Projekt geöffnet: dessen Suchverlauf laden, Felder und Treffer des vorigen Projekts verwerfen
-  if (s.historyFor !== state.projectId && !s.historyBusy) {
-    if (s.historyFor != null) {
-      Object.assign(s, { query: { ...EMPTY_QUERY }, results: null, total: 0, picked: new Map(), showPicked: false, lastIdx: null,
-        activeId: null, fromHistory: null, historyFilter: '', history: null, advanced: false });
-    }
-    loadHistory();
-  }
+  if (s.history === null && !s.historyBusy) loadHistory();
   const z = state.status && state.status.zotero;
   return h('div', { class: 'view-wrap' },
     viewHeader(t('Suchen'), t('Zotero-Bibliothek und Gruppen durchsuchen – ohne Sprachmodell')),

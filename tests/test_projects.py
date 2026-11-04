@@ -1,7 +1,9 @@
 """Projekte, Export/Import, Presets, Suchstrategie, Relevanzanzeige, Kostenschätzung."""
 
+import io
 import json
 import re
+import zipfile
 
 from fakes import ScriptedModel
 from test_rag import indexed, install_models  # noqa: F401 - Fixture
@@ -90,38 +92,48 @@ def test_project_order_by_hand(client):
         assert client.post("/api/projects/reorder", json={"ids": bad}, headers=H).status_code == 400
 
 
-def test_search_history_per_project(client):
-    projects = client.get("/api/projects").json()["projects"]
-    a = projects[0]["id"]
-    b = client.post("/api/projects", json={"name": "Zweites"}, headers=H).json()["id"]
+def test_search_history_is_shared(client):
+    def search(**q):
+        return client.post("/api/library/search", json={"query": q, "remember": True}, headers=H).json()
 
-    def search(pid, **q):
-        return client.post("/api/library/search", json={"query": q, "project_id": pid}, headers=H).json()
-
-    r = search(a, q="chatbots")
+    r = search(q="chatbots")
     assert r["searches"][0]["query"] == {"q": "chatbots"} and r["searches"][0]["total"] == 1
-    search(a, creator="devlieghere", year_from=2010, item_types=["journalArticle"])
-    search(a, q="  chatbots ", sort="year_desc")  # gleiche Suche: rückt nach oben, kein zweiter Eintrag
-    hist = client.get(f"/api/library/searches?project={a}").json()["searches"]
+    search(creator="devlieghere", year_from=2010, item_types=["journalArticle"])
+    search(q="  chatbots ", sort="year_desc")  # gleiche Suche: rückt nach oben, kein zweiter Eintrag
+    hist = client.get("/api/library/searches").json()["searches"]
     assert [h["query"] for h in hist] == [{"q": "chatbots"},
                                          {"creator": "devlieghere", "year_from": 2010, "item_types": ["journalArticle"]}]
     assert hist[0]["sort"] == "year_desc"
-    # „Weitere laden“ (offset) zählt nicht als neue Suche; ohne Projekt wird nichts gespeichert
-    client.post("/api/library/search", json={"query": {"q": "jugend", "offset": 100}, "project_id": a}, headers=H)
+    # „Weitere laden“ (offset) zählt nicht als neue Suche; Nachschlagen aus anderen Ansichten (CSL-Editor) auch nicht
+    client.post("/api/library/search", json={"query": {"q": "jugend", "offset": 100}, "remember": True}, headers=H)
     client.post("/api/library/search", json={"query": {"q": "jugend"}}, headers=H)
-    assert len(client.get(f"/api/library/searches?project={a}").json()["searches"]) == 2
-    # Je Projekt getrennt
-    assert client.get(f"/api/library/searches?project={b}").json()["searches"] == []
-    search(b, q="systems")
-    assert len(client.get(f"/api/library/searches?project={b}").json()["searches"]) == 1
-    # Eine Suche entfernen, dann alle
-    left = client.delete(f"/api/library/searches?project={a}&id={hist[0]['id']}", headers=H).json()["searches"]
-    assert [h["id"] for h in left] == [hist[1]["id"]]
-    assert client.delete(f"/api/library/searches?project={a}", headers=H).json()["searches"] == []
-    assert len(client.get(f"/api/library/searches?project={b}").json()["searches"]) == 1
-    # Löschen des Projekts entfernt seinen Verlauf
+    assert len(client.get("/api/library/searches").json()["searches"]) == 2
+    # Das Löschen eines Projekts berührt den Verlauf nicht
+    b = client.post("/api/projects", json={"name": "Zweites"}, headers=H).json()["id"]
     client.delete(f"/api/projects/{b}", headers=H)
-    assert client.app.state.engine.store.searches(b) == []
+    assert len(client.app.state.engine.store.searches()) == 2
+    # Eine Suche entfernen, dann alle
+    left = client.delete(f"/api/library/searches?id={hist[0]['id']}", headers=H).json()["searches"]
+    assert [h["id"] for h in left] == [hist[1]["id"]]
+    assert client.delete("/api/library/searches", headers=H).json()["searches"] == []
+
+
+def test_old_search_histories_are_merged(client):
+    store = client.app.state.engine.store
+    a = json.dumps({"q": "chatbots"}, ensure_ascii=False, sort_keys=True)
+    b = json.dumps({"q": "jugend"}, ensure_ascii=False, sort_keys=True)
+    with store.write() as con:
+        con.executemany("INSERT INTO searches(project_id, signature, query, sort, total, created_at, used_at) VALUES(?,?,?,?,?,?,?)",
+                        [(1, a, a, "relevance", 3, 10.0, 10.0), (2, a, a, "year_desc", 5, 20.0, 20.0), (2, b, b, "relevance", 7, 15.0, 15.0)])
+        con.execute("DELETE FROM meta WHERE key='search_history_merged'")
+        type(store)._migrate(con)
+    hist = store.searches()
+    assert [(h["query"], h["sort"], h["total"]) for h in hist] == [({"q": "chatbots"}, "year_desc", 5), ({"q": "jugend"}, "relevance", 7)]
+    # Die alte Tabelle bleibt für den Fall, dass eine frühere Version wieder installiert wird
+    assert store.con.execute("SELECT COUNT(*) FROM searches").fetchone()[0] == 3
+    with store.write() as con:
+        type(store)._migrate(con)  # nur einmal
+    assert len(store.searches()) == 2
 
 
 def test_project_export_import_roundtrip(client):
@@ -130,16 +142,18 @@ def test_project_export_import_roundtrip(client):
                                             "project_id": p["id"]}, headers=H).json()["id"]
     client.post("/api/chat", json={"question": "Chatbots Jugendliche", "search_only": True, "project_id": p["id"]},
                 headers=H)
-    client.post("/api/library/search", json={"query": {"q": "chatbots"}, "project_id": p["id"]}, headers=H)
+    client.post("/api/library/search", json={"query": {"q": "chatbots"}, "remember": True}, headers=H)
     r = client.get(f"/api/projects/{p['id']}/export")
     assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
+    with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+        assert "searches" not in json.loads(z.read("project.json"))  # der Suchverlauf gehört keinem Projekt
+    client.delete("/api/library/searches", headers=H)
     imported = client.post("/api/projects/import", content=r.content, headers=H).json()
     assert imported["name"] == "Export (2)" and imported["corpora_reused"] == 1 and imported["chats"] == 1
     assert imported["missing_sources"] == [] and imported["checked"] is True
     new = next(x for x in client.get("/api/projects").json()["projects"] if x["id"] == imported["project_id"])
     assert new["corpus_ids"] == [cid] and new["chats"] == 1
-    [s] = client.get(f"/api/library/searches?project={new['id']}").json()["searches"]  # Suchverlauf kommt mit
-    assert s["query"] == {"q": "chatbots"} and s["total"] == 1
+    assert client.get("/api/library/searches").json()["searches"] == []
     bad =client.post("/api/projects/import", content=b"kein zip", headers=H)
     assert bad.status_code == 400 and "zllm" in bad.json()["detail"]
 

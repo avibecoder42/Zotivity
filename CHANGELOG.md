@@ -2,6 +2,41 @@
 
 All notable changes, newest first.
 
+## 1.2.0 – 2026-11-04
+
+### New
+- **Mistral** as a language model provider. Mistral Large 4 and Small 4 are suggested; with a key, the app loads the current
+  model list. For processing in the EU, change the server address to `https://api.eu.mistral.ai` (10 % surcharge, not all
+  models).
+- **Database search shows the way:** the tabs show the status (a tick when done, numbers for the pool and screening), and a
+  line below them says what to do next. Every tab has **Next**, which turns blue once nothing is open in the current one; nothing
+  is locked. After the handover, it leads on to creating a corpus.
+
+### Changed
+- **Search no longer belongs to a project.** It moved down to the views that apply to all projects (Ctrl+6 stays). There is one
+  search history; existing histories are merged. Switching projects keeps the fields, results and selection. Items can be added
+  to any corpus, and results show all corpora containing them. Search history is no longer part of `.zoty` files; older files
+  still import it.
+- **Database search, clearer names:** the tab "Project" is now "Research question", so that "project" only means the Zotivity
+  project; "Folders" is now "Target & folders" and also holds the target in Zotero. The target library can be chosen right at the
+  check in the pool.
+- **AI suggestion for folders** now also uses a sample of the titles in the pool, not only those of included works.
+- **AI buttons without a research question** now say visibly what is missing instead of only being greyed out.
+- **Database search:** one rule for button colours. Blue is the next step, at most one per area; violet starts a language
+  model; white is for other actions. In Search & import, for example, "Search all" is blue while something has not been
+  searched yet, and it follows "Add search string".
+- **Database search:** areas with AI suggestions are tinted violet. "Apply all" under search strings per source is now called
+  "Apply all as search strings", because the AI suggestion has a button with the same name.
+
+### Fixed
+- **Zotivity no longer disturbs Zotero while it starts.** Zotero opens its interface before its items are ready. A request from
+  Zotivity in that moment could apparently leave Zotero stuck on "Loading items" until it was restarted. Zotivity now only pings
+  until Zotero is ready: the Zotero plugin shows that the start is finished; without the plugin, Zotivity waits 20 seconds.
+- **A hanging Zotero is reported correctly and quickly.** Instead of waiting two minutes and then saying that Zotero is not running,
+  Zotivity says after a few seconds that Zotero is running but its interface does not respond, and asks to restart Zotero.
+- After a change of the target library, the pool named the new library for matches found in the old one. It now asks for a new
+  check, and the new check removes the old matches. What was already handed over stays linked.
+
 ## 1.1.1 – 2026-11-02
 
 ### Fixed

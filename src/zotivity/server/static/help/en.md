@@ -10,7 +10,7 @@ Zotivity (formerly ZotLLM) enables comprehensive scholarly work with your own Zo
 
 **Database search** can come first: a search in subject databases (PubMed, OpenAlex and others), with screening and handover of the selected literature to Zotero collections.
 
-The navigation bar on the left has two parts. At the very top is the **Guide**, below it the views of the active **project** in the order of the workflow: Project, Database search, Corpora, Ask and Literature review – first find new literature, then decide what is read, then work with it. Set apart follows **Search**, a tool for any time. At the bottom are **CSL editor**, **Index**, **Help** and **Settings**; they apply to all projects. Above the menu, the project tile shows the active project; click it (or press **Ctrl+P**) to switch projects.
+The navigation bar on the left has two parts. At the very top is the **Guide**, below it the views of the active **project** in the order of the workflow: Project, Database search, Corpora, Ask and Literature review – first find new literature, then decide what is read, then work with it. At the bottom are **Search**, **CSL editor**, **Index**, **Help** and **Settings**; they apply to all projects. Above the menu, the project tile shows the active project; click it (or press **Ctrl+P**) to switch projects.
 
 Zotivity is an independent project, not affiliated with Zotero or the Corporation for Digital Scholarship; “Zotero” is their registered trademark.
 
@@ -31,8 +31,8 @@ The technical part belongs to Setup (see the chapter Setup).
 
 ### Keyboard shortcuts
 
-- **Ctrl+1 … Ctrl+6** Project, Database search, Corpora, Ask, Literature review, Search
-- **Ctrl+7** CSL editor, **Ctrl+8** Index, **Ctrl+,** Settings, **F1** Help
+- **Ctrl+1 … Ctrl+5** Project, Database search, Corpora, Ask, Literature review
+- **Ctrl+6** Search, **Ctrl+7** CSL editor, **Ctrl+8** Index, **Ctrl+,** Settings, **F1** Help
 - **Ctrl+P** switch project
 - In database search: **Alt+1 … Alt+9** switches the tab; for screening see the chapter Database search
 - In the program window: **Ctrl + mouse wheel**, **pinch** on the touchpad or **Ctrl +/−** zooms the whole interface, **Ctrl+0** resets it
@@ -67,11 +67,11 @@ Zotivity reads the library through Zotero's local interface. It has to be switch
 2. Open the **Advanced** pane.
 3. Tick **"Allow other applications on this computer to communicate with Zotero"**.
 
-Zotero must be open while Zotivity synchronises or indexes. Search, Ask and Literature review also work when Zotero is closed – only the links into Zotero need a running Zotero. The Zotero database is never read or changed directly.
+Zotero must be open while Zotivity synchronises or indexes. Search, Ask and Literature review also work when Zotero is closed – only the links into Zotero need a running Zotero. The Zotero database is never read or changed directly. While Zotero is starting, Zotivity holds back its requests. If Zotero keeps showing “Loading items” for **My Library** and Zotivity reports that the interface does not respond, restart Zotero.
 
 ### Language model and API key
 
-Under **Settings → Language models** you choose the provider (Anthropic Claude, OpenAI, Google Gemini, DeepSeek, local Ollama or an OpenAI-compatible server) and enter the API key. The key is stored encrypted in the Windows Credential Manager and is never shown in plain text or written to files.
+Under **Settings → Language models** you choose the provider (Anthropic Claude, OpenAI, Google Gemini, DeepSeek, Mistral, local Ollama or an OpenAI-compatible server) and enter the API key. The key is stored encrypted in the Windows Credential Manager and is never shown in plain text or written to files. With Mistral the server address can be changed: `https://api.eu.mistral.ai` processes in the EU, with a 10% surcharge and not for all models.
 
 There are two roles:
 
@@ -138,7 +138,7 @@ The **Project** view lists all projects on the left, one below the other; **New 
 
 - **New project** creates an empty project (name, description, colour).
 - The **⋯** menu on a project tile offers Edit, Move up/down, Export as file, Duplicate, Archive and Delete.
-- **Export as file** saves the project as a `.zoty` file (`.zllm` files from earlier versions can still be imported) – with corpus definitions, chats, literature reviews, evaluation sheets and search history, but without the index. Use it to back up a project or move it to another computer. **Import** loads such a file; missing collections are reported.
+- **Export as file** saves the project as a `.zoty` file (`.zllm` files from earlier versions can still be imported) – with corpus definitions, chats, literature reviews and evaluation sheets, but without the index. Use it to back up a project or move it to another computer. **Import** loads such a file; missing collections are reported.
 - A corpus can belong to several projects. When a project is deleted, corpora that are used elsewhere are kept.
 
 ### Archive
@@ -294,7 +294,7 @@ Type into the large field and press **Enter**. Title, people, publication, tags,
 
 ### Previous searches
 
-The panel on the left lists all searches of the active project, newest first – with the search term, further fields and filters, number of results and time. A search that is run again moves to the top instead of appearing twice. A click on a search **fills the search fields** (opening the advanced search if needed) but does not search yet, so you can adjust it first; **Search** or **Enter** runs it. The **×** removes a search from the history, the bin clears the project's history. From six entries on, a filter field appears. Each project has its own history; it is exported with the project.
+The panel on the left lists all searches, regardless of the project, newest first – with the search term, further fields and filters, number of results and time. A search that is run again moves to the top instead of appearing twice. A click on a search **fills the search fields** (opening the advanced search if needed) but does not search yet, so you can adjust it first; **Search** or **Enter** runs it. The **×** removes a search from the history, the bin clears the project's history. From six entries on, a filter field appears. Each project has its own history; it is exported with the project.
 
 ### Results
 
@@ -303,9 +303,9 @@ Each result shows title, people, year, item type and publication, and below that
 - **Show in Zotero** – if the item is in several places, a selection opens.
 - **PDF icon** – opens the PDF in Zotero.
 - **Quote icon (❝)** – copies the **reference** in the citation style from the settings (Settings → Zotero and export), formatted for Word (italics stay italic) and as plain text. The message names the style. Zotero provides the reference; if Zotero is closed, Zotivity builds a simplified form and says so.
-- **Corpus icon** – **Add to corpus**: only the corpora of the active project are offered. If the item is already included it is marked and can be removed there. **New corpus from selection** creates a corpus with exactly these items.
+- **Corpus icon** – **Add to corpus**: all corpora are offered, those of the active project first. If a corpus belongs to no project, Zotivity then offers to assign it to the active project. If the item is already included it is marked and can be removed there. **New corpus from selection** creates a corpus with exactly these items.
 - **⋯** – copy the in-text citation (e.g. "(Gong/Li 2026)"), copy the DOI link or Zotero link, save as Word, BibTeX, RIS or Markdown, ask about this item, file in a Zotero collection.
-- On the right are the indexing status (indexed, not yet indexed, no text, no PDF) and the project corpora that already contain the item.
+- On the right are the indexing status (indexed, not yet indexed, no text, no PDF) and the corpora that already contain the item; those of the active project are highlighted.
 
 ### Selection and bulk actions
 
@@ -314,7 +314,7 @@ Use the checkboxes on the left to select results: **Shift+click** selects a rang
 - **Copy reference list** – all selected items in the chosen citation style, sorted as in the style.
 - **Copy in-text citations** – e.g. "(Gong/Li 2026; Samatha et al. 2025)".
 - **Export** – **Word (.docx)** with citations and bibliography as Zotero fields (style can be changed with the Zotero Word plugin), **BibTeX (.bib)** for LaTeX, **RIS (.ris)** for other reference managers, **Markdown (.md)**.
-- **To corpus** – add to a corpus of the project or create a new one. Newly added texts must be indexed afterwards; the message offers **Index now** for this.
+- **To corpus** – add to any corpus or create a new one. Newly added texts must be indexed afterwards; the message offers **Index now** for this.
 - **Ask questions** – opens **Ask** with exactly these items as scope. If some are not indexed yet, Zotivity asks whether to index them first (the run goes into the queue if needed) or to ask with the indexed ones only.
 - **⋯** – **File in a Zotero collection** (existing or new collection; requires write access, see setup). A Zotero collection belongs to one library: if the selected items are in different libraries, you choose the library; items from the others are skipped.
 - **Show selection only** lists all selected items, including those from earlier searches; **Clear** empties the selection.
@@ -346,11 +346,11 @@ Follow-up questions refer to the conversation so far. The project's previous que
 
 ## Database search
 
-**Database search** (Ctrl+2) takes a search in subject databases from the research question to the selected literature in Zotero. The machine searches, removes duplicates and suggests – you decide. Every database search belongs to a project; the view shows the searches of the active project, the project page their status. The data is stored in `research.db` in the data folder. Searches without a project (e.g. after a project was deleted) are listed under “Without project” and can be assigned. A project has nine tabs (Alt+1 … Alt+9): Project, Databases, Search strategy, Search & import, Pool, Folders, Screening, Handover and Full texts. Everything is saved automatically. The header shows where the project stands, e.g. "PubMed 503 · OpenAlex 934 · screened 380/1150".
+**Database search** (Ctrl+2) takes a search in subject databases from the research question to the selected literature in Zotero. The machine searches, removes duplicates and suggests – you decide. Every database search belongs to a project; the view shows the searches of the active project, the project page their status. The data is stored in `research.db` in the data folder. Searches without a project (e.g. after a project was deleted) are listed under “Without project” and can be assigned. A database search has nine tabs (Alt+1 … Alt+9): Research question, Databases, Search strategy, Search & import, Pool, Target & folders, Screening, Handover and Full texts. Everything is saved automatically. The header shows where the project stands, e.g.The tabs show the status: a tick when done, the number of records for the pool, the screened ones for screening. The line below says what to do next; **Next** leads to the next tab and turns blue once nothing is open in the current one. Nothing is locked: you can switch to any tab at any time.
 
-### Project and databases
+### Research question and databases
 
-**Project** holds the research question, a short description and the inclusion and exclusion criteria (one line per criterion). The exclusion criteria work in three ways: they are offered as reasons in screening and for full texts, they feed into the AI suggestions, and they go into the log. They filter nothing automatically; an exclusion block in the search strategy arises from them only if a criterion is clearly recognisable in the title. Also here are the **selection process** (up to three reviewers, procedure) and the **target in Zotero**: the target library, normally through Zotero on this computer. Under **Databases** you choose disciplines; the app suggests matching databases from its catalog, with access, terms of use and the key needed. Directly searchable are PubMed, OpenAlex, Europe PMC, ERIC, EconBiz, Semantic Scholar, arXiv, OSF Preprints and swisscovery. Licensed databases (PsycInfo, CINAHL, SocINDEX …) use the **RIS route**: search and export there, import here. The app never logs in to licensed databases and does not automate a browser.
+**Research question** holds the research question, a short description and the inclusion and exclusion criteria (one line per criterion). The exclusion criteria work in three ways: they are offered as reasons in screening and for full texts, they feed into the AI suggestions, and they go into the log. They filter nothing automatically; an exclusion block in the search strategy arises from them only if a criterion is clearly recognisable in the title. Also here is the **selection process** (up to three reviewers, procedure). Under **Databases** you choose disciplines; the app suggests matching databases from its catalog, with access, terms of use and the key needed. Directly searchable are PubMed, OpenAlex, Europe PMC, ERIC, EconBiz, Semantic Scholar, arXiv, OSF Preprints and swisscovery. Licensed databases (PsycInfo, CINAHL, SocINDEX …) use the **RIS route**: search and export there, import here. The app never logs in to licensed databases and does not automate a browser.
 
 You store keys under **Settings → Databases**: OpenAlex (required since February 2026), PubMed (10 instead of 3 requests per second) and Semantic Scholar. The Databases tab shows when a key is missing. The key for the Zotero web API is under **Settings → Zotero and export**; it is only needed if a database search writes through zotero.org instead of Zotero on this computer.
 
@@ -360,11 +360,11 @@ The **search strategy** consists of concept blocks (e.g. population, phenomenon,
 
 ### Pool and prefilters
 
-The **pool** holds all records without duplicates (DOI, PMID, OpenAlex ID, accession number, title) – per search string the records of the latest search, plus the imports. It remains the complete list after screening, so the filter “all decisions” also shows the decisions from screening. Prefilters and the recall check are in the panel on the right. **Check against Zotero** marks what is already in the target library. **Prefilters** only mark, they never delete: an exclusion rule such as "cyberbull*, bully*" can have exception terms; records with an exception term become **borderline cases** instead of being hidden. **Review hidden records** opens a quick review with multiple selection. Missing abstracts are fetched via Crossref, PubMed and Semantic Scholar; without an abstract a record appears as "title only", never as an exclusion. The **recall check** tests known key papers (DOIs) and warns if one is missing or silently hidden.
+The **pool** holds all records without duplicates (DOI, PMID, OpenAlex ID, accession number, title) – per search string the records of the latest search, plus the imports. It remains the complete list after screening, so the filter “all decisions” also shows the decisions from screening. Prefilters and the recall check are in the panel on the right. **Check against Zotero** marks what is already in the target library; you can choose it right next to the button, normally your own library. If it changes later, the pool asks for a new check. **Prefilters** only mark, they never delete: an exclusion rule such as "cyberbull*, bully*" can have exception terms; records with an exception term become **borderline cases** instead of being hidden. **Review hidden records** opens a quick review with multiple selection. Missing abstracts are fetched via Crossref, PubMed and Semantic Scholar; without an abstract a record appears as "title only", never as an exclusion. The **recall check** tests known key papers (DOIs) and warns if one is missing or silently hidden.
 
 ### Folders
 
-Under **Folders** you create up to 20 folders with fixed numbers, each mapped to a collection of the target library (chosen under Project). The tab comes before screening because including a record there means putting it into a folder; the first nine have the shortcuts 1–9 in screening. You choose collections in the tree as elsewhere in Zotivity; new ones can be marked for creation. Nothing is created in Zotero before you confirm.
+**Target & folders** holds the **target in Zotero**: the target library, normally through Zotero on this computer. You also create up to 20 folders with fixed numbers, each mapped to a collection of the target library. The tab comes before screening because including a record there means putting it into a folder; the first nine have the shortcuts 1–9 in screening. You choose collections in the tree as elsewhere in Zotivity; new ones can be marked for creation. Nothing is created in Zotero before you confirm.
 
 ### Screening
 
@@ -372,7 +372,7 @@ Under **Folders** you create up to 20 folders with fixed numbers, each mapped to
 
 ### AI suggestions
 
-AI suggestions are optional: in screening (relevant with a folder suggestion, not relevant, borderline case – each with the criterion and a one-sentence reason), for databases from the research question, for concept blocks, for subfolders and for the report. Database search uses the model of the **pre-selection in literature reviews** (Settings → Expert → Literature review: helper or main model) with its reasoning depth. Only title, journal, year and abstract of the records plus the project text are sent – nothing from Zotero and no full texts. Before each run the app shows the estimated tokens and – with prices entered – the costs; a run can be stopped. The **AI suggestions** switch hides the suggestions (blind screening). A suggestion never replaces the decision; both are logged.
+AI suggestions are optional: in screening (relevant with a folder suggestion, not relevant, borderline case – each with the criterion and a one-sentence reason), for databases from the research question, for concept blocks, for subfolders (from the research question, the titles in the pool and those of included works) and for the report. Database search uses the model of the **pre-selection in literature reviews** (Settings → Expert → Literature review: helper or main model) with its reasoning depth. Only title, journal, year and abstract of the records plus the project text are sent – nothing from Zotero and no full texts. Before each run the app shows the estimated tokens and – with prices entered – the costs; a run can be stopped. The **AI suggestions** switch hides the suggestions (blind screening). A suggestion never replaces the decision; both are logged.
 
 ### Handover and log
 

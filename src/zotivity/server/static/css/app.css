@@ -1,6 +1,8 @@
 /* Zotivity – Gestaltungssystem. Aufbau und Bedienelemente angelehnt an LLMplot 4, eigener Akzent (Indigo).
    Farben nur als Tokens; Hell, Grau und Dunkel sind eigens abgestimmt. Farbe trägt Bedeutung:
-   Aktion/Auswahl – Indigo · Sprachmodell anstossen – Violett · erledigt – Grün · prüfen – Bernstein · Fehler – Rot · Hinweis – Petrol · Belege – Akzent. */
+   Aktion/Auswahl – Indigo · Sprachmodell – Violett · erledigt – Grün · prüfen – Bernstein · Fehler – Rot · Hinweis – Petrol · Belege – Akzent.
+   Knöpfe: primary (Indigo) der nächste Schritt, höchstens einer je Bereich · ai (Violett) startet ein Sprachmodell, unabhängig davon ·
+   secondary (weiss) weitere Aktionen · ghost (ohne Rahmen) Nebensachen. Flächen mit KI-Vorschlägen sind violett getönt, übernommen wird mit Indigo. */
 :root {
   --bg: #f4f3f0;
   --surface: #ffffff;
@@ -22,6 +24,9 @@
   --ai-fill: #9333ea;
   --ai-fill-ink: #ffffff;
   --ai-fill-hover: #7e22ce;
+  --ai: #7e22ce;
+  --ai-soft: #f5effd;
+  --ai-line: #dcc8f7;
   --danger: #be2a30;
   --danger-soft: #fceaea;
   --warn: #935805;
@@ -75,6 +80,9 @@
   --accent-fill: #5a52dc;
   --accent-fill-ink: #ffffff;
   --accent-fill-hover: #4c45c2;
+  --ai: #c9a2ff;
+  --ai-soft: #2a1f3f;
+  --ai-line: #4a3670;
   --danger: #f2877d;
   --danger-soft: #3a1d1b;
   --warn: #f0b35b;
@@ -112,6 +120,9 @@
   --accent-fill: #5a52dc;
   --accent-fill-ink: #ffffff;
   --accent-fill-hover: #4c45c2;
+  --ai: #d6baff;
+  --ai-soft: #3f3355;
+  --ai-line: #5c4a80;
   --danger: #f4958c;
   --danger-soft: #4a2c29;
   --warn: #f2bd6e;
@@ -326,6 +337,8 @@ ul, ol { margin: .4em 0; padding-left: 1.4em; }
 .notice-body { min-width: 0; flex: 1; overflow-wrap: anywhere; }
 .notice-info { background: var(--info-soft); }
 .notice-info > .icon { color: var(--info); }
+.notice-ai { background: var(--ai-soft); }
+.notice-ai > .icon { color: var(--ai); }
 .notice-warning { background: var(--warn-soft); }
 .notice-warning > .icon { color: var(--warn); }
 .notice-error { background: var(--danger-soft); }
@@ -460,6 +473,10 @@ details.fold-plain > summary { cursor: pointer; color: var(--ink-2); font-size: 
 .menu-label { display: flex; align-items: baseline; gap: 8px; min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu-hint { margin-left: auto; font-size: 11px; color: var(--ok); font-weight: 600; }
 .menu-sep { height: 1px; background: var(--line); margin: 4px 6px; }
+/* Suchen: Korpus wählen (Dialog, nach Projekten gruppiert) */
+.corpus-pick-group { display: flex; flex-direction: column; gap: 1px; }
+.corpus-pick { width: 100%; text-align: left; }
+.corpus-pick .menu-label { flex-direction: column; align-items: flex-start; gap: 0; white-space: normal; }
 
 .modal-backdrop { position: fixed; inset: 0; z-index: 70; background: rgba(15, 14, 20, .45); display: grid; place-items: center; padding: 20px; animation: fade .12s ease-out; }
 @keyframes fade { from { opacity: 0; } }
@@ -552,8 +569,7 @@ details.fold-plain > summary { cursor: pointer; color: var(--ink-2); font-size: 
 .setup-step.done .setup-title { color: var(--ink-2); }
 .setup-detail { font-size: 12px; color: var(--ink-3); overflow-wrap: anywhere; }
 .setup-step.optional:not(.done) .setup-mark { background: transparent; border: 1.5px dashed var(--line-strong); }
-.start-cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-@container (max-width: 980px) { .start-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.start-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 @container (max-width: 600px) { .start-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .guide-inner { max-width: 900px; margin: 0 auto; }
 .guide-step { align-items: start; padding: 12px; border-color: var(--line); background: var(--surface); }
@@ -909,7 +925,6 @@ details.doc-group > summary:hover .doc-group-title { color: var(--accent); }
 .rail-project-name { font-size: 10.5px; font-weight: 650; line-height: 1.15; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px; }
 .rail-project-caret { position: absolute; right: 3px; top: 5px; color: var(--ink-3); }
 .rail-group { display: flex; flex-direction: column; gap: 3px; }
-.rail-apart { margin-top: 10px; }
 .rail-global { border-top: 1px solid var(--line); padding-top: 6px; }
 .stack-lg { display: flex; flex-direction: column; gap: 20px; }
 .brand-name { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
@@ -1147,7 +1162,6 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .recent-search-q { font-weight: 580; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recent-search-sub { font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recent-search-meta { font-size: 11px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.search-side-hint { margin: auto 0 0; padding-top: 8px; border-top: 1px solid var(--line); flex: none; }
 .recent-search .btn-icon { opacity: 0; }
 .recent-search:hover .btn-icon, .recent-search .btn-icon:focus-visible { opacity: 1; }
 .search-main-col { min-height: 0; overflow: auto; padding: 20px 22px 20px var(--gap-22); }

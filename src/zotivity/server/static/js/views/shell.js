@@ -20,18 +20,18 @@ import { cslEditorView } from './csleditor.js';
 import { projectBadge, switcherItems } from './projects.js';
 import { researchBoot, researchView, researchKey, researchStatus } from './research.js';
 
-// Ansichten des aktiven Projekts in der Reihenfolge des Ablaufs (Strg+1–6): finden (Recherche) → festlegen, was gelesen
-// wird (Korpora) → damit arbeiten (Fragen, Forschungsstand); Suchen ist ein Werkzeug für jederzeit und steht abgesetzt
-// danach. CSL-Editor, Index, Hilfe und Einstellungen gelten für alle Projekte (unten)
+// Ansichten des aktiven Projekts in der Reihenfolge des Ablaufs (Strg+1–5): finden (Recherche) → festlegen, was gelesen
+// wird (Korpora) → damit arbeiten (Fragen, Forschungsstand). Suchen, CSL-Editor, Index, Hilfe und Einstellungen gelten
+// für alle Projekte (unten)
 export const VIEWS = [
   { id: 'start', icon: 'home', label: () => t('Projekt') },
   { id: 'research', icon: 'litsearch', label: () => t('Recherche'), hint: () => t('neue Literatur in Fachdatenbanken') },
   { id: 'corpora', icon: 'corpus', label: () => t('Korpora') },
   { id: 'ask', icon: 'chat', label: () => t('Fragen') },
   { id: 'review', icon: 'review', label: () => t('Forschungs­stand') },
-  { id: 'search', icon: 'search', label: () => t('Suchen'), hint: () => t('in der eigenen Zotero-Bibliothek'), apart: true },
 ];
 export const GLOBAL_VIEWS = [
+  { id: 'search', icon: 'search', label: () => t('Suchen'), hint: () => t('in der eigenen Zotero-Bibliothek'), key: 'Strg+6' },
   { id: 'csl', icon: 'cslStyle', label: () => t('CSL-Editor'), key: 'Strg+7' },
   { id: 'index', icon: 'index', label: () => t('Index'), key: 'Strg+8' },
   { id: 'help', icon: 'help', label: () => t('Hilfe'), key: 'F1' },
@@ -65,7 +65,7 @@ function rail() {
   const indexJob = Object.values(state.jobs).find(j => j.kind === 'index' && j.status === 'running');
   const p = project();
   const item = (v, shortcut) => h('button', {
-    key: v.id, type: 'button', class: ['rail-item', state.view === v.id && 'active', v.apart && 'rail-apart'],
+    key: v.id, type: 'button', class: ['rail-item', state.view === v.id && 'active'],
     title: `${v.label().replace('­', '')}${v.hint ? ` – ${v.hint()}` : ''} (${shortcut})`,
     onclick: () => navigate(v.id), 'aria-current': state.view === v.id ? 'page' : null,
   }, icon(v.icon, 21), h('span', null, v.label()),
@@ -285,7 +285,8 @@ function safe(part, fn) {
 
 export function handleKey(e) {
   const mod = e.ctrlKey || e.metaKey;
-  if (mod && /^[1-6]$/.test(e.key)) { e.preventDefault(); navigate(VIEWS[Number(e.key) - 1].id); return; }
+  if (mod && /^[1-5]$/.test(e.key)) { e.preventDefault(); navigate(VIEWS[Number(e.key) - 1].id); return; }
+  if (mod && e.key === '6') { e.preventDefault(); navigate('search'); return; }
   if (mod && e.key === '7') { e.preventDefault(); navigate('csl'); return; }
   if (mod && e.key === '8') { e.preventDefault(); navigate('index'); return; }
   if (mod && e.key === ',') { e.preventDefault(); navigate('settings'); return; }

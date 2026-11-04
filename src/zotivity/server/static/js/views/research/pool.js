@@ -8,8 +8,10 @@ import * as api from '../../core/api.js';
 import { t } from '../../core/i18n.js';
 import { fmtInt, debounce } from '../../core/util.js';
 import { btn, iconBtn, card, field, textInput, textArea, select, segmented, checkbox, notice, emptyState, badge, progress, spinner } from '../../ui/components.js';
-import { R, rs, enc, busy, isBusy, invalidate, needsLoad, refreshSummary, sourceLabel, sourceBadges, statusBadge, authorsShort,
+import { R, rs, enc, busy, isBusy, invalidate, needsLoad, refreshSummary, flushSaves, sourceLabel, sourceBadges, statusBadge, authorsShort,
   loadProject, borderlineText, aiInfo, aiBadge, aiVisible, workspace, targetName, serverText } from './common.js';
+import { draft } from './project.js';
+import { librarySelect } from './folders.js';
 
 const PAGE = 200;
 const PATTERN_KINDS = ['title', 'text', 'journal'];
@@ -47,6 +49,7 @@ async function savePrefilters(list) {
 
 async function zoteroMatch() {
   const s = rs();
+  await flushSaves();  // eben gewählte Bibliothek
   const r = await busy('zotero-match', () => api.post(`${R}/projects/${s.pid}/zotero/match`, {}));
   if (!r) return;
   toast(t('Abgleich mit Zotero: {m} von {n} Einträgen der Zielbibliothek sind schon im Pool.', { m: fmtInt(r.matches), n: fmtInt(r.items) }), 'success', 6000);
@@ -380,12 +383,16 @@ export function poolTab() {
             { n: fmtInt(pool.total), h: fmtInt(pool.hidden), v: fmtInt((sum.visible || 0) - (sum.screened || 0)), b: fmtInt(sum.borderline || 0) }))),
         pool.total ? btn(t('Pool zurücksetzen …'), { icon: 'trash', kind: 'ghost', busy: isBusy('reset-pool'), onClick: () => resetPool(pool),
           title: t('Alle Treffer und Entscheide löschen, um neu zu suchen') }) : null,
+        h('div', { class: 'rs-pool-target' }, h('span', { class: 'muted small' }, t('Zielbibliothek:')),
+          librarySelect(() => { if (draft().d.folder_map.some(x => x.path)) toast(t('Die Ordner beziehen sich jetzt auf „{lib}“.', { lib: draft().d.target_name }), 'info', 6000); })),
         btn(t('Mit Zotero abgleichen'), { icon: 'zotero', busy: isBusy('zotero-match'), onClick: zoteroMatch,
           title: t('Liest die Zielbibliothek ({lib}) und markiert Treffer, die dort schon sind (DOI, PMID, Titel).', { lib: targetName(p) }) })),
       !pool.total ? emptyState('library', t('Der Pool ist leer'), t('Unter Suche & Import Suchstrings ausführen oder RIS-Dateien importieren.'))
         : h('div', { class: 'stack' },
           pool.stale ? notice('info', t('{n} Treffer stammen nur noch aus früheren Suchen oder gelöschten Suchstrings. Sie bleiben, weil sie schon entschieden sind, und sind mit „nicht mehr in aktueller Suche“ markiert.', { n: fmtInt(pool.stale) })) : null,
           sum.in_zotero ? notice('info', t('{n} Treffer sind schon in Zotero ({lib}).', { n: fmtInt(sum.in_zotero), lib: targetName(p) })) : null,
+          sum.in_zotero_other ? notice('warning', t('{n} Treffer sind noch mit einer anderen Bibliothek abgeglichen. Das Ziel ist jetzt „{lib}“.', { n: fmtInt(sum.in_zotero_other), lib: targetName(p) }),
+            h('div', { class: 'notice-actions' }, btn(t('Neu abgleichen'), { size: 'sm', icon: 'zotero', busy: isBusy('zotero-match'), onClick: zoteroMatch }))) : null,
           abstractsNotice(pool),
           filterBar(pool),
           h('div', { class: 'muted small' }, t('{n} angezeigt', { n: fmtInt(pool.items.length) }), s.busy['loading:pool'] ? ' …' : ''),

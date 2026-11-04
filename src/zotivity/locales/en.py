@@ -6,6 +6,9 @@ MESSAGES: dict[str, str] = {
     "Verbunden mit Zotero": "Connected to Zotero",
     "Verbunden mit Zotero {v}": "Connected to Zotero {v}",
     "Zotero läuft nicht.": "Zotero is not running.",
+    "Zotero startet noch – einen Moment bitte.": "Zotero is still starting – one moment please.",
+    "Zotero läuft, aber seine Schnittstelle antwortet nicht. Bitte Zotero neu starten.":
+        "Zotero is running, but its interface does not respond. Please restart Zotero.",
     "Sprachmodell und API-Schlüssel": "Language model and API key",
     "Für {p} ist kein API-Schlüssel gespeichert.": "No API key is stored for {p}.",
     "Embedding-Modell": "Embedding model",
@@ -181,8 +184,8 @@ MESSAGES: dict[str, str] = {
     "Nach Zotero wird nur nach ausdrücklicher Bestätigung geschrieben.": "Nothing is written to Zotero without explicit confirmation.",
     "Kein Schreibzugriff auf die Zielbibliothek (Schlüssel oder Freigabe fehlt).":
         "No write access to the target library (key or permission missing).",
-    "Für einen Vorschlag braucht es eine Fragestellung oder Kurzbeschreibung (Projekt).":
-        "A suggestion needs a research question or short description (Project).",
+    "Für einen Vorschlag braucht es eine Fragestellung oder Kurzbeschreibung.":
+        "A suggestion needs a research question or short description.",
     "Kürzen": "Shortening",
     "Gekürzt: {a} → {b} Wörter": "Shortened: {a} → {b} words",
     "Gekürzt: {a} → {b} Wörter; unverändert: {list}": "Shortened: {a} → {b} words; unchanged: {list}",

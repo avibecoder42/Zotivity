@@ -89,6 +89,19 @@ PROVIDERS: dict[str, ProviderInfo] = {
             notes="Keine Embeddings beim Anbieter.",
         ),
         ProviderInfo(
+            id="mistral",
+            label="Mistral",
+            needs_key=True,
+            key_url="https://console.mistral.ai/api-keys",
+            default_base_url="https://api.mistral.ai/v1",
+            # Geprüft 4.11.2026: Large 4 ist Public Preview, Small 4 allgemein verfügbar
+            chat_models=("mistral-large-4", "mistral-small-2603"),
+            default_main="mistral-large-4",
+            default_helper="mistral-small-2603",
+            hide_models=("embed", "ocr", "moderation", "voxtral", "transcribe", "tts"),
+            notes="Zotivity nutzt bei Mistral nur die Sprachmodelle, keine Embeddings.",
+        ),
+        ProviderInfo(
             id="ollama",
             label="Ollama (lokal)",
             needs_key=False,

@@ -10,7 +10,7 @@ Zotivity (vormals ZotLLM) ermöglicht umfassendes wissenschaftliches Arbeiten mi
 
 Davor kann die **Recherche** stehen: eine Literatursuche in Fachdatenbanken (PubMed, OpenAlex und weitere), mit Screening und Übergabe der ausgewählten Literatur in Zotero-Sammlungen.
 
-Die Navigationsleiste links ist zweigeteilt. Ganz oben steht die **Anleitung**, darunter die Ansichten des aktiven **Projekts** in der Reihenfolge des Ablaufs: Projekt, Recherche, Korpora, Fragen und Forschungsstand – erst neue Literatur finden, dann festlegen, was gelesen wird, dann damit arbeiten. Abgesetzt folgt **Suchen**, ein Werkzeug für jederzeit. Unten stehen **CSL-Editor**, **Index**, **Hilfe** und **Einstellungen**; sie gelten für alle Projekte. Über dem Menü zeigt die Projektkachel das aktive Projekt; ein Klick darauf (oder **Strg+P**) wechselt das Projekt.
+Die Navigationsleiste links ist zweigeteilt. Ganz oben steht die **Anleitung**, darunter die Ansichten des aktiven **Projekts** in der Reihenfolge des Ablaufs: Projekt, Recherche, Korpora, Fragen und Forschungsstand – erst neue Literatur finden, dann festlegen, was gelesen wird, dann damit arbeiten. Unten stehen **Suchen**, **CSL-Editor**, **Index**, **Hilfe** und **Einstellungen**; sie gelten für alle Projekte. Über dem Menü zeigt die Projektkachel das aktive Projekt; ein Klick darauf (oder **Strg+P**) wechselt das Projekt.
 
 Zotivity ist ein unabhängiges Projekt und steht in keiner Verbindung zu Zotero oder der Corporation for Digital Scholarship; „Zotero“ ist deren eingetragene Marke.
 
@@ -31,8 +31,8 @@ Das Technische gehört zur Einrichtung (siehe Kapitel Einrichtung).
 
 ### Tastenkürzel
 
-- **Strg+1 … Strg+6** Projekt, Recherche, Korpora, Fragen, Forschungsstand, Suchen
-- **Strg+7** CSL-Editor, **Strg+8** Index, **Strg+,** Einstellungen, **F1** Hilfe
+- **Strg+1 … Strg+5** Projekt, Recherche, Korpora, Fragen, Forschungsstand
+- **Strg+6** Suchen, **Strg+7** CSL-Editor, **Strg+8** Index, **Strg+,** Einstellungen, **F1** Hilfe
 - **Strg+P** Projekt wechseln
 - In der Recherche: **Alt+1 … Alt+9** wechselt den Reiter; im Screening siehe Kapitel Recherche
 - Im Programmfenster: **Strg + Mausrad**, **Pinch** auf dem Touchpad oder **Strg +/−** vergrössert oder verkleinert die ganze Oberfläche, **Strg+0** setzt sie zurück
@@ -67,11 +67,11 @@ Zotivity liest die Bibliothek über die lokale Schnittstelle von Zotero. Sie mus
 2. Den Bereich **Erweitert** öffnen.
 3. Das Häkchen bei **„Anderen Anwendungen auf diesem Computer erlauben, mit Zotero zu kommunizieren“** setzen.
 
-Zotero muss geöffnet sein, solange Zotivity abgleicht oder indexiert. Suchen, Fragen und Forschungsstand funktionieren danach auch bei geschlossenem Zotero – nur die Links nach Zotero brauchen ein laufendes Zotero. Die Zotero-Datenbank wird nie direkt gelesen oder verändert.
+Zotero muss geöffnet sein, solange Zotivity abgleicht oder indexiert. Suchen, Fragen und Forschungsstand funktionieren danach auch bei geschlossenem Zotero – nur die Links nach Zotero brauchen ein laufendes Zotero. Die Zotero-Datenbank wird nie direkt gelesen oder verändert. Während Zotero startet, wartet Zotivity mit seinen Anfragen. Zeigt Zotero bei **Meine Bibliothek** dauerhaft „Lade Einträge“ und meldet Zotivity, die Schnittstelle antworte nicht, hilft ein Neustart von Zotero.
 
 ### Sprachmodell und API-Schlüssel
 
-Unter **Einstellungen → Sprachmodelle** wählen Sie den Anbieter (Anthropic Claude, OpenAI, Google Gemini, DeepSeek, Ollama lokal oder ein OpenAI-kompatibler Server) und tragen den API-Schlüssel ein. Der Schlüssel wird verschlüsselt im Anmeldeinformationsspeicher von Windows abgelegt und nie im Klartext angezeigt oder in Dateien geschrieben.
+Unter **Einstellungen → Sprachmodelle** wählen Sie den Anbieter (Anthropic Claude, OpenAI, Google Gemini, DeepSeek, Mistral, Ollama lokal oder ein OpenAI-kompatibler Server) und tragen den API-Schlüssel ein. Der Schlüssel wird verschlüsselt im Anmeldeinformationsspeicher von Windows abgelegt und nie im Klartext angezeigt oder in Dateien geschrieben. Bei Mistral lässt sich die Server-Adresse ändern: `https://api.eu.mistral.ai` verarbeitet in der EU, mit 10 % Aufschlag und nicht für alle Modelle.
 
 Es gibt zwei Rollen:
 
@@ -139,7 +139,7 @@ Die Ansicht **Projekt** zeigt links alle Projekte untereinander; oben stehen **N
 
 - **Neues Projekt** legt ein leeres Projekt an (Name, Beschreibung, Farbe).
 - Das Menü **⋯** auf einer Projektkachel bietet Bearbeiten, Nach oben/unten, Als Datei exportieren, Duplizieren, Archivieren und Löschen.
-- **Als Datei exportieren** speichert das Projekt als `.zoty`-Datei (`.zllm`-Dateien früherer Versionen lassen sich weiter importieren) – mit Korpus-Definitionen, Chats, Forschungsständen, Auswertungsblättern und Suchverlauf, aber ohne Index. So lässt sich ein Projekt sichern oder auf einen anderen Rechner bringen. **Importieren** lädt eine solche Datei; fehlende Sammlungen werden gemeldet.
+- **Als Datei exportieren** speichert das Projekt als `.zoty`-Datei (`.zllm`-Dateien früherer Versionen lassen sich weiter importieren) – mit Korpus-Definitionen, Chats, Forschungsständen und Auswertungsblättern, aber ohne Index. So lässt sich ein Projekt sichern oder auf einen anderen Rechner bringen. **Importieren** lädt eine solche Datei; fehlende Sammlungen werden gemeldet.
 - Ein Korpus kann zu mehreren Projekten gehören. Beim Löschen eines Projekts bleiben Korpora, die auch anderswo verwendet werden, erhalten.
 
 ### Archiv
@@ -295,7 +295,7 @@ Ins grosse Feld schreiben und **Enter** drücken. Gesucht wird in Titel, Persone
 
 ### Bisherige Suchen
 
-Die Leiste links zeigt alle Suchen des aktiven Projekts, die neueste oben – mit Suchbegriff, weiteren Feldern und Filtern, Trefferzahl und Zeitpunkt. Eine erneut ausgeführte Suche rückt nach oben statt doppelt zu erscheinen. Ein Klick auf eine Suche **füllt die Suchfelder** (bei Bedarf mit geöffneter Erweiterter Suche), sucht aber noch nicht: So lässt sie sich zuerst anpassen; **Suchen** oder **Enter** führt sie aus. Das **×** entfernt eine Suche aus dem Verlauf, der Papierkorb leert den Verlauf des Projekts. Ab sechs Einträgen erscheint ein Filterfeld. Jedes Projekt hat seinen eigenen Verlauf; er wird mit dem Projekt exportiert.
+Die Leiste links zeigt alle Suchen, unabhängig vom Projekt, die neueste oben – mit Suchbegriff, weiteren Feldern und Filtern, Trefferzahl und Zeitpunkt. Eine erneut ausgeführte Suche rückt nach oben statt doppelt zu erscheinen. Ein Klick auf eine Suche **füllt die Suchfelder** (bei Bedarf mit geöffneter Erweiterter Suche), sucht aber noch nicht: So lässt sie sich zuerst anpassen; **Suchen** oder **Enter** führt sie aus. Das **×** entfernt eine Suche aus dem Verlauf, der Papierkorb leert den Verlauf des Projekts. Ab sechs Einträgen erscheint ein Filterfeld. Jedes Projekt hat seinen eigenen Verlauf; er wird mit dem Projekt exportiert.
 
 ### Treffer
 
@@ -304,9 +304,9 @@ Jeder Treffer zeigt Titel, Personen, Jahr, Eintragsart und Publikation, darunter
 - **In Zotero zeigen** – liegt der Eintrag an mehreren Orten, öffnet sich eine Auswahl.
 - **PDF-Symbol** – öffnet die PDF in Zotero.
 - **Zitat-Symbol (❝)** – kopiert den **Literaturnachweis** im Zitierstil der Einstellungen (Einstellungen → Zotero und Export), mit Formatierung für Word (Kursives bleibt kursiv) und als reiner Text. Die Meldung nennt den Stil. Den Nachweis liefert Zotero; ist Zotero geschlossen, baut Zotivity eine vereinfachte Form nach und sagt das.
-- **Korpus-Symbol** – **In Korpus aufnehmen**: Angeboten werden nur die Korpora des aktiven Projekts. Ist der Eintrag schon enthalten, ist er markiert und lässt sich dort wieder entfernen. **Neuer Korpus aus Auswahl** legt einen Korpus mit genau diesen Einträgen an.
+- **Korpus-Symbol** – **In Korpus aufnehmen**: Angeboten werden alle Korpora, die des aktiven Projekts zuerst. Gehört ein Korpus zu keinem Projekt, bietet Zotivity danach an, ihn dem aktiven Projekt zuzuordnen. Ist der Eintrag schon enthalten, ist er markiert und lässt sich dort wieder entfernen. **Neuer Korpus aus Auswahl** legt einen Korpus mit genau diesen Einträgen an.
 - **⋯** – Kurzbeleg kopieren (z. B. «(Gong/Li 2026)»), DOI-Link oder Zotero-Link kopieren, speichern als Word, BibTeX, RIS oder Markdown, Fragen zu diesem Eintrag, in eine Zotero-Sammlung ablegen.
-- Rechts stehen der Indexierstand (indexiert, noch nicht indexiert, ohne Text, ohne PDF) und die Korpora des Projekts, die den Eintrag schon enthalten.
+- Rechts stehen der Indexierstand (indexiert, noch nicht indexiert, ohne Text, ohne PDF) und die Korpora, die den Eintrag schon enthalten; die des aktiven Projekts sind hervorgehoben.
 
 ### Auswahl und Sammelaktionen
 
@@ -315,7 +315,7 @@ Mit den Häkchen links wählen Sie Treffer aus: **Shift+Klick** wählt einen Ber
 - **Literaturliste kopieren** – alle gewählten Einträge im eingestellten Zitierstil, sortiert wie im Stil.
 - **Kurzbelege kopieren** – z. B. «(Gong/Li 2026; Samatha et al. 2025)».
 - **Exportieren** – **Word (.docx)** mit Belegen und Literaturverzeichnis als Zotero-Felder (mit dem Zotero-Word-Plugin im Stil änderbar), **BibTeX (.bib)** für LaTeX, **RIS (.ris)** für andere Literaturprogramme, **Markdown (.md)**.
-- **In Korpus** – in einen Korpus des Projekts aufnehmen oder einen neuen anlegen. Neu aufgenommene Texte müssen anschliessend indexiert werden; die Meldung bietet dafür **Jetzt indexieren** an.
+- **In Korpus** – in einen beliebigen Korpus aufnehmen oder einen neuen anlegen. Neu aufgenommene Texte müssen anschliessend indexiert werden; die Meldung bietet dafür **Jetzt indexieren** an.
 - **Fragen stellen** – öffnet **Fragen** mit genau diesen Einträgen als Umfang. Sind einige noch nicht indexiert, fragt Zotivity, ob sie zuerst indexiert werden sollen (der Lauf kommt bei Bedarf in die Warteschlange) oder ob nur mit den indexierten gefragt wird.
 - **⋯** – **In Zotero-Sammlung ablegen** (bestehende oder neue Sammlung; braucht den Schreibzugriff, siehe Einrichtung). Eine Zotero-Sammlung gehört zu einer Bibliothek: Liegen gewählte Einträge in verschiedenen Bibliotheken, wählen Sie die Bibliothek; Einträge aus den anderen werden übersprungen.
 - **Nur Auswahl zeigen** listet alle gewählten Einträge, auch die aus früheren Suchen; **Aufheben** leert die Auswahl.
@@ -347,11 +347,11 @@ Folgefragen beziehen sich auf den bisherigen Verlauf. Links stehen die bisherige
 
 ## Recherche
 
-Die **Recherche** (Strg+2) führt eine Literatursuche in Fachdatenbanken von der Fragestellung bis zur ausgewählten Literatur in Zotero. Die Maschine sucht, entfernt Duplikate und schlägt vor – entscheiden tun Sie. Jede Recherche gehört zu einem Projekt; die Ansicht zeigt die Recherchen des aktiven Projekts, die Projektseite ihren Stand. Die Daten liegen in `research.db` im Datenordner. Recherchen ohne Projekt (z. B. nach dem Löschen eines Projekts) stehen unter „Ohne Projekt“ und lassen sich zuordnen. Ein Projekt hat neun Reiter (Alt+1 … Alt+9): Projekt, Datenbanken, Suchstrategie, Suche & Import, Pool, Ordner, Screening, Übergabe und Volltexte. Alles wird automatisch gespeichert. Die Kopfzeile zeigt, wo das Projekt steht, z. B. „PubMed 503 · OpenAlex 934 · gesichtet 380/1150“.
+Die **Recherche** (Strg+2) führt eine Literatursuche in Fachdatenbanken von der Fragestellung bis zur ausgewählten Literatur in Zotero. Die Maschine sucht, entfernt Duplikate und schlägt vor – entscheiden tun Sie. Jede Recherche gehört zu einem Projekt; die Ansicht zeigt die Recherchen des aktiven Projekts, die Projektseite ihren Stand. Die Daten liegen in `research.db` im Datenordner. Recherchen ohne Projekt (z. B. nach dem Löschen eines Projekts) stehen unter „Ohne Projekt“ und lassen sich zuordnen. Eine Recherche hat neun Reiter (Alt+1 … Alt+9): Fragestellung, Datenbanken, Suchstrategie, Suche & Import, Pool, Ziel & Ordner, Screening, Übergabe und Volltexte. Alles wird automatisch gespeichert. Die Reiter zeigen den Stand: ein Häkchen bei Erledigtem, beim Pool die Zahl der Treffer, beim Screening die gesichteten. Die Zeile darunter sagt, was als Nächstes zu tun ist; **Weiter** führt zum nächsten Reiter und wird blau, sobald im aktuellen nichts mehr offen ist. Nichts ist gesperrt: Sie können jederzeit zu jedem Reiter wechseln.
 
-### Projekt und Datenbanken
+### Fragestellung und Datenbanken
 
-Unter **Projekt** stehen Fragestellung, Kurzbeschreibung sowie Ein- und Ausschlusskriterien (eine Zeile je Kriterium). Die Ausschlusskriterien wirken dreifach: Sie stehen im Screening und bei den Volltexten als Gründe zur Wahl, sie gehen in die KI-Vorschläge ein und ins Protokoll. Sie filtern nichts automatisch; ein Ausschlussblock in der Suchstrategie entsteht aus ihnen nur, wenn ein Kriterium am Titel eindeutig erkennbar ist. Dazu kommen der **Auswahlprozess** (bis zu drei Reviewende, Vorgehen) und das **Ziel in Zotero**: die Zielbibliothek, normalerweise über Zotero auf diesem Computer. Unter **Datenbanken** wählen Sie Disziplinen; die App schlägt passende Datenbanken aus ihrem Katalog vor, mit Zugang, Bedingungen und nötigem Schlüssel. Direkt durchsuchbar sind PubMed, OpenAlex, Europe PMC, ERIC, EconBiz, Semantic Scholar, arXiv, OSF-Preprints und swisscovery. Lizenzierte Datenbanken (PsycInfo, CINAHL, SocINDEX …) laufen über den **RIS-Weg**: dort suchen und exportieren, hier importieren. Die App meldet sich nie bei lizenzierten Datenbanken an und automatisiert keinen Browser.
+Unter **Fragestellung** stehen Fragestellung, Kurzbeschreibung sowie Ein- und Ausschlusskriterien (eine Zeile je Kriterium). Die Ausschlusskriterien wirken dreifach: Sie stehen im Screening und bei den Volltexten als Gründe zur Wahl, sie gehen in die KI-Vorschläge ein und ins Protokoll. Sie filtern nichts automatisch; ein Ausschlussblock in der Suchstrategie entsteht aus ihnen nur, wenn ein Kriterium am Titel eindeutig erkennbar ist. Dazu kommt der **Auswahlprozess** (bis zu drei Reviewende, Vorgehen). Unter **Datenbanken** wählen Sie Disziplinen; die App schlägt passende Datenbanken aus ihrem Katalog vor, mit Zugang, Bedingungen und nötigem Schlüssel. Direkt durchsuchbar sind PubMed, OpenAlex, Europe PMC, ERIC, EconBiz, Semantic Scholar, arXiv, OSF-Preprints und swisscovery. Lizenzierte Datenbanken (PsycInfo, CINAHL, SocINDEX …) laufen über den **RIS-Weg**: dort suchen und exportieren, hier importieren. Die App meldet sich nie bei lizenzierten Datenbanken an und automatisiert keinen Browser.
 
 Schlüssel hinterlegen Sie unter **Einstellungen → Datenbanken**: OpenAlex (seit Februar 2026 nötig), PubMed (10 statt 3 Anfragen pro Sekunde) und Semantic Scholar. Fehlt ein Schlüssel, zeigt der Reiter Datenbanken das an. Den Schlüssel der Zotero-Web-API finden Sie unter **Einstellungen → Zotero und Export**; er ist nur nötig, wenn eine Recherche über zotero.org statt über Zotero auf diesem Computer schreibt.
 
@@ -361,11 +361,11 @@ Die **Suchstrategie** besteht aus Konzeptblöcken (z. B. Population, Phänomen, 
 
 ### Pool und Vorfilter
 
-Der **Pool** enthält alle Treffer ohne Duplikate (DOI, PMID, OpenAlex-ID, Accession Number, Titel) – je Suchstring die Treffer der letzten Suche und dazu die Importe. Er ist auch nach dem Screening die vollständige Liste; der Filter „alle Entscheide“ zeigt deshalb auch die Stände aus dem Screening. Vorfilter und Recall-Check stehen im rechten Fenster. **Mit Zotero abgleichen** markiert, was in der Zielbibliothek schon da ist. **Vorfilter** markieren nur, sie löschen nie: Eine Ausschlussregel wie „cyberbull*, bully*“ kann Ausnahmebegriffe haben; Treffer mit einem Ausnahmebegriff werden **Grenzfälle** statt ausgeblendet. **Ausgeblendete prüfen** öffnet eine Schnellsichtung mit Mehrfachauswahl. Fehlende Abstracts lädt die App über Crossref, PubMed und Semantic Scholar nach; ohne Abstract erscheint ein Treffer mit „nur Titel“, nie als Ausschluss. Der **Recall-Check** prüft bekannte Schlüsselarbeiten (DOIs) und warnt, wenn eine fehlt oder still ausgeblendet ist.
+Der **Pool** enthält alle Treffer ohne Duplikate (DOI, PMID, OpenAlex-ID, Accession Number, Titel) – je Suchstring die Treffer der letzten Suche und dazu die Importe. Er ist auch nach dem Screening die vollständige Liste; der Filter „alle Entscheide“ zeigt deshalb auch die Stände aus dem Screening. Vorfilter und Recall-Check stehen im rechten Fenster. **Mit Zotero abgleichen** markiert, was in der Zielbibliothek schon da ist; sie lässt sich direkt daneben wählen, normalerweise ist es Ihre eigene Bibliothek. Wechselt sie später, bittet der Pool um einen neuen Abgleich. **Vorfilter** markieren nur, sie löschen nie: Eine Ausschlussregel wie „cyberbull*, bully*“ kann Ausnahmebegriffe haben; Treffer mit einem Ausnahmebegriff werden **Grenzfälle** statt ausgeblendet. **Ausgeblendete prüfen** öffnet eine Schnellsichtung mit Mehrfachauswahl. Fehlende Abstracts lädt die App über Crossref, PubMed und Semantic Scholar nach; ohne Abstract erscheint ein Treffer mit „nur Titel“, nie als Ausschluss. Der **Recall-Check** prüft bekannte Schlüsselarbeiten (DOIs) und warnt, wenn eine fehlt oder still ausgeblendet ist.
 
 ### Ordner
 
-Unter **Ordner** legen Sie bis zu 20 Ordner mit festen Nummern an, je einer Sammlung der Zielbibliothek zugeordnet (diese wählen Sie unter Projekt). Der Reiter steht vor dem Screening, weil dort das Aufnehmen in einen Ordner das Einschliessen ist; die ersten neun haben im Screening die Kürzel 1–9. Sammlungen wählen Sie im Baum wie in Zotivity; neue lassen sich vormerken. In Zotero angelegt wird erst nach Ihrer Bestätigung.
+Unter **Ziel & Ordner** steht das **Ziel in Zotero**: die Zielbibliothek, normalerweise über Zotero auf diesem Computer. Dazu legen Sie bis zu 20 Ordner mit festen Nummern an, je einer Sammlung der Zielbibliothek zugeordnet. Der Reiter steht vor dem Screening, weil dort das Aufnehmen in einen Ordner das Einschliessen ist; die ersten neun haben im Screening die Kürzel 1–9. Sammlungen wählen Sie im Baum wie in Zotivity; neue lassen sich vormerken. In Zotero angelegt wird erst nach Ihrer Bestätigung.
 
 ### Screening
 
@@ -373,7 +373,7 @@ Das **Screening** zeigt die Treffer als **Karten** (ein Treffer mit ganzem Abstr
 
 ### KI-Vorschläge
 
-KI-Vorschläge sind freiwillig: im Screening (passend mit Ordner-Vorschlag, nicht passend, Grenzfall – je mit Kriterium und einem Satz Begründung), für Datenbanken aus der Fragestellung, für Konzeptblöcke, für Unterordner und für den Bericht. Die Recherche nutzt das Modell der **Vorauswahl im Forschungsstand** (Einstellungen → Experten → Forschungsstand: Hilfs- oder Hauptmodell) mit dessen Denktiefe. Gesendet werden nur Titel, Zeitschrift, Jahr und Abstract der Treffer sowie der Projekttext, nichts aus Zotero und keine Volltexte. Vor jedem Lauf zeigt die App die geschätzten Token und – mit eingetragenen Preisen – die Kosten; der Lauf lässt sich anhalten. Der Schalter **KI-Vorschläge** blendet die Vorschläge aus (blind sichten). Ein Vorschlag ersetzt nie den Entscheid; beide stehen im Protokoll.
+KI-Vorschläge sind freiwillig: im Screening (passend mit Ordner-Vorschlag, nicht passend, Grenzfall – je mit Kriterium und einem Satz Begründung), für Datenbanken aus der Fragestellung, für Konzeptblöcke, für Unterordner (aus der Fragestellung, den Titeln im Pool und aufgenommener Arbeiten) und für den Bericht. Die Recherche nutzt das Modell der **Vorauswahl im Forschungsstand** (Einstellungen → Experten → Forschungsstand: Hilfs- oder Hauptmodell) mit dessen Denktiefe. Gesendet werden nur Titel, Zeitschrift, Jahr und Abstract der Treffer sowie der Projekttext, nichts aus Zotero und keine Volltexte. Vor jedem Lauf zeigt die App die geschätzten Token und – mit eingetragenen Preisen – die Kosten; der Lauf lässt sich anhalten. Der Schalter **KI-Vorschläge** blendet die Vorschläge aus (blind sichten). Ein Vorschlag ersetzt nie den Entscheid; beide stehen im Protokoll.
 
 ### Übergabe und Protokoll
 

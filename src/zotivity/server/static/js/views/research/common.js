@@ -32,17 +32,26 @@ export function serverText(text) {
   return (hit ? hit[1](...hit[0].slice(1)) : t(s)) + (exceptions ? ` ${t('(mit Ausnahmen)')}` : '');
 }
 
+// In der Reihenfolge des Ablaufs, in drei Abschnitten (group: beginnt einen): planen, suchen, auswählen
 export const TABS = [
-  { id: 'project', label: () => t('Projekt'), icon: 'edit' },
+  { id: 'project', label: () => t('Fragestellung'), icon: 'edit' },
   { id: 'databases', label: () => t('Datenbanken'), icon: 'globe' },
   { id: 'strategy', label: () => t('Suchstrategie'), icon: 'layers' },
-  { id: 'search', label: () => t('Suche & Import'), icon: 'search' },
+  { id: 'search', label: () => t('Suche & Import'), icon: 'search', group: true },
   { id: 'pool', label: () => t('Pool'), icon: 'library' },
-  { id: 'folders', label: () => t('Ordner'), icon: 'folder' },
-  { id: 'screening', label: () => t('Screening'), icon: 'check' },
+  { id: 'folders', label: () => t('Ziel & Ordner'), icon: 'folder', group: true },
+  { id: 'screening', label: () => t('Screening'), icon: 'filter' },
   { id: 'handover', label: () => t('Übergabe'), icon: 'send' },
   { id: 'fulltext', label: () => t('Volltexte'), icon: 'pdf' },
 ];
+
+export function openTab(id) {
+  const s = rs();
+  flushSaves();
+  s.tab = id;
+  invalidate('flow', 'fulltext');  // Stand kann sich geändert haben
+  update();
+}
 
 // Namen und Fähigkeiten der Quellen kommen vom Dienst (/info); diese Liste gilt nur, bis er geantwortet hat
 const FALLBACK_LABELS = { pubmed: 'PubMed', openalex: 'OpenAlex', psycinfo: 'PsycInfo', wos: 'Web of Science', ris: 'RIS' };

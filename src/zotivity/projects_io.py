@@ -56,8 +56,6 @@ def export_project(engine: Engine, project_id: int) -> tuple[str, bytes]:
                      "sources": c["sources"], "sources_info": describe_sources(engine, c["sources"])}
                     for c in corpora if c],
         "chats": chats, "reviews": reviews, "sheets": sheets,
-        "searches": [{k: s[k] for k in ("query", "sort", "total", "used_at")}
-                     for s in reversed(store.searches(project_id))],
     }
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
@@ -127,9 +125,9 @@ def import_project(engine: Engine, payload: bytes) -> dict:
         rid = store.create_review(str(r.get("title") or r.get("question") or "Forschungsstand"),
                                   str(r.get("question") or ""), r.get("state") or {}, project_id=pid)
         store.put_review_docs(rid, [d for d in r.get("docs") or [] if d.get("lib") and d.get("item_key")])
-    for s in data.get("searches") or []:
+    for s in data.get("searches") or []:  # Dateien früherer Versionen: Der Suchverlauf gilt jetzt für alle Projekte
         if isinstance(s.get("query"), dict) and s["query"]:
-            store.remember_search(pid, s["query"], str(s.get("sort") or "relevance"), int(s.get("total") or 0),
+            store.remember_search(s["query"], str(s.get("sort") or "relevance"), int(s.get("total") or 0),
                                   used_at=s.get("used_at"))
     sheets = 0
     for s in data.get("sheets") or []:

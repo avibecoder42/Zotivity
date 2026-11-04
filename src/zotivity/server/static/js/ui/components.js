@@ -148,7 +148,7 @@ export function dismissNotice(key, session = false) {
 // opts.dismiss: Schlüssel → Hinweis mit × zum Ausblenden; opts.session: nur bis zum nächsten Programmstart
 export function notice(kind, text, extra, opts = {}) {
   if (opts.dismiss && isDismissed(opts.dismiss, opts.session)) return null;
-  const ic = { error: 'alert', warning: 'alert', success: 'check', info: 'info' }[kind] || 'info';
+  const ic = { error: 'alert', warning: 'alert', success: 'check', info: 'info', ai: 'ai' }[kind] || 'info';
   return h('div', { class: ['notice', `notice-${kind}`, opts.dismiss && 'notice-dismissible'], role: kind === 'error' ? 'alert' : 'note' },
     icon(ic, 16), h('div', { class: 'notice-body' }, text, extra),
     opts.dismiss && h('button', { type: 'button', class: 'notice-close', title: t('Hinweis ausblenden'), 'aria-label': t('Hinweis ausblenden'),

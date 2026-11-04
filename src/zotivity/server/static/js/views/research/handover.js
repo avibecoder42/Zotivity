@@ -98,7 +98,7 @@ function zoteroCard() {
   let body;
   if (!plan) body = h('div', { class: 'muted' }, t('Lade Plan …'));
   else if (plan.error) body = notice('error', plan.error);
-  else if (!plan.folders.length) body = notice('warning', t('Noch keine Ordner zugeordnet. Unter „Ordner“ Ordner anlegen und Sammlungen festlegen.'));
+  else if (!plan.folders.length) body = notice('warning', t('Noch keine Ordner zugeordnet. Unter „Ziel & Ordner“ Ordner anlegen und Sammlungen festlegen.'));
   else {
     const tot = plan.totals;
     body = h('div', { class: 'stack' },

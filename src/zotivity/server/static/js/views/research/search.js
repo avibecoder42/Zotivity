@@ -203,7 +203,8 @@ async function removeQuery(q) {
 }
 
 // ------------------------------------------------------------------ Tabellen
-function queryRow(q) {
+// „Suchen“ ist nur blau, solange es den Knopf „Alle suchen“ nicht gibt (ein einziger Suchstring): sonst ist er der nächste Schritt
+function queryRow(q, soleLive) {
   const live = isLive(q.source);
   const last = q.last_run;
   const st = ui('rs-q-open', {});
@@ -226,7 +227,7 @@ function queryRow(q) {
         : h('span', { class: 'muted' }, t('noch nicht gesucht'))),
       h('td', { class: 'nowrap rs-q-actions' },
         live && iconBtn('refresh', t('Trefferzahl holen'), () => countQuery(q), { disabled: isBusy(`count:${q.id}`) }),
-        live && btn(t('Suchen'), { size: 'sm', icon: 'play', kind: q.current_run ? 'secondary' : 'primary', busy: isBusy(`run:${q.id}`), onClick: () => runQuery(q) }),
+        live && btn(t('Suchen'), { size: 'sm', icon: 'play', kind: soleLive && !q.current_run ? 'primary' : 'secondary', busy: isBusy(`run:${q.id}`), onClick: () => runQuery(q) }),
         iconBtn('edit', t('Bearbeiten'), () => editQuery(q)),
         q.source === 'pubmed' && iconBtn('globe', t('In die gewählten Datenbanken übersetzen'), () => translateQuery(q)),
         iconBtn('copy', t('Kopieren'), async () => { await copyToClipboard(q.string); toast(t('Kopiert.'), 'success', 1500); }),
@@ -238,7 +239,7 @@ function queryRow(q) {
   ];
 }
 
-function sourceCard(source, list) {
+function sourceCard(source, list, soleLive) {
   const st = ui('rs-search', {});
   const live = isLive(source);
   const batch = st.batch && st.batch.source === source ? st.batch : null;
@@ -250,7 +251,7 @@ function sourceCard(source, list) {
       h('colgroup', null, h('col', { class: 'rs-qc-name' }), h('col'), h('col', { class: 'rs-qc-hits' }), h('col', { class: 'rs-qc-last' }), h('col', { class: 'rs-qc-actions' })),
       h('thead', null, h('tr', null, h('th', null, t('Name')), h('th', null, t('Suchstring')), h('th', { class: 'num' }, t('Treffer')),
         h('th', null, t('Letzte Suche')), h('th', null))),
-      h('tbody', null, list.map(queryRow)))),
+      h('tbody', null, list.map(q => queryRow(q, soleLive))))),
     live && list.length > 1 && h('div', { class: 'muted small' }, t('Summe der Trefferzahlen: {n} (vor dem Entfernen von Duplikaten)', { n: fmtInt(total) }))),
   { actions: live ? [
     btn(t('Alle zählen'), { size: 'sm', icon: 'refresh', kind: 'ghost', disabled: !!st.batch, onClick: () => runAll(source, list, countQuery, t('Zählen')) }),
@@ -352,18 +353,20 @@ export function searchTab() {
   const st = ui('rs-search', {});
   const everything = st.batch && st.batch.source === '*' ? st.batch : null;
   const live = liveQueries(queries);
+  const soleLive = live.length === 1;
   return workspace('search', h('div', { class: 'stack-lg' },
       h('div', { class: 'row wrap' }, h('h2', { class: 'grow' }, t('Suchstrings')),
         live.length > 1 ? btn(t('Alle zählen ({n})', { n: live.length }), { icon: 'refresh', kind: 'ghost', disabled: !!st.batch,
           title: t('Trefferzahl für alle Suchstrings aller Quellen holen'), onClick: () => runAll('*', live, countQuery, t('Zählen')) }) : null,
-        live.length > 1 ? btn(t('Alle suchen ({n})', { n: live.length }), { icon: 'play', disabled: !!st.batch,
+        btn(t('Suchstring hinzufügen'), { icon: 'plus', kind: queries && !queries.length ? 'primary' : 'secondary', onClick: () => editQuery(null) }),
+        // Blau, solange etwas noch nicht gesucht ist; danach geht es im Pool weiter
+        live.length > 1 ? btn(t('Alle suchen ({n})', { n: live.length }), { icon: 'play', kind: live.some(q => !q.current_run) ? 'primary' : 'secondary', disabled: !!st.batch,
           title: t('Alle Suchstrings aller direkt durchsuchbaren Quellen nacheinander suchen; der Pool folgt danach der jeweils letzten Suche'),
-          onClick: () => searchAll('*', live) }) : null,
-        btn(t('Suchstring hinzufügen'), { icon: 'plus', kind: 'primary', onClick: () => editQuery(null) })),
+          onClick: () => searchAll('*', live) }) : null),
       everything ? h('div', { class: 'row' }, spinner(14), h('span', null, `${everything.label}: ${everything.done}/${everything.total}`),
         btn(t('Anhalten'), { size: 'sm', kind: 'ghost', onClick: () => { st.batch = null; update(); } })) : null,
       queries == null ? h('div', { class: 'muted' }, t('Lade …'))
-        : order.length ? order.map(src => h('div', { key: src }, sourceCard(src, groups[src])))
+        : order.length ? order.map(src => h('div', { key: src }, sourceCard(src, groups[src], soleLive)))
           : emptyState('search', t('Noch keine Suchstrings'), t('Aus der Suchstrategie übernehmen, von Hand einfügen oder als Textdateien laden.'))),
   [filesCard(), otherSourcesCard(),
     runs && runs.length ? h('div', { key: 'runs' }, btn(t('Protokoll der Läufe ({n})', { n: fmtInt(runs.length) }), { icon: 'history', onClick: () => showRuns(runs) })) : null]);

@@ -69,8 +69,9 @@ def test_unavailable_zotero_is_remembered_briefly():
     zot = ZoteroClient("http://127.0.0.1:9", keystore=object(), transport=httpx.MockTransport(handle))
     assert zot.is_available() is False and zot.is_available() is False and len(calls) == 1
     up["on"] = True
-    assert zot.is_available(fresh=True) is True and len(calls) == 2  # Hintergrundplaner: immer neu prüfen
-    assert zot.is_available() is True and len(calls) == 3  # erreichbar: nichts gemerkt
+    assert zot.is_available(fresh=True) is True and "/api/" in calls  # Hintergrundplaner: immer neu prüfen
+    calls.clear()
+    assert zot.is_available() is True and "/api/" in calls  # erreichbar: nichts gemerkt
 
 
 def export(api, fmt):

@@ -61,3 +61,26 @@ def test_ai_folders_suggestion(store, sim):
     assert "Übergeordnete Sammlung in Zotero: test" in prompt and "- Rollen" in prompt and "1: Phänomene" in prompt
     assert "angelegt wird erst nach ihrer Bestätigung" in system and schema["required"] == ["folders", "note"]
     assert zotero.writes == []  # ein Vorschlag legt nichts an
+    assert "Titel" not in prompt  # noch nichts gefunden
+
+
+def test_ai_folders_uses_titles_from_the_pool(store, sim):
+    chat = FakeChat(lambda s, p, schema: {"folders": [], "note": ""})
+    svc, _ = service(store, sim, chat)
+    pid = svc.create_project({"title": "Ordner", "question": "Wie gehen Jugendliche mit Onlineaggressionen um?",
+                              "prefilters": [{"kind": "title", "pattern": "ausgeblendet*", "active": True}]})["id"]
+    run = store.add_run(pid, kind="import", source="ris")
+    store.add_records(pid, run, [{"title": f"Offene Arbeit Nummer {i} zum Thema", "year": 2020 + i % 5} for i in range(100)]
+                      + [{"title": "Ausgeblendete Arbeit ohne Bezug zum Thema"}, {"title": "Aufgenommene Arbeit zur Bewältigung im Alltag"},
+                         {"title": "Ausgeschlossene Arbeit zu etwas ganz anderem"}])
+    recs = {r["title"]: r["id"] for r in store.records(pid)}
+    svc.decide(pid, recs["Aufgenommene Arbeit zur Bewältigung im Alltag"], "include", folder=1)
+    svc.decide(pid, recs["Ausgeschlossene Arbeit zu etwas ganz anderem"], "exclude", reason="Thema")
+    svc.ai_folders(pid, "test")
+    prompt = chat.calls[-1][1]
+    assert "Titel bereits aufgenommener Arbeiten (1):" in prompt and "- Aufgenommene Arbeit zur Bewältigung im Alltag" in prompt
+    assert "Titel aus dem Pool, noch nicht gesichtet (Auswahl, 59):" in prompt
+    assert "Ausgeschlossene Arbeit" not in prompt and "Ausgeblendete Arbeit" not in prompt
+    # gleichmässig verteilt, nicht nur die ersten
+    assert "Nummer 0 " in prompt and "Nummer 98 " in prompt and prompt.count("Offene Arbeit") == 59
+    assert svc.ai_estimate(pid, "folders", parent="test")["input"] > 500

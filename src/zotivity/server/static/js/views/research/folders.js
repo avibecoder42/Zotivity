@@ -1,15 +1,16 @@
-// Tab „Ordner“: die Ordner, in die das Screening aufnimmt (beliebig viele bis 20, feste Nummern; Kürzel 1–9; die
-// Zielbibliothek steht unter „Projekt“). Ordner mit aufgenommenen Treffern werden vor dem Löschen geleert (Treffer verschieben). Sammlungen wählt man im
+// Reiter „Ziel & Ordner“: das Ziel in Zotero und die Ordner, in die das Screening aufnimmt (beliebig viele bis 20, feste Nummern;
+// Kürzel 1–9). Ordner mit aufgenommenen Treffern werden vor dem Löschen geleert (Treffer verschieben). Sammlungen wählt man im
 // Baum wie in Zotivity (eigene Bibliothek und Gruppen, mit Suchfeld). Auf Wunsch schlägt das Sprachmodell Unterordner vor;
 // angelegt wird in Zotero nur nach ausdrücklicher Bestätigung und nur unter einer gewählten Sammlung.
 import { h } from '../../core/vdom.js';
-import { update, toast, openModal, closeModal, confirmDialog } from '../../core/store.js';
+import { update, ui, toast, openModal, closeModal, confirmDialog } from '../../core/store.js';
 import * as api from '../../core/api.js';
 import { t } from '../../core/i18n.js';
 import { icon } from '../../ui/icons.js';
-import { btn, iconBtn, card, field, textInput, select, checkbox, notice, badge, spinner } from '../../ui/components.js';
+import { btn, iconBtn, card, field, textInput, select, segmented, checkbox, notice, badge, spinner } from '../../ui/components.js';
 import { R, rs, enc, busy, isBusy, aiInfo, tokenText, noteUsage, invalidate, refreshSummary, folderLabel, targetName } from './common.js';
-import { draft, draftBar, saveDraft, touchDraft, zoteroLibraries, collectionPaths, estimateLine } from './project.js';
+import { draft, draftBar, saveDraft, touchDraft, zoteroLibraries, collectionPaths, estimateLine, hasQuestion, questionHint, NO_QUESTION } from './project.js';
+import { navigate } from '../shell.js';
 
 const norm = p => String(p || '').split('/').map(x => x.trim()).filter(Boolean).join('/');
 const isGroup = lib => String(lib).startsWith('groups/');
@@ -182,7 +183,7 @@ function aiFoldersDialog(x = null) {
   openModal({
     title: t('KI-Vorschlag für Unterordner'), cls: 'modal-wide',
     body: () => h('div', { class: 'stack' },
-      h('p', { class: 'muted small' }, t('Das Sprachmodell schlägt 3–6 thematische Ordner vor, passend zu Fragestellung und Kriterien und – falls es schon welche gibt – zu den Titeln aufgenommener Arbeiten. Übernommene kommen als neue Ordner dazu; in Zotero wird nichts angelegt, bevor du es bestätigst.')),
+      h('p', { class: 'muted small' }, t('Das Sprachmodell schlägt 3–6 thematische Ordner vor, passend zu Fragestellung und Kriterien und zu den Titeln im Pool und aufgenommener Arbeiten. Übernommene kommen als neue Ordner dazu; in Zotero wird nichts angelegt, bevor du es bestätigst.')),
       field(t('Unter dieser Sammlung'), h('div', { class: 'row' },
         h('div', { class: 'grow' }, x.parent ? h('b', null, `${libName} › ${crumbs(x.parent)}`) : h('span', { class: 'muted' }, t('noch keine gewählt'))),
         btn(t('Wählen …'), { size: 'sm', kind: 'ghost', icon: 'folder', onClick: chooseParent }))),
@@ -262,6 +263,41 @@ function removeFolder(i) {
   });
 }
 
+// ------------------------------------------------------------------ Ziel in Zotero
+// Auswahl der Zielbibliothek; steht auch im Pool beim Abgleich, wo sie zuerst gebraucht wird
+export function librarySelect(onChanged) {
+  const d = draft().d;
+  const libs = zoteroLibraries(d.zotero_backend || 'local').libraries || [];
+  return select({ value: d.target_library, label: t('Zielbibliothek'), options: [
+    ...(libs.some(l => l.lib === d.target_library) ? [] : [{ value: d.target_library, label: targetName(d) }]),
+    ...libs.map(l => ({ value: l.lib, label: isGroup(l.lib) ? t('Gruppe: {n}', { n: l.name }) : l.name }))],
+  onChange: v => { d.target_name = (libs.find(l => l.lib === v) || {}).name || v; d.target_library = v; touchDraft(); if (onChanged) onChanged(); } });
+}
+
+function targetCard() {
+  const s = rs();
+  const st = draft();
+  const d = st.d;
+  const set = (k, v) => { d[k] = v; touchDraft(); };
+  const backend = d.zotero_backend || 'local';
+  const z = zoteroLibraries(backend);
+  const hasWebKey = !!(s.info && s.info.keys && s.info.keys['zotero-web']);
+  const reload = () => { delete s.zotero[backend]; update(); };
+  return card(t('Ziel in Zotero'), 'zotero', h('div', { class: 'stack' },
+    hasWebKey || backend === 'web' ? field(t('Zugang'), segmented({ value: backend, options: [
+      { value: 'local', label: t('Zotero auf diesem Computer') }, { value: 'web', label: t('Zotero-Server (Web-API)') }],
+    onChange: v => set('zotero_backend', v) }), { hint: backend === 'local'
+      ? t('Lokale API von Zotero: Zotero muss laufen; Schreiben braucht eine Freigabe in Zotero (unter Übergabe).')
+      : t('Schreibt über zotero.org; die Zotero-App übernimmt die Einträge beim nächsten Sync.') }) : null,
+    z.error ? notice('warning', z.error, backend === 'web' ? h('div', { class: 'notice-actions' },
+      btn(t('Schlüssel eingeben'), { size: 'sm', onClick: () => { ui('settings', {}).tab = 'zotero'; navigate('settings'); } }),
+      btn(t('Zotero auf diesem Computer'), { size: 'sm', kind: 'ghost', onClick: () => set('zotero_backend', 'local') })) : null) : null,
+    h('div', { class: 'row rs-target-row' },
+      h('div', { class: 'grow' }, field(t('Zielbibliothek'), librarySelect(),
+      { hint: z.libraries == null ? t('Lade Bibliotheken …') : t('Eigene Bibliothek oder eine Gruppe. Der Pool gleicht damit ab, die Ordner beziehen sich darauf.') })),
+      iconBtn('refresh', t('Bibliotheken neu laden'), reload))));
+}
+
 // ------------------------------------------------------------------ Tab
 export function foldersTab() {
   const s = rs();
@@ -284,11 +320,10 @@ export function foldersTab() {
     } });
   return h('div', { class: 'view-body scroll' },
     h('div', { class: 'rs-narrow stack-lg' },
+      targetCard(),
       card(t('Ordner'), 'folder', h('div', { class: 'stack' },
         h('p', { class: 'muted small' }, t('Im Screening nimmst du Treffer in einen dieser Ordner auf (Kürzel: Zifferntasten 1–9 für die Ordner 1–9). Bei der Übergabe landen sie in der zugeordneten Sammlung.')),
-        h('div', { class: 'muted small' }, t('Ziel: {lib}', { lib: targetName(d) }), ' · ',
-          h('button', { type: 'button', class: 'rs-link small', onclick: () => { s.tab = 'project'; update(); } }, t('unter Projekt ändern'))),
-        z.error ? notice('warning', z.error) : null,
+        questionHint(),
         h('datalist', { id: listId }, [...known].map(p => h('option', { value: p }))),
         d.folder_map.length ? null : h('div', { class: 'muted small' }, t('Noch keine Ordner. Mit „Ordner hinzufügen“ anlegen oder per KI-Vorschlag.')),
         h('div', { class: 'rs-folders' }, d.folder_map.map((f, i) => h('div', { class: 'rs-folder-row', key: f.slot },
@@ -308,7 +343,7 @@ export function foldersTab() {
           fresh.length ? btn(t('{n} neue Sammlungen jetzt anlegen …', { n: fresh.length }), { size: 'sm', icon: 'plus', disabled: st.dirty,
             busy: isBusy('create-collections'), title: st.dirty ? t('Wird gespeichert …') : t('Legt die mit „neu“ markierten Sammlungen in Zotero an – nach Rückfrage.'),
             onClick: () => createNow(fresh.map(f => norm(f.path))) }) : null)),
-      { actions: [aiInfo().available ? btn(t('KI-Vorschlag für Unterordner …'), { size: 'sm', kind: 'ai', icon: 'ai', onClick: () => aiFoldersDialog(),
+      { actions: [aiInfo().available ? btn(t('KI-Vorschlag für Unterordner …'), { size: 'sm', kind: 'ai', icon: 'ai', onClick: () => aiFoldersDialog(), disabled: !hasQuestion(), why: NO_QUESTION(),
         title: t('Schlägt 3–6 thematische Ordner unter einer gewählten Sammlung vor ({m}).', { m: aiInfo().label }) }) : null] }),
       draftBar()));
 }

@@ -191,9 +191,11 @@ function keyCard() {
     { help: t('Der Schlüssel wird nie im Klartext angezeigt oder in Dateien geschrieben.') }),
     hasKeyField && backend && !backend.secure && notice('warning', t('Kein sicherer Schlüsselspeicher verfügbar ({b}).', { b: backend.backend }), null,
       { dismiss: `keystore:${backend.backend}`, session: true }),
-    (pid === 'ollama' || pid === 'openai_compatible') && field(t('Server-Adresse'), textInput({ value: baseUrls[pid] || p.default_base_url, placeholder: p.default_base_url,
+    (pid === 'ollama' || pid === 'openai_compatible' || pid === 'mistral') && field(t('Server-Adresse'), textInput({ value: baseUrls[pid] || p.default_base_url, placeholder: p.default_base_url,
       onChange: v => saveSettings({ llm: { base_urls: { ...baseUrls, [pid]: v.trim() } } }) }),
-    { hint: pid === 'ollama' ? t('Ollama muss installiert sein und laufen. Modelle mit „ollama pull <name>“ laden.') : t('Adresse mit /v1, z. B. LM Studio oder vLLM.') })));
+    { hint: pid === 'ollama' ? t('Ollama muss installiert sein und laufen. Modelle mit „ollama pull <name>“ laden.')
+      : pid === 'mistral' ? t('Verarbeitung in der EU: https://api.eu.mistral.ai eintragen (10 % Aufschlag, nicht alle Modelle). Der Standardserver sichert keinen Verarbeitungsort zu.')
+        : t('Adresse mit /v1, z. B. LM Studio oder vLLM.') })));
 }
 
 function roleRow(role) {
@@ -226,7 +228,7 @@ function roleRow(role) {
         s.modelsLoading[pid] ? spinner(14) : null),
       { hint: r ? (r.loaded ? t('{n} Modelle von {p} geladen', { n: r.models.length, p: t(p.label) }) : t('Vorschläge – mit gültigem Schlüssel wird die aktuelle Liste geladen')) : null }),
       field(t('Denktiefe'), select({ value: effort, options: EFFORTS(), onChange: v => setLLM(isMain ? { effort: v } : { helper_effort: v }) }),
-        { help: t('Wie gründlich das Modell vor der Antwort „nachdenkt“ (Claude: effort, OpenAI/DeepSeek: reasoning, Gemini: thinking). Höher = besser bei schwierigen Fragen, aber langsamer und teurer.') })),
+        { help: t('Wie gründlich das Modell vor der Antwort „nachdenkt“ (Claude: effort, OpenAI/DeepSeek/Mistral: reasoning, Gemini: thinking). Höher = besser bei schwierigen Fragen, aber langsamer und teurer.') })),
     priceRow(model),
     !providerReady(pid) && notice('warning', t('Für {p} ist kein API-Schlüssel gespeichert.', { p: t(p.label) }),
       h('div', { class: 'notice-actions' }, btn(t('Schlüssel eingeben'), { size: 'sm', onClick: () => { s.keyProvider = pid; update(); } })),

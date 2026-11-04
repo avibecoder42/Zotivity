@@ -26,13 +26,23 @@
   border-bottom-width: 2px; background: var(--surface-2); color: var(--ink-2); font: 600 11px/1 var(--mono); }
 
 /* Kopf mit Reitern */
-.rs-header { flex-wrap: wrap; row-gap: 8px; }
-.rs-header .view-title { min-width: 220px; }
+.rs-header { flex-wrap: wrap; row-gap: 6px; padding-bottom: 8px; }
+.rs-header .view-title { min-width: 220px; flex-basis: 0; }
+.rs-header .view-title h1 { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .rs-tabs { display: flex; gap: 2px; background: var(--surface-3); padding: 3px; border-radius: 10px; flex-wrap: wrap; }
+.rs-tab-sep { flex: none; width: 1px; margin: 5px; background: var(--line-strong); }
+.rs-tab.done .icon { color: var(--ok); }
+.rs-tab-count { font-size: 11.5px; font-weight: 500; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.rs-tab.active .rs-tab-count { color: inherit; }
+/* Zeile unter den Reitern: was ist zu tun, wie geht es weiter */
+.rs-nextbar { flex-basis: 100%; display: flex; align-items: center; gap: 8px; min-height: 30px; }
+.rs-nexttext { flex: 1; min-width: 0; font-size: 12.5px; color: var(--ink-2); }
+.rs-pool-target { display: inline-flex; align-items: center; gap: 6px; }
+.rs-pool-target .select-wrap { width: 190px; }
 .rs-tab { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 6px 11px; border-radius: 8px; color: var(--ink-2);
   cursor: pointer; font-size: 12.5px; font-weight: 560; white-space: nowrap; }
 .rs-tab:hover { color: var(--ink); background: var(--surface-2); }
-@media (max-width: 1400px) { .rs-tab .icon { display: none; } .rs-tab { padding: 6px 9px; } }
+@media (max-width: 1600px) { .rs-tab .icon { display: none; } .rs-tab.done .icon { display: inline-block; } .rs-tab { padding: 6px 9px; } }
 .rs-tab.active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow-1); }
 
 /* Projekte */
@@ -45,10 +55,10 @@
 .rs-draft-bar { padding-top: 4px; min-height: 30px; }
 
 /* Suchstrategie: Vorschläge stehen in den Blockkarten */
-.rs-ai-suggest { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--accent-line); background: var(--accent-soft); }
-.rs-ai-suggest > .row > .icon { color: var(--accent); flex: none; }
-.rs-suggest { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px dashed var(--accent-line); background: var(--accent-soft); }
-.rs-suggest-label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--accent); }
+.rs-ai-suggest { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--ai-line); background: var(--ai-soft); }
+.rs-ai-suggest > .row > .icon { color: var(--ai); flex: none; }
+.rs-suggest { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px dashed var(--ai-line); background: var(--ai-soft); }
+.rs-suggest-label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--ai); }
 .rs-block-suggested { border-style: dashed; border-color: var(--accent-line); }
 .rs-target-row { align-items: flex-end; }
 .rs-target-row > .btn { margin-bottom: 22px; }
@@ -201,7 +211,7 @@
 /* KI-Leiste oben im Screening */
 .rs-ai-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 12px; width: 100%; max-width: 1100px; margin-inline: auto;
   border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
-.rs-ai-bar > .icon { color: var(--accent); flex: none; }
+.rs-ai-bar > .icon { color: var(--ai); flex: none; }
 .rs-ai-bar .chips { flex-wrap: wrap; }
 .rs-ai-bar .grow { min-width: 220px; }
 .rs-ai-bar-meta { flex-basis: 100%; }

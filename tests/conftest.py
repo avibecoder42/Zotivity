@@ -38,13 +38,23 @@ class HashEmbedder(Embedder):
 
 
 @pytest.fixture(autouse=True)
+def no_zotero_start_wait(monkeypatch):
+    """Die Attrappen von Zotero sind sofort bereit (Tests zur Wartezeit setzen sie selbst)."""
+    from zotivity.zotero.client import ZoteroClient
+
+    monkeypatch.setattr(ZoteroClient, "STARTUP_GRACE", 0.0)
+    monkeypatch.setattr(ZoteroClient, "PLUGIN_WAIT", 0.0)
+    monkeypatch.setattr(ZoteroClient, "PROBE_EVERY", 0.0)
+
+
+@pytest.fixture(autouse=True)
 def memory_keyring(monkeypatch):
     """Nie den echten Schlüsselspeicher des Rechners anfassen."""
     backend = MemoryKeyring()
     previous = keyring.get_keyring()
     keyring.set_keyring(backend)
     monkeypatch.setattr(keystore, "_store", None)
-    for var in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "DEEPSEEK_API_KEY"):
+    for var in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "DEEPSEEK_API_KEY", "MISTRAL_API_KEY"):
         monkeypatch.delenv(var, raising=False)
     yield backend
     keyring.set_keyring(previous)

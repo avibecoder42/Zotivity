@@ -1,4 +1,4 @@
-"""OpenAI (ChatGPT) sowie OpenAI-kompatible Schnittstellen: DeepSeek, Ollama, LM Studio …"""
+"""OpenAI (ChatGPT) sowie OpenAI-kompatible Schnittstellen: DeepSeek, Mistral, Ollama, LM Studio …"""
 
 from __future__ import annotations
 
@@ -9,7 +9,28 @@ import openai
 
 from zotivity.llm.base import ChatMessage, ChatModel, GenParams, LLMError, StreamEvent, Usage
 
-_LABELS = {"openai": "OpenAI", "deepseek": "DeepSeek", "ollama": "Ollama", "openai_compatible": "Server"}
+_LABELS = {"openai": "OpenAI", "deepseek": "DeepSeek", "mistral": "Mistral", "ollama": "Ollama", "openai_compatible": "Server"}
+# Diese Anbieter halten eine Antwort nach JSON-Schema ein; die übrigen bekommen nur den JSON-Modus
+_SCHEMA_PROVIDERS = ("openai", "mistral")
+
+
+def _mistral_effort(model: str, effort: str) -> str:
+    """Mistral kennt je Modell andere Stufen: Large 4 low bis high, die anderen Denkmodelle nur high und none."""
+    if "large-4" in model:
+        return "high" if effort in ("xhigh", "max") else effort
+    return "high" if effort in ("high", "xhigh", "max") else "none"
+
+
+def _delta_text(content) -> str:
+    """Text eines Stream-Stücks. Mistral schickt beim Nachdenken Listen von Teilen: Die Denkspur fällt weg, der Text bleibt."""
+    if isinstance(content, str):
+        return content
+    parts = []
+    for part in content or []:
+        get = part.get if isinstance(part, dict) else lambda k, part=part: getattr(part, k, None)
+        if get("type") == "text":
+            parts.append(get("text") or "")
+    return "".join(parts)
 
 
 class OpenAIChat(ChatModel):
@@ -25,7 +46,7 @@ class OpenAIChat(ChatModel):
         super().__init__(model, meter)
         self.provider = provider
         self.name = _LABELS.get(provider, provider)
-        if provider in ("openai", "deepseek") and not api_key:
+        if provider in ("openai", "deepseek", "mistral") and not api_key:
             raise LLMError(f"Kein {self.name}-API-Schlüssel gespeichert.", "auth")
         kwargs = {"api_key": api_key or "not-needed", "timeout": timeout, "max_retries": 3}
         if base_url:
@@ -58,8 +79,9 @@ class OpenAIChat(ChatModel):
             "model": self.model,
             "messages": self._messages(system, messages),
             "stream": True,
-            "stream_options": {"include_usage": True},
         }
+        if self.provider != "mistral":  # Mistral kennt den Parameter nicht und meldet den Verbrauch von selbst
+            kw["stream_options"] = {"include_usage": True}
         kw[self._token_key] = params.max_tokens
         if params.temperature is not None:
             kw["temperature"] = params.temperature
@@ -67,8 +89,10 @@ class OpenAIChat(ChatModel):
             effort = params.effort
             if self.provider == "openai" and effort == "max":
                 effort = "xhigh"
+            elif self.provider == "mistral":
+                effort = _mistral_effort(self.model, effort)
             kw["reasoning_effort"] = effort
-        if params.json_mode and params.json_schema and self.provider == "openai":
+        if params.json_mode and params.json_schema and self.provider in _SCHEMA_PROVIDERS:
             kw["response_format"] = {"type": "json_schema",
                                      "json_schema": {"name": "answer", "schema": params.json_schema, "strict": False}}
         elif params.json_mode:
@@ -83,7 +107,7 @@ class OpenAIChat(ChatModel):
             try:
                 stream = self.client.chat.completions.create(**kw)
                 break
-            except openai.BadRequestError as e:
+            except (openai.BadRequestError, openai.UnprocessableEntityError) as e:  # Mistral lehnt mit 422 ab
                 msg = str(e).lower()
                 dropped = False
                 for param in ("temperature", "reasoning_effort", "response_format", "stream_options"):
@@ -112,8 +136,9 @@ class OpenAIChat(ChatModel):
                 if not chunk.choices:
                     continue
                 choice = chunk.choices[0]
-                if choice.delta and choice.delta.content:
-                    yield StreamEvent("text", text=choice.delta.content)
+                text = _delta_text(choice.delta.content) if choice.delta else ""
+                if text:
+                    yield StreamEvent("text", text=text)
                 if choice.finish_reason:
                     stop = choice.finish_reason
         except openai.APIError as e:
@@ -132,7 +157,7 @@ class OpenAIChat(ChatModel):
             return LLMError(f"{n}: Ratenlimit oder Guthaben erschöpft – {e}", "rate_limit")
         if isinstance(e, openai.APIConnectionError):
             return LLMError(f"{n}: keine Verbindung ({self.client.base_url}).", "connection")
-        if isinstance(e, openai.BadRequestError):
+        if isinstance(e, (openai.BadRequestError, openai.UnprocessableEntityError)):
             kind = "context" if "context" in str(e).lower() else "error"
             return LLMError(f"{n}: ungültige Anfrage – {e}", kind)
         return LLMError(f"{n}-Fehler: {e}", "error")

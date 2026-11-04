@@ -126,7 +126,7 @@ async function boot() {
     state.view = 'settings';
   } else if (state.projectId) {
     await openProject(state.projectId);
-    state.view = VIEWS.some(v => v.id === lastView) ? lastView : 'start';
+    state.view = lastView === 'search' || VIEWS.some(v => v.id === lastView) ? lastView : 'start';
   } else {
     state.view = 'start';
   }

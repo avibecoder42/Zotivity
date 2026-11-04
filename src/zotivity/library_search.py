@@ -115,12 +115,12 @@ def search_signature(query: CatalogQuery) -> dict:
     return out
 
 
-def remember_search(store: Store, project_id: int, query: CatalogQuery, total: int) -> int | None:
-    """Ausgeführte Suche in den Verlauf des Projekts (alle Suchen; dieselbe Suche nur einmal, zuoberst)."""
+def remember_search(store: Store, query: CatalogQuery, total: int) -> int | None:
+    """Ausgeführte Suche in den Verlauf (alle Suchen; dieselbe Suche nur einmal, zuoberst)."""
     sig = search_signature(query)
     if not sig:
         return None
-    return store.remember_search(project_id, sig, query.sort, total)
+    return store.remember_search(sig, query.sort, total)
 
 
 def search_catalog(store: Store, query: CatalogQuery) -> dict:

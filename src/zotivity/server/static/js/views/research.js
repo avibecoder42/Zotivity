@@ -1,6 +1,5 @@
-// Ansicht „Recherche“: ein Projekt als Arbeitsfluss in Ansichten (Projekt, Datenbanken, Suchstrategie, Suche & Import,
-// Pool, Ordner, Screening, Übergabe, Volltexte). Kopfzeile zeigt, wo man steht: „PubMed 503 · OpenAlex 937 · gesichtet 380/1150 · ausgewählt 71“.
-// Diese Datei und views/research/ wandern bei der Integration unverändert nach Zotivity (static/js/views).
+// Ansicht „Recherche“: eine Recherche als Arbeitsfluss in Reitern (Fragestellung, Datenbanken, Suchstrategie, Suche & Import,
+// Pool, Ziel & Ordner, Screening, Übergabe, Volltexte). Die Reiter zeigen den Stand, die Zeile darunter den nächsten Schritt.
 import { h } from '../core/vdom.js';
 import { state, update, ui } from '../core/store.js';
 import * as api from '../core/api.js';
@@ -8,8 +7,9 @@ import { t } from '../core/i18n.js';
 import { fmtInt } from '../core/util.js';
 import { icon } from '../ui/icons.js';
 import { btn } from '../ui/components.js';
-import { R, rs, TABS, loadInfo, loadProjects, openProject, closeProject, summaryLine, tokenText, flushSaves, invalidate } from './research/common.js';
+import { R, rs, TABS, loadInfo, loadProjects, openProject, closeProject, openTab, tokenText, invalidate } from './research/common.js';
 import { projectList, projectTab, databasesTab } from './research/project.js';
+import { tabState, nextBar } from './research/guidance.js';
 import { foldersTab } from './research/folders.js';
 import { strategyTab } from './research/strategy.js';
 import { searchTab } from './research/search.js';
@@ -21,14 +21,6 @@ import { navigate } from './shell.js';
 
 const VIEWS = { project: projectTab, databases: databasesTab, strategy: strategyTab, search: searchTab, pool: poolTab, folders: foldersTab,
   screening: screeningTab, handover: handoverTab, fulltext: fulltextTab };
-
-function openTab(id) {
-  const s = rs();
-  flushSaves();
-  s.tab = id;
-  invalidate('flow', 'fulltext');  // Stand kann sich geändert haben
-  update();
-}
 
 export async function researchBoot() {
   await Promise.all([loadInfo().catch(() => {}), loadProjects().catch(() => {})]);
@@ -42,13 +34,16 @@ function header() {
   const s = rs();
   const p = s.project;
   return h('header', { class: 'view-header rs-header' },
-    btn('', { icon: 'arrowLeft', kind: 'ghost', title: t('Alle Projekte'), onClick: closeProject }),
-    h('div', { class: 'view-title grow' }, h('h1', null, p ? p.title : t('Projekt …')),
-      h('div', { class: 'view-subtitle' }, p ? summaryLine(p.summary) : '')),
-    h('nav', { class: 'rs-tabs', role: 'tablist' }, TABS.map((tab, i) => h('button', {
-      key: tab.id, type: 'button', role: 'tab', class: ['rs-tab', s.tab === tab.id && 'active'], 'aria-selected': s.tab === tab.id ? 'true' : 'false',
-      title: `${tab.label()} (Alt+${i + 1})`, onclick: () => openTab(tab.id),
-    }, icon(tab.icon, 16), h('span', null, tab.label())))));
+    btn('', { icon: 'arrowLeft', kind: 'ghost', title: t('Alle Recherchen'), onClick: closeProject }),
+    h('div', { class: 'view-title grow' }, h('h1', { title: p ? p.title : undefined }, p ? p.title : t('Recherche …'))),
+    h('nav', { class: 'rs-tabs', role: 'tablist' }, TABS.map((tab, i) => {
+      const { done, count } = tabState(tab.id);
+      return [tab.group ? h('span', { key: `sep${i}`, class: 'rs-tab-sep', 'aria-hidden': 'true' }) : null, h('button', {
+        key: tab.id, type: 'button', role: 'tab', class: ['rs-tab', s.tab === tab.id && 'active', done && 'done'], 'aria-selected': s.tab === tab.id ? 'true' : 'false',
+        title: `${tab.label()} (Alt+${i + 1})`, onclick: () => openTab(tab.id),
+      }, icon(done ? 'check' : tab.icon, 16), h('span', null, tab.label()), count ? h('span', { class: 'rs-tab-count' }, count) : null)];
+    })),
+    p ? nextBar() : null);
 }
 
 // Zotero wurde geöffnet, während die Recherche offen war: Bibliotheken und Stand neu holen
@@ -72,7 +67,7 @@ export function researchView() {
       recall: null, flow: null, fulltext: null, stale: {} });
   }
   if (!s.pid) return h('div', { class: 'view-wrap' }, projectList());
-  if (!s.project) return h('div', { class: 'view-wrap' }, header(), h('div', { class: 'view-body muted' }, t('Lade Projekt …')));
+  if (!s.project) return h('div', { class: 'view-wrap' }, header(), h('div', { class: 'view-body muted' }, t('Lade Recherche …')));
   return h('div', { class: 'view-wrap' }, header(), (VIEWS[s.tab] || projectTab)());
 }
 

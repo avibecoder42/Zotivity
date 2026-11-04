@@ -67,7 +67,7 @@ function row(it, data, project) {
       it.zotero_key ? iconBtn('zotero', t('In Zotero zeigen'), () => api.openExternal(zoteroSelect(it.zotero_lib, it.zotero_key))) : null,
       it.doi ? iconBtn('external', t('DOI öffnen'), () => api.openExternal(`https://doi.org/${it.doi}`)) : null,
       decided ? btn(t('Zurücksetzen'), { size: 'sm', kind: 'ghost', onClick: () => setStatus([it.id], '') }) : [
-        btn(t('Einschliessen'), { size: 'sm', kind: 'primary', icon: 'check', onClick: () => setStatus([it.id], 'include') }),
+        btn(t('Einschliessen'), { size: 'sm', icon: 'check', onClick: () => setStatus([it.id], 'include') }),
         btn(t('Ausschliessen …'), { size: 'sm', icon: 'x', onClick: () => reasonDialog(it, 'exclude', data.reasons) }),
         it.state === 'missing' ? btn(t('Nicht beschaffbar …'), { size: 'sm', kind: 'ghost', onClick: () => reasonDialog(it, 'not_retrieved', []) }) : null]));
 }

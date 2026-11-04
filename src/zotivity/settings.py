@@ -101,7 +101,7 @@ class LLMSettings(BaseModel):
     # None = Standard des Modells (manche Modelle akzeptieren keine Temperatur)
     temperature: float | None = Field(None, ge=0, le=2)
     max_output_tokens: int = Field(16000, ge=256, le=128000)
-    # Denk-/Reasoning-Tiefe (Claude: effort, OpenAI/DeepSeek: reasoning_effort, Gemini: thinking_level)
+    # Denk-/Reasoning-Tiefe (Claude: effort, OpenAI/DeepSeek/Mistral: reasoning_effort, Gemini: thinking_level)
     effort: Effort = ""
     helper_effort: Effort = "low"
     base_urls: dict[str, str] = Field(default_factory=dict)

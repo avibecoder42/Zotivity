@@ -156,7 +156,7 @@ export function listSideCard(queue, { onUndo, status = 'open' }) {
     h('div', { class: 'small' }, t('{i} aufnehmen · {x} ausschliessen · {o} bleiben offen', { i: fmtInt(n('include')), x: fmtInt(n('exclude')), o: fmtInt(n('open')) })),
     slots.length ? field(t('Ordner für Angehakte ohne Vorschlag'), select({ value: String(l.folder || slots[0]),
       options: slots.map(x => ({ value: String(x), label: `${x} · ${folderLabel(p, x)}` })), onChange: v => { l.folder = Number(v); update(); } }))
-      : h('div', { class: 'warn-text small' }, t('Noch keine Ordner zugeordnet (Tab „Ordner“).')),
+      : h('div', { class: 'warn-text small' }, t('Noch keine Ordner zugeordnet (Reiter „Ziel & Ordner“).')),
     !aiVisible() ? checkbox({ checked: l.excludeRest, label: t('Nicht Angehakte ausschliessen (ausser Grenzfälle und ohne Abstract)'),
       onChange: v => { l.excludeRest = v; update(); } }) : null,
     btn(t('Übernehmen …'), { kind: 'primary', icon: 'check', busy: isBusy('bulk'), disabled: !(n('include') + n('exclude')), onClick: () => commit(queue, onUndo, status) }),

@@ -157,10 +157,10 @@ class ZoteroClientPort:
 
 
 # ------------------------------------------------------------------------------------------------ Sprachmodell
-VENDORS = {"anthropic": "Anthropic", "gemini": "Google", "openai": "OpenAI", "deepseek": "DeepSeek",
+VENDORS = {"anthropic": "Anthropic", "gemini": "Google", "openai": "OpenAI", "deepseek": "DeepSeek", "mistral": "Mistral AI",
            "ollama": "Ollama (lokal)", "openai_compatible": "OpenAI-kompatibler Server"}
 # Anbieter, die eine Antwort nach JSON-Schema einhalten können (llm/*_provider.py); sonst steht das Schema im Auftrag
-SCHEMA_PROVIDERS = ("anthropic", "gemini", "openai")
+SCHEMA_PROVIDERS = ("anthropic", "gemini", "openai", "mistral")
 KEY_SOURCES = {"keyring": "Zotivity (Schlüsselspeicher)", "env": "Umgebungsvariable"}
 LLM_KINDS = {"auth": "ai_auth", "model": "ai_model", "rate_limit": "ai_rate", "connection": "ai_offline",
              "refusal": "ai_refusal", "context": "ai_request", "error": "ai_server"}

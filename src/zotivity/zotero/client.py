@@ -59,7 +59,23 @@ def file_url_to_path(url: str) -> Path | None:
         return Path(url2pathname(unquote(parsed.path)))
 
 
+STARTING = "Zotero startet noch – einen Moment bitte."
+HANGING = "Zotero läuft, aber seine Schnittstelle antwortet nicht. Bitte Zotero neu starten."
+# Schnittstellen des Plugins (auch unter den früheren Namen): Zotero lädt Plugins erst, wenn sein Start fertig ist
+PLUGIN_ENDPOINTS = ("/zotivity/uris", "/zotllm/uris", "/zoterollm/uris")
+
+
 class ZoteroClient:
+    # Beim Start öffnet Zotero seine Schnittstelle, bevor die Einträge bereit sind (zotero.js: Server.init vor Items.init).
+    # Eine Anfrage an /api/ in dieser Lücke kann das Laden der Bibliothek dauerhaft blockieren: Zotero zeigt dann „Lade
+    # Einträge“ und beantwortet /api/ nicht mehr, bis es neu gestartet wird. Bis Zotero bereit ist, geht deshalb nur der
+    # harmlose Ping hinaus (/connector/ping fasst die Bibliothek nicht an).
+    STARTUP_GRACE = 20.0  # ohne Plugin: so viele Sekunden nach dem ersten Ping gilt Zotero als bereit
+    PLUGIN_WAIT = 60.0  # Plugin war schon da und fehlt jetzt: Zotero startet neu (oder es wurde entfernt)
+    PROBE_TIMEOUT = 8.0  # so lange darf die Prüfung von /api/ dauern (Zotero lädt beim ersten Mal die Bibliothek)
+    PROBE_EVERY = 5.0  # höchstens so oft prüfen
+    HUNG_TTL = 30.0  # eine hängende Schnittstelle so lange nicht erneut prüfen
+
     def __init__(
         self,
         base_url: str = "http://127.0.0.1:23119",
@@ -79,16 +95,76 @@ class ZoteroClient:
         self._server_id: str | None = None
         self._lock = threading.Lock()
         self._unavailable_at = 0.0  # letzter Fehlschlag (monotonic), siehe is_available
+        self._first_ping: float | None = None  # seit wann Zotero antwortet
+        self._plugin_known = False  # Plugin schon einmal gesehen
+        self._plugin_here = False  # beim letzten Blick da
+        self._api_ok_at = 0.0
+        self._hung_at = 0.0
 
     def close(self) -> None:
         self._http.close()
 
+    # -- Bereitschaft von Zotero -------------------------------------------------
+    def _forget_start(self) -> None:
+        """Zotero ist weg: Beim nächsten Start gilt die Wartezeit wieder."""
+        self._first_ping = None
+        self._plugin_here = False
+        self._api_ok_at = self._hung_at = 0.0
+
+    def _zotero_ready(self) -> bool:
+        """Darf /api/ angefragt werden? Antwortet eine Schnittstelle des Plugins (auch mit „Methode nicht erlaubt“), ist der
+        Start von Zotero fertig. Ohne Plugin gilt eine Wartezeit ab dem ersten Ping."""
+        now = time.monotonic()
+        if self._first_ping is None:
+            self._first_ping = now
+        timeout = httpx.Timeout(self.PROBE_TIMEOUT, connect=3.0)
+        if any(self._http.get(path, timeout=timeout).status_code != 404 for path in PLUGIN_ENDPOINTS):
+            self._plugin_known = self._plugin_here = True
+            return True
+        if self._plugin_here:  # war eben noch da: Zotero startet gerade neu
+            self._plugin_here = False
+            self._first_ping = now
+        return now - self._first_ping >= (self.PLUGIN_WAIT if self._plugin_known else self.STARTUP_GRACE)
+
+    def _check_api(self) -> None:
+        """Vor Anfragen an /api/: Ist Zotero bereit, und antwortet die Schnittstelle? Sonst sofort eine klare Meldung statt
+        minutenlangem Warten auf die Zeitüberschreitung."""
+        now = time.monotonic()
+        if self._hung_at and now - self._hung_at < self.HUNG_TTL:
+            raise ZoteroUnavailable(HANGING)
+        if self._api_ok_at and now - self._api_ok_at < self.PROBE_EVERY:
+            return
+        timeout = httpx.Timeout(self.PROBE_TIMEOUT, connect=3.0)
+        try:
+            self._http.get("/connector/ping", timeout=timeout)
+            if not self._zotero_ready():
+                raise ZoteroUnavailable(STARTING)
+            r = self._http.get("/api/", timeout=timeout)
+        except httpx.TimeoutException as e:
+            self._hung_at = now
+            raise ZoteroUnavailable(HANGING) from e
+        except httpx.TransportError as e:
+            self._forget_start()
+            raise ZoteroUnavailable("Zotero ist nicht erreichbar. Läuft Zotero?") from e
+        self._hung_at = 0.0
+        self._api_ok_at = time.monotonic()
+        self._note_response(r)
+
     # -- Grundfunktionen ---------------------------------------------------------
     def _request(self, method: str, url: str, **kw) -> httpx.Response:
+        if url.startswith("/api"):
+            self._check_api()
         try:
             r = self._http.request(method, url, **kw)
+        except httpx.TimeoutException as e:
+            raise ZoteroUnavailable(HANGING) from e
         except httpx.TransportError as e:
+            self._forget_start()
             raise ZoteroUnavailable("Zotero ist nicht erreichbar. Läuft Zotero?") from e
+        self._note_response(r)
+        return r
+
+    def _note_response(self, r: httpx.Response) -> None:
         sid = r.headers.get("Zotero-Server-ID")
         if sid:
             self._server_id = sid
@@ -97,7 +173,6 @@ class ZoteroClient:
                 "Die lokale API ist in Zotero deaktiviert. Zotero → Einstellungen → Erweitert → "
                 "„Anderen Anwendungen auf diesem Computer erlauben, mit Zotero zu kommunizieren“ aktivieren."
             )
-        return r
 
     def _get_json(self, url: str, params: dict | None = None) -> Any:
         r = self._request("GET", url, params=params)
@@ -111,11 +186,12 @@ class ZoteroClient:
         """Prüft Erreichbarkeit und ob die lokale API aktiv ist."""
         out = {"running": False, "local_api": False, "server_id": None, "version": None, "message": ""}
         try:
-            r = self._http.get("/connector/ping")
+            r = self._http.get("/connector/ping", timeout=httpx.Timeout(self.PROBE_TIMEOUT, connect=3.0))
             out["running"] = r.status_code == 200
             out["version"] = r.headers.get("X-Zotero-Version")
         except httpx.TransportError:
             out["message"] = "Zotero läuft nicht."
+            self._forget_start()
             self._unavailable_at = time.monotonic()
             return out
         try:
