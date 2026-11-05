@@ -1,9 +1,10 @@
 // Dubletten: dasselbe Werk mehrfach in Zotero (z. B. in Meine Bibliothek und in einer Gruppe). Je Werk wird nur eine
 // Kopie gelesen und bei Fragen und im Forschungsstand verwendet. Vor einem Lauf von Hand fragt ein Dialog nach neuen
-// Dubletten (beim Klick – ein wartender Lauf unterbricht nie); unter Index lässt sich jede Wahl ändern, unter
-// Einstellungen → Index die Regel einstellen. Läufe ohne Rückfrage (Hintergrund, Zotero) wählen nach der Regel.
+// Dubletten (beim Klick – ein wartender Lauf unterbricht nie), vorgewählt ist die Kopie aus dem Korpus; unter Index lässt
+// sich jede Wahl ändern, auch für einen ganzen Korpus, unter Einstellungen → Index die Regel einstellen. Läufe ohne
+// Rückfrage (Hintergrund, Zotero) wählen nach der Regel.
 import { h } from '../core/vdom.js';
-import { state, update, ui, run, toast, openModal, closeModal, saveSettings, loadCorpora, setBeforeIndexHandler } from '../core/store.js';
+import { state, update, ui, run, toast, openModal, closeModal, saveSettings, loadCorpora, setBeforeIndexHandler, submitIndexRun } from '../core/store.js';
 import * as api from '../core/api.js';
 import { t } from '../core/i18n.js';
 import { btn, card, foldCard, toggle, checkbox, select, field } from '../ui/components.js';
@@ -26,6 +27,9 @@ const copyId = c => `${c.lib}|${c.key}`;
 const sameTitle = (a, b) => [a, b].map(s => (s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()).reduce((x, y) => x === y);
 const currentSel = g => (g.mode === 'separate' ? 'separate' : copyId(g.copies.find(c => c.chosen) || g.copies[0]));
 const ruleSel = g => copyId(g.copies.find(c => c.rule) || g.copies[0]);
+// Im Dialog: Von Hand Gewähltes bleibt, sonst der Vorschlag (die Kopie aus dem Korpus, wenn sie gleichwertig ist)
+const dialogSel = g => (g.mode === 'user' || g.mode === 'separate' ? currentSel(g) : copyId(g.copies.find(c => c.suggest) || g.copies[0]));
+const textLevel = c => (c.text > 0 ? 2 : c.file ? 1 : 0);
 
 // Auswahl → Entscheidung: wie die Regel = „rule“ (folgt dem Zustand, z. B. wenn die Kopie keinen Text hat),
 // sonst „user“ (bleibt fest)
@@ -37,7 +41,7 @@ function choiceOf(g, sel) {
 }
 
 function copyFacts(c) {
-  return [c.text === 2 ? t('Text gelesen') : c.text === 1 ? t('Datei vorhanden, noch nicht gelesen') : t('ohne lesbaren Text'),
+  return [c.text === 2 ? t('Text gelesen') : c.text === 1 ? t('Datei vorhanden, noch nicht gelesen') : c.file ? t('Datei vorhanden, aber kein lesbarer Text') : t('keine Datei'),
     c.pages ? t('Seitenzahlen erkannt') : null].filter(Boolean).join(' · ');
 }
 
@@ -52,22 +56,25 @@ function groupRow(g, sel, onPick, name) {
     h('div', { class: 'dup-copies' },
       g.copies.map(c => option(copyId(c),
         [h('b', null, c.library), c.collections.length ? h('span', { class: 'muted' }, ` · ${c.collections.join(', ')}`) : null,
-          c.rule ? h('span', { class: 'dup-rule' }, ` · ${t('Vorschlag der Regel')}`) : null],
+          c.in_corpus ? h('span', { class: 'muted' }, ` · ${t('im Korpus')}`) : null,
+          c.suggest ? h('span', { class: 'dup-rule' }, ` · ${t('Vorschlag')}`) : null],
         [copyFacts(c), sameTitle(c.title, g.title) ? null : `„${c.title}“`].filter(Boolean).join(' · '))),
       option('separate', t('Keine Dublette – alle Kopien verwenden'), t('Falls es verschiedene Werke sind, z. B. eine andere Auflage.'))));
 }
 
-// ------------------------------------------------------------------ Rückfrage vor einem Lauf von Hand
-function openDuplicatesDialog(r) {
+// ------------------------------------------------------------------ Auswahl vor einem Lauf von Hand oder für einen Korpus
+// again: für einen ganzen Korpus neu wählen, auch schon entschiedene Werke; ohne anschliessenden Lauf
+function openDuplicatesDialog(r, again = null) {
   return new Promise(resolve => {
-    const sel = Object.fromEntries(r.groups.map(g => [g.work, currentSel(g)]));
+    const sel = Object.fromEntries(r.groups.map(g => [g.work, dialogSel(g)]));
     const st = { never: false, busy: false };
     const libs = [...new Set(r.groups.flatMap(g => g.copies.map(c => c.lib)))];
     const libName = lib => (r.libraries.find(l => l.lib === lib) || {}).name || lib;
-    // „Für alle“ wählt keine Kopie ohne lesbare Datei, wenn eine andere Kopie Text hat – sonst verlöre das Werk den Text
+    // „Für alle“ wählt keine Kopie, die schlechter ist als eine andere – sonst verlöre das Werk seinen Text oder seine Datei
     const pickAll = lib => {
       for (const g of r.groups) {
-        const c = g.copies.find(x => x.lib === lib && (x.text > 0 || g.copies.every(y => y.text === 0)));
+        const best = Math.max(...g.copies.map(textLevel));
+        const c = g.copies.find(x => x.lib === lib && textLevel(x) === best);
         if (c) sel[g.work] = copyId(c);
       }
       update();
@@ -85,17 +92,18 @@ function openDuplicatesDialog(r) {
     };
     const n = r.groups.length;
     openModal({
-      title: n === 1 ? t('Vor dem Indexieren: 1 Werk liegt doppelt vor') : t('Vor dem Indexieren: {n} Werke liegen doppelt vor', { n: fmtInt(n) }),
+      title: again ? t('Dubletten in „{name}“ neu wählen', { name: again }) : n === 1 ? t('Vor dem Indexieren: 1 Werk liegt doppelt vor') : t('Vor dem Indexieren: {n} Werke liegen doppelt vor', { n: fmtInt(n) }),
       cls: 'modal-xl', onClose: () => resolve(false),
       body: () => h('div', { class: 'stack' },
-        h('p', { class: 'muted small' }, t('Diese Werke sind in Zotero mehrfach vorhanden. Je Werk wird nur die gewählte Kopie gelesen und bei Fragen und im Forschungsstand verwendet – auch in Korpora, die nur eine andere Kopie enthalten. Vorgewählt ist der Vorschlag der Regel; ändern lässt sich die Wahl jederzeit unter Index → Dubletten.')),
+        h('p', { class: 'muted small' }, t('Diese Werke sind in Zotero mehrfach vorhanden. Je Werk wird nur die gewählte Kopie gelesen und bei Fragen und im Forschungsstand verwendet – auch in Korpora, die nur eine andere Kopie enthalten. Vorgewählt ist die Kopie aus dem Korpus, sofern sie gleichwertig ist; ändern lässt sich die Wahl jederzeit unter Index → Dubletten.')),
         libs.length > 1 ? h('div', { class: 'row wrap small' }, h('span', { class: 'muted' }, t('Für alle:')),
           libs.map(lib => btn(t('Kopie aus {lib}', { lib: libName(lib) }), { size: 'sm', kind: 'ghost', key: lib, onClick: () => pickAll(lib) }))) : null,
         h('div', { class: 'dup-list' }, r.groups.map((g, i) => groupRow(g, sel[g.work], v => { sel[g.work] = v; update(); }, `dup-dialog-${i}`))),
-        checkbox({ checked: st.never, label: t('Künftig nicht mehr fragen und immer nach der Regel wählen'), onChange: v => { st.never = v; update(); } })),
+        again ? null : checkbox({ checked: st.never, label: t('Künftig nicht mehr fragen und immer nach der Regel wählen'), onChange: v => { st.never = v; update(); } })),
       actions: () => [
         { label: t('Abbrechen'), onClick: () => finish(false) },
-        { label: t('Übernehmen und indexieren'), kind: 'primary', icon: 'play', disabled: st.busy, onClick: () => finish(true) }],
+        again ? { label: t('Übernehmen'), kind: 'primary', disabled: st.busy, onClick: () => finish(true) }
+          : { label: t('Übernehmen und indexieren'), kind: 'primary', icon: 'play', disabled: st.busy, onClick: () => finish(true) }],
     });
   });
 }
@@ -129,6 +137,28 @@ async function choose(g, v) {
   toast(t('Gespeichert. Ist die gewählte Kopie noch nicht gelesen, liest sie der nächste Lauf ein.'), 'success', 5000);
 }
 
+// Für einen ganzen Korpus neu wählen, z. B. wenn die Kopien aus seinen Sammlungen verwendet werden sollen. Gespeichert wird
+// erst mit „Übernehmen“; Abbrechen ändert nichts.
+async function chooseAgain(c) {
+  const r = await run(() => api.get(`/api/duplicates?corpus_id=${c.id}`));
+  if (!r.groups.length) { toast(t('In diesem Korpus liegt kein Werk doppelt vor.'), 'info'); return; }
+  if (!await openDuplicatesDialog(r, c.name)) return;
+  loadDuplicates();
+  loadCorpora();
+  toast(t('Gespeichert. Eine neu gewählte Kopie liest der nächste Lauf ein.'), 'success', 9000,
+    { label: t('Jetzt indexieren'), onClick: () => submitIndexRun(`/api/corpora/${c.id}/index`, {}) });
+}
+
+function chooseAgainRow() {
+  const s = ds();
+  const corpora = state.corpora || [];
+  const shown = corpora.find(c => c.id === s.againId) || corpora.find(c => c.id === ui('index', {}).corpus) || corpora[0];
+  if (!shown) return null;
+  return h('div', { class: 'row wrap' }, h('span', { class: 'small' }, t('Für einen Korpus neu wählen:')),
+    select({ value: shown.id, label: t('Korpus'), onChange: v => { s.againId = Number(v); update(); }, options: corpora.map(c => ({ value: c.id, label: c.name })) }),
+    btn(t('Neu wählen …'), { size: 'sm', onClick: () => chooseAgain(shown) }));
+}
+
 export function duplicatesCard() {
   loadDuplicates();
   const d = ds().data;
@@ -144,6 +174,7 @@ export function duplicatesCard() {
   ].filter(Boolean).join(' · ');
   return foldCard('dups', t('Dubletten ({n})', { n: fmtInt(groups.length) }), 'copy', summary, () => h('div', { class: 'stack' },
     h('p', { class: 'muted small' }, t('Je Werk wird nur die gewählte Kopie gelesen und bei Fragen und im Forschungsstand verwendet – auch in Korpora, die nur eine andere Kopie enthalten. Eine andere Wahl liest der nächste Lauf ein; bis dahin bleibt die bisherige Kopie in Gebrauch.')),
+    chooseAgainRow(),
     h('div', { class: 'dup-list dup-list-card' }, groups.map((g, i) => groupRow(g, currentSel(g), v => choose(g, v), `dup-card-${i}`)))),
   { class: 'span-2' });
 }
@@ -160,5 +191,5 @@ export function duplicatesSettingsCard() {
       onChange: v => saveSettings({ indexing: { ask_duplicates: v } }) }),
     field(t('Sonst bevorzugen'), select({ value: cfg.duplicate_library, options: libs.map(l => ({ value: l.lib, label: l.name })),
       onChange: async v => { await saveSettings({ indexing: { duplicate_library: v } }); resetDuplicates(); loadCorpora(); update(); } }),
-    { help: t('Die Regel wählt zuerst die Kopie mit lesbarem Text, dann die mit erkannten Seitenzahlen, dann die aus dieser Bibliothek. Sie gilt für Läufe im Hintergrund und aus Zotero und ist im Dialog vorgewählt.') })));
+    { help: t('Die Regel wählt zuerst die Kopie mit lesbarem Text, dann eine mit Datei, unter gleichwertigen die aus dem Korpus, dann die mit gelesenem Text und erkannten Seitenzahlen, dann die aus dieser Bibliothek.') })));
 }

@@ -535,13 +535,18 @@ function reportCard(r) {
     problems: t('{t} verarbeitet, davon ohne Text oder mit Fehler: {p}.', { t: nTexts(r.docs_done), p: fmtInt(problems) }),
     stage: r.stopped || doneText,
     switched: r.stopped,
-    cancelled: t('Abgebrochen nach {n} von {m} Texten. Bereits verarbeitete Texte bleiben im Index.', { n: fmtInt(r.docs_done), m: fmtInt(r.docs_total) }),
+    cancelled: t('{n} von {m} Texten verarbeitet.', { n: fmtInt(r.docs_done), m: fmtInt(r.docs_total) }),
     error: r.error || t('Fehler'),
   }[out];
+  // Abgebrochen: Offen ist, was die Tabelle jetzt zeigt – die Wahl der Kopien kann sich seit dem Lauf geändert haben
+  const corpus = out === 'cancelled' && r.corpus_id && (state.corpora || []).find(c => c.id === r.corpus_id);
+  const standNow = corpus ? h('div', { class: 'small' }, t('Stand jetzt in „{name}“: {t} · {i} indexiert · {e} einzubetten · {p} offen · Probleme: {x}', {
+    name: corpus.name, t: nTexts(corpus.stats.documents), i: fmtInt(nIndexed(corpus.stats)), e: fmtInt(corpus.stats.to_embed || 0),
+    p: fmtInt(corpus.stats.pending || 0), x: fmtInt((corpus.stats.no_text || 0) + (corpus.stats.error || 0)) })) : null;
   const action = { problems: btn(t('Probleme ansehen'), { size: 'sm', icon: 'alert', onClick: showProblems }),
     stage: btn(t('Jetzt weitermachen'), { size: 'sm', kind: 'primary', icon: 'play', disabled: !!runningJob('index'), onClick: () => continueRun(r) }),
     switched: btn(t('Mit dem neuen Modell weitermachen'), { size: 'sm', kind: 'primary', icon: 'play', disabled: !!runningJob('index'), onClick: () => continueRun(r) }),
-    cancelled: btn(t('Fortsetzen'), { size: 'sm', kind: 'primary', icon: 'play', disabled: !!runningJob('index'), onClick: () => continueRun(r) }),
+    cancelled: btn(t('Indexieren'), { size: 'sm', kind: 'primary', icon: 'play', disabled: !!runningJob('index'), onClick: () => continueRun(r) }),
     error: btn(t('Erneut starten'), { size: 'sm', icon: 'refresh', disabled: !!runningJob('index'), onClick: () => continueRun(r) }) }[out];
   const d = s.runDetail;
   const docs = d ? d.docs.filter(x => s.runDocsFilter !== 'problems' || !['indexed', 'embedded'].includes(x.status)) : [];
@@ -551,7 +556,7 @@ function reportCard(r) {
       h('span', { class: 'small' }, `${fmtDate(r.started_at)} · ${t('Dauer {d}', { d: runDuration(r) })} · ${triggerLabel(r)}`),
       r.model && h('span', { class: 'small' }, t('Modell {m}', { m: r.model })),
       r.title && h('span', { class: 'muted small' }, r.title)),
-    notice(out === 'done' ? 'success' : out === 'error' ? 'error' : ['stage', 'switched'].includes(out) ? 'info' : 'warning', message, action ? h('div', { class: 'notice-actions' }, action) : null),
+    notice(out === 'done' ? 'success' : out === 'error' ? 'error' : ['stage', 'switched'].includes(out) ? 'info' : 'warning', message, [standNow, action ? h('div', { class: 'notice-actions' }, action) : null]),
     h('div', { class: 'stats-row' },
       stat(t('Texte verarbeitet'), fmtInt(r.docs_done)), stat(t('gelesen'), fmtInt(r.indexed)),
       embedded ? stat(t('nur eingebettet'), fmtInt(embedded)) : null, stat(t('ohne Text'), fmtInt(r.no_text)),

@@ -1132,7 +1132,6 @@ export default {
   '{tps} Tokens/s · ≈ {min} pro 100 Seiten · RAM {ram} · geladen in {s} s': '{tps} tokens/s · ≈ {min} per 100 pages · RAM {ram} · loaded in {s} s',
   // Index: Zustand, letzter Lauf, Verlauf; Korpora löschen
   '1 offenen Text indexieren': 'Index 1 open text',
-  'Abgebrochen nach {n} von {m} Texten. Bereits verarbeitete Texte bleiben im Index.': 'Cancelled after {n} of {m} texts. Texts already processed stay in the index.',
   'Abschnitte/s': 'Passages/s',
   'Alles aktuell': 'All up to date',
   'Anzeigen': 'Show',
@@ -1357,10 +1356,6 @@ export default {
   'Dasselbe Werk mehrfach in Zotero, z. B. in Meine Bibliothek und in einer Gruppe: Je Werk wird nur eine Kopie gelesen und verwendet. Erkannt an der DOI, sonst an Titel, Erstautor/in und Jahr.':
     'The same work more than once in Zotero, e.g. in My library and in a group: only one copy per work is read and used. Detected by DOI, otherwise by title, first author and year.',
   'Datei vorhanden, noch nicht gelesen': 'file available, not read yet',
-  'Die Regel wählt zuerst die Kopie mit lesbarem Text, dann die mit erkannten Seitenzahlen, dann die aus dieser Bibliothek. Sie gilt für Läufe im Hintergrund und aus Zotero und ist im Dialog vorgewählt.':
-    'The rule first picks the copy with readable text, then the one with detected page numbers, then the one from this library. It applies to background runs and runs started from Zotero and is preselected in the dialog.',
-  'Diese Werke sind in Zotero mehrfach vorhanden. Je Werk wird nur die gewählte Kopie gelesen und bei Fragen und im Forschungsstand verwendet – auch in Korpora, die nur eine andere Kopie enthalten. Vorgewählt ist der Vorschlag der Regel; ändern lässt sich die Wahl jederzeit unter Index → Dubletten.':
-    'These works exist more than once in Zotero. Only the chosen copy per work is read and used in questions and literature reviews – also in corpora that only contain another copy. The rule\'s suggestion is preselected; you can change the choice at any time under Index → Duplicates.',
   'Dubletten': 'Duplicates',
   'Dubletten ({n})': 'Duplicates ({n})',
   'Falls es verschiedene Werke sind, z. B. eine andere Auflage.': 'If they are different works, e.g. another edition.',
@@ -1380,8 +1375,6 @@ export default {
   'Vor dem Indexieren fragen, welche Kopie verwendet wird': 'Ask before indexing which copy to use',
   'Vor dem Indexieren: 1 Werk liegt doppelt vor': 'Before indexing: 1 work exists more than once',
   'Vor dem Indexieren: {n} Werke liegen doppelt vor': 'Before indexing: {n} works exist more than once',
-  'Vorschlag der Regel': 'suggested by the rule',
-  'ohne lesbaren Text': 'no readable text',
   '{n} als keine Dublette': '{n} marked as not a duplicate',
   '{n} nach der Regel': '{n} by the rule',
   '{n} von dir gewählt': '{n} chosen by you',
@@ -2563,4 +2556,16 @@ export default {
   'Die Fragen gehören zum aktiven Projekt. Für ein anderes zuerst wechseln (Strg+P); die Auswahl bleibt.': 'The questions belong to the active project. For another one, switch first (Ctrl+P); the selection stays.',
   'Fragen in „{name}“': 'Ask in “{name}”',
   'PubMed und OpenAlex sind vorgewählt. Wähle deine Disziplinen, dann schlägt die App passende Datenbanken vor.': 'PubMed and OpenAlex are preselected. Choose your disciplines, and the app suggests matching databases.',
+  'Datei vorhanden, aber kein lesbarer Text': 'file available, but no readable text',
+  'keine Datei': 'no file',
+  'im Korpus': 'in the corpus',
+  'Dubletten in „{name}“ neu wählen': 'Choose duplicates in “{name}” again',
+  'Diese Werke sind in Zotero mehrfach vorhanden. Je Werk wird nur die gewählte Kopie gelesen und bei Fragen und im Forschungsstand verwendet – auch in Korpora, die nur eine andere Kopie enthalten. Vorgewählt ist die Kopie aus dem Korpus, sofern sie gleichwertig ist; ändern lässt sich die Wahl jederzeit unter Index → Dubletten.': 'These works exist more than once in Zotero. Only the chosen copy of each work is read and used in questions and literature reviews – also in corpora that only contain another copy. The copy from the corpus is preselected if it is equally good; you can change the choice at any time under Index → Duplicates.',
+  'In diesem Korpus liegt kein Werk doppelt vor.': 'No work in this corpus exists more than once.',
+  'Gespeichert. Eine neu gewählte Kopie liest der nächste Lauf ein.': 'Saved. The next run reads a newly chosen copy.',
+  'Für einen Korpus neu wählen:': 'Choose again for a corpus:',
+  'Neu wählen …': 'Choose again …',
+  'Die Regel wählt zuerst die Kopie mit lesbarem Text, dann eine mit Datei, unter gleichwertigen die aus dem Korpus, dann die mit gelesenem Text und erkannten Seitenzahlen, dann die aus dieser Bibliothek.': 'The rule first picks a copy with readable text, then one with a file; among equally good copies the one from the corpus, then the one with text already read and detected page numbers, then the one from this library.',
+  '{n} von {m} Texten verarbeitet.': '{n} of {m} texts processed.',
+  'Stand jetzt in „{name}“: {t} · {i} indexiert · {e} einzubetten · {p} offen · Probleme: {x}': 'Status now in “{name}”: {t} · {i} indexed · {e} to embed · {p} open · problems: {x}',
 };

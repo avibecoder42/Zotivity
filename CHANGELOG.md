@@ -2,6 +2,24 @@
 
 All notable changes, newest first.
 
+## 1.2.1 – 2026-11-05
+
+### Fixed
+- **Duplicates: a copy with a file no longer loses to a copy without one.** If a PDF yielded no readable text, it counted the
+  same as no PDF at all, and the preferred library could win with a copy that has no file. The work then seemed to be missing
+  from the corpus. It now appears under problems, with the hint about text recognition.
+- **Duplicates: the copy from the collections you chose for a corpus comes first.** Among equally good copies, the dialog before
+  indexing preselects the copy from the corpus, even if another copy has already been read. Runs for one corpus or collection
+  that do not ask choose the same way.
+
+### New
+- **Index → Duplicates: choose again for a corpus.** This opens the selection for all works of a corpus, with its copies
+  preselected. Nothing changes until you apply it.
+
+### Changed
+- **Index → Last run:** a cancelled run now shows the current status of the corpus, with the same numbers as the corpora table,
+  and the button is called Index like there, because it reads what is open now and does not continue the old list.
+
 ## 1.2.0 – 2026-11-04
 
 ### New

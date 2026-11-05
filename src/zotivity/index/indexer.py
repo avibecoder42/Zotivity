@@ -623,8 +623,10 @@ class Indexer:
                 result["sync_error"] = str(e)
 
         raw_scope = self.scope(extra_items=items, collections=collections, corpus_id=corpus_id, resolve=False)
-        # Dubletten, über die vor dem Lauf niemand entschieden hat (Hintergrund, Zotero-Plugin): Regel übernehmen
-        progress["duplicates_auto"] = duplicates.acknowledge(self.store, raw_scope)
+        # Dubletten, über die vor dem Lauf niemand entschieden hat (Hintergrund, Zotero-Plugin): Regel übernehmen;
+        # gilt der Lauf einem Korpus, einer Sammlung oder Einträgen, zählen unter gleichwertigen Kopien deren eigene
+        own = raw_scope if corpus_id or collections or items else frozenset()
+        progress["duplicates_auto"] = duplicates.acknowledge(self.store, raw_scope, settings.indexing.duplicate_library, own)
         if progress["duplicates_auto"]:
             job.note(f"{progress['duplicates_auto']} Werke liegen doppelt vor – Kopie nach der Regel gewählt")
         scope = self.engine.resolve_copies(raw_scope)

@@ -1624,7 +1624,7 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
         if undecided:
             known = engine.store.duplicate_choices()
             works = [w for w in works if w not in known]
-        groups = duplicates.describe(engine.store, icfg.duplicate_library, works)
+        groups = duplicates.describe(engine.store, icfg.duplicate_library, works, raw if corpus_id else frozenset())
         for g in groups:
             for c in g["copies"]:
                 c["library"] = tr_exact(c["library"])

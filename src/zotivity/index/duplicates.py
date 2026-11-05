@@ -6,10 +6,12 @@ Erkennung aus den Metadaten im Index (Suchkatalog bzw. Abgleich):
   „Editorial“ oder „Einleitung“ (weniger als MIN_TITLE_WORDS Wörter) werden nur über die DOI zusammengefasst;
   Einträge mit verschiedenen DOIs nie (meist verschiedene Fassungen, z. B. Preprint und Artikel).
 
-Je Werk wird genau eine Kopie verwendet: die von Hand gewählte, sonst die nach der Regel – lesbarer Volltext vor
-fehlendem, erkannte Seitenzahlen, bevorzugte Bibliothek. Die übrigen Kopien werden weder gelesen noch eingebettet;
-Fragen und Forschungsstand sehen das Werk einmal, über die gewählte Kopie – auch in Korpora, die nur eine andere
-Kopie enthalten (der Umfang wird auf die gewählte Kopie abgebildet, siehe Engine.resolve_copies).
+Je Werk wird genau eine Kopie verwendet: die von Hand gewählte, sonst die nach der Regel – lesbarer Text vor einer Datei
+ohne Text, diese vor einer Kopie ganz ohne Datei, dann gelesener Text, erkannte Seitenzahlen, bevorzugte Bibliothek. Vor
+einem Lauf für einen bestimmten Umfang (Korpus, Sammlung) wird unter gleichwertigen Kopien die aus diesem Umfang
+vorgeschlagen. Die übrigen Kopien werden weder gelesen noch eingebettet; Fragen und Forschungsstand sehen das Werk einmal,
+über die gewählte Kopie – auch in Korpora, die nur eine andere Kopie enthalten (der Umfang wird auf die gewählte Kopie
+abgebildet, siehe Engine.resolve_copies).
 
 Entscheidungen (Tabelle duplicate_choices, je Werk):
 - user: von Hand gewählte Kopie (bleibt fest, solange sie zum Werk gehört);
@@ -24,7 +26,7 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 
 Key = tuple[str, str]
 
@@ -93,10 +95,10 @@ def find_groups(rows: Iterable[dict]) -> dict[str, list[Key]]:
     return {w: sorted(keys) for w, keys in groups.items() if len(keys) > 1}
 
 
-def quality(store, keys: Iterable[Key]) -> dict[Key, tuple[int, int]]:
-    """Je Kopie (Text, Seitenzahlen): Text 2 = gelesen, 1 = lesbare Datei noch nicht gelesen, 0 = keine;
-    Seitenzahlen 1 = gedruckte Seitenzahlen erkannt."""
-    out = {k: (0, 0) for k in keys}
+def quality(store, keys: Iterable[Key]) -> dict[Key, tuple[int, int, int]]:
+    """Je Kopie (Text, Seitenzahlen, Datei): Text 2 = gelesen, 1 = lesbare Datei noch nicht gelesen, 0 = keiner;
+    Seitenzahlen 1 = gedruckte Seitenzahlen erkannt; Datei 1 = eine Datei liegt vor, auch wenn sie keinen Text lieferte."""
+    out = {k: (0, 0, 0) for k in keys}
     for (lib, parent), atts in store.attachments_of(out).items():
         text = pages = 0
         for a in atts:
@@ -108,14 +110,20 @@ def quality(store, keys: Iterable[Key]) -> dict[Key, tuple[int, int]]:
                     pass
             elif a["status"] == "pending":
                 text = max(text, 1)
-        out[(lib, parent)] = (text, pages)
+        out[(lib, parent)] = (text, pages, 1 if atts else 0)
     return out
 
 
-def rule_choice(copies: list[Key], q: dict[Key, tuple[int, int]], prefer_lib: str) -> Key:
-    """Regel: lesbarer Volltext, dann Seitenzahlen, dann bevorzugte Bibliothek, dann „Meine Bibliothek“."""
-    return sorted(copies, key=lambda k: (-q.get(k, (0, 0))[0], -q.get(k, (0, 0))[1], k[0] != prefer_lib,
-                                         k[0] != "users/0", k))[0]
+def rule_choice(copies: list[Key], q: dict[Key, tuple[int, int, int]], prefer_lib: str,
+                own: Collection[Key] = frozenset()) -> Key:
+    """Regel: lesbarer Text vor einer Datei ohne Text, diese vor einer Kopie ohne Datei; unter gleichwertigen die aus dem
+    gewählten Umfang (own, auch wenn eine andere schon gelesen ist), dann gelesener Text, Seitenzahlen, bevorzugte
+    Bibliothek, „Meine Bibliothek“."""
+    def rank(k: Key) -> tuple:
+        text, pages, has_file = q.get(k, (0, 0, 0))
+        return (text == 0, -has_file, k not in own, -text, -pages, k[0] != prefer_lib, k[0] != "users/0", k)
+
+    return min(copies, key=rank)
 
 
 def resolve(store, prefer_lib: str) -> dict[str, dict]:
@@ -166,8 +174,9 @@ def collection_paths(store) -> dict[Key, str]:
     return {k: path(*k) for k in by}
 
 
-def describe(store, prefer_lib: str, works: Iterable[str] | None = None) -> list[dict]:
-    """Werke mit ihren Kopien für die Oberfläche: Bibliothek, Sammlungen, Text/Seitenzahlen, gewählt, Regelwahl."""
+def describe(store, prefer_lib: str, works: Iterable[str] | None = None, own: Collection[Key] = frozenset()) -> list[dict]:
+    """Werke mit ihren Kopien für die Oberfläche: Bibliothek, Sammlungen, Text/Seitenzahlen, gewählt, Regelwahl und der
+    Vorschlag für den Umfang own (die Kopien eines Korpus, siehe rule_choice)."""
     from zotivity.index.store import strip_bidi
 
     res = resolve(store, prefer_lib)
@@ -181,15 +190,17 @@ def describe(store, prefer_lib: str, works: Iterable[str] | None = None) -> list
     out = []
     for work, g in res.items():
         copies = []
+        suggest = rule_choice(g["copies"], g["quality"], prefer_lib, own)
         for k in g["copies"]:
             it = items.get(k) or {}
-            text, pages = g["quality"][k]
+            text, pages, has_file = g["quality"][k]
             copies.append({
                 "lib": k[0], "key": k[1], "library": names.get(k[0], k[0]), "title": it.get("title") or k[1],
                 "creators": strip_bidi(it.get("creator_summary") or ""), "year": it.get("year"),
                 "item_type": it.get("item_type") or "", "publication": it.get("publication") or "",
                 "collections": [p for p in (paths.get((k[0], c), "") for c in it.get("collections") or []) if p],
-                "text": text, "pages": bool(pages), "chosen": k == g["chosen"], "rule": k == g["rule"]})
+                "text": text, "pages": bool(pages), "file": bool(has_file), "chosen": k == g["chosen"], "rule": k == g["rule"],
+                "suggest": k == suggest, "in_corpus": k in own})
         main = next((c for c in copies if c["chosen"] or c["rule"]), copies[0])
         out.append({"work": work, "doi": work[4:] if work.startswith("doi:") else "", "mode": g["mode"],
                     "title": main["title"], "creators": main["creators"], "year": main["year"], "copies": copies})
@@ -197,10 +208,17 @@ def describe(store, prefer_lib: str, works: Iterable[str] | None = None) -> list
     return out
 
 
-def acknowledge(store, scope: set[Key]) -> int:
-    """Lauf ohne Rückfrage: neue Werke im Umfang übernehmen die Regel. Rückgabe: Zahl der neu vermerkten Werke."""
+def acknowledge(store, scope: set[Key], prefer_lib: str = "users/0", own: Collection[Key] = frozenset()) -> int:
+    """Lauf ohne Rückfrage: Neue Werke im Umfang übernehmen die Regel. Gilt der Lauf einem bestimmten Umfang (own), bleibt
+    es bei dessen Kopie, wenn sie gleichwertig ist. Rückgabe: Zahl der neu vermerkten Werke."""
     known = store.duplicate_choices()
     new = [w for w in works_touching(store, scope) if w not in known]
+    groups = store.duplicate_groups() if own else {}
+    q = quality(store, (k for w in new for k in groups[w])) if own else {}
     for w in new:
-        store.set_duplicate_choice(w, "rule")
+        pick = rule_choice(groups[w], q, prefer_lib, own) if own else None
+        if pick and pick != rule_choice(groups[w], q, prefer_lib):
+            store.set_duplicate_choice(w, "user", *pick)
+        else:
+            store.set_duplicate_choice(w, "rule")
     return len(new)
