@@ -9,7 +9,7 @@ import { t } from '../../core/i18n.js';
 import { fmtInt } from '../../core/util.js';
 import { btn, iconBtn, card, textInput, notice, badge, emptyState, spinner } from '../../ui/components.js';
 import { icon } from '../../ui/icons.js';
-import { R, rs, lazy, busy, isBusy, invalidate, refreshSummary, authorsShort, folderLabel, workspace, zoteroSelect } from './common.js';
+import { R, rs, lazy, busy, isBusy, invalidate, loadingNote, refreshSummary, authorsShort, folderLabel, workspace, zoteroSelect } from './common.js';
 
 const STATES = {
   missing: { label: () => t('fehlt noch'), kind: 'neutral' },
@@ -118,7 +118,7 @@ function sideCards(data) {
 export function fulltextTab() {
   const s = rs();
   const data = load(s);
-  if (!data) return h('div', { class: 'view-body muted' }, spinner(14), ' ', t('Lade …'));
+  if (!data) return h('div', { class: 'view-body' }, loadingNote('fulltext'));
   if (!data.items.length) {
     return h('div', { class: 'view-body scroll' }, h('div', { class: 'rs-narrow' },
       emptyState('pdf', t('Noch keine Texte für die Volltextprüfung'), t('Hier erscheinen die im Screening eingeschlossenen Treffer.'))));

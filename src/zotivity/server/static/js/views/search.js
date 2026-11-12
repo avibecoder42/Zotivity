@@ -24,7 +24,7 @@ const ADVANCED_KEYS = ['title', 'creator', 'publication', 'abstract', 'tags', 'd
 function st() {
   return ui('search', { query: { ...EMPTY_QUERY }, advanced: false, results: null, total: 0, busy: false,
     picked: new Map(), showPicked: false, lastIdx: null,
-    status: null, statusLoading: false, offset: 0, autoSynced: false, error: null,
+    status: null, statusLoading: false, statusFailedAt: 0, offset: 0, autoSynced: false, error: null,
     history: null, historyBusy: false, historyFilter: '', activeId: null, fromHistory: null });
 }
 
@@ -117,11 +117,22 @@ function historyPanel() {
     splitter('search', { def: 250, max: 480 }));
 }
 
-async function loadStatus(force = false) {
+// Scheitert die Abfrage, bleibt der Stand leer oder alt, und jedes Zeichnen fragte sofort wieder – pausenlos, solange
+// der Fehler anhält. Darum nach einem Fehler erst nach einer Pause wieder; nach einer Aktion (retry) sofort.
+const STATUS_RETRY_MS = 20000;
+
+async function loadStatus(force = false, { retry = false } = {}) {
   const s = st();
   if (s.statusLoading || (s.status && !force)) return;
+  if (!retry && s.statusFailedAt && Date.now() - s.statusFailedAt < STATUS_RETRY_MS) return;
   s.statusLoading = true;
-  try { s.status = await api.get('/api/library/status'); } catch { /* Dienst */ }
+  try {
+    s.status = await api.get('/api/library/status');
+    s.statusFailedAt = 0;
+  } catch {
+    s.statusFailedAt = Date.now();
+    setTimeout(update, STATUS_RETRY_MS + 200);  // nach der Pause neu zeichnen – dann der nächste Versuch
+  }
   s.statusLoading = false;
   // Beim ersten Öffnen: Katalog anlegen bzw. auffrischen, wenn Zotero läuft
   const z = state.status && state.status.zotero;
@@ -144,7 +155,7 @@ async function syncCatalog(quiet = false) {
   if (done.status === 'done') { if (!quiet) toast(t('Suchkatalog aktualisiert.'), 'success'); }
   else if (done.status === 'error') toast(done.error, 'error', 8000);
   s.status = null;
-  await loadStatus(true);
+  await loadStatus(true, { retry: true });
   if (s.results) doSearch(0);
   loadCorpora();
 }

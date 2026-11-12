@@ -43,8 +43,9 @@ def test_bibliography_from_several_libraries_is_sorted(zengine, monkeypatch):
     """Zotero sortiert je Bibliothek; über eigene Bibliothek und Gruppen hinweg ordnet Zotivity zusammen."""
     from zotivity.exporting import Citations
 
-    def load(self, zot, by_lib):
-        self.bib_html = ["Zeller, A. (2020). <i>Z</i>.", "Meier, B. (2019). <i>M</i>.", "Arnold, C. (2021). <i>A</i>."]
+    def load(self, zot, by_lib):  # zwei Pakete, wie Zotero sie je Bibliothek liefert
+        self._add_bib(["Zeller, A. (2020). <i>Z</i>."], [("users/0", "K1")])
+        self._add_bib(["Meier, B. (2019). <i>M</i>.", "Arnold, C. (2021). <i>A</i>."], [("groups/1", "K2"), ("groups/1", "K3")])
 
     monkeypatch.setattr(Citations, "_load_from_zotero", load)
     cit = Citations(zengine, [("users/0", "K1"), ("groups/1", "K2"), ("groups/1", "K3")], "apa", "de")

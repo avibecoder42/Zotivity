@@ -8,15 +8,20 @@ import { fmtDate } from '../../core/util.js';
 import { btn, card, field, textInput, textArea, checkbox, notice, emptyState, badge } from '../../ui/components.js';
 import { icon } from '../../ui/icons.js';
 import { R, rs, enc, loadProjects, openProject, closeProject, openTab, summaryLine, busy, isBusy, aiInfo, aiEstimate, tokenText,
-  noteUsage, zotivityProject, assignProject, saveLater, savePending, saveState, loadInfo } from './common.js';
+  noteUsage, zotivityProject, assignProject, saveLater, savePending, saveState, loadInfo, loadFailed, noteLoadFailed, loadOk, loadingNote } from './common.js';
 import { navigate } from '../shell.js';
 
 // ------------------------------------------------------------------ Liste
 export function projectList() {
   const s = rs();
   if (s.projects == null) {
-    loadProjects().catch(err => toast(err.message, 'error'));
-    return h('div', { class: 'center-pad muted' }, t('Lade Recherchen …'));
+    // Ein Abruf zur Zeit, und nach einem Fehler erst nach einer Pause wieder – nicht bei jedem Zeichnen
+    if (!s.busy['loading:projects'] && !loadFailed('projects')) {
+      s.busy['loading:projects'] = true;
+      loadProjects().then(() => loadOk('projects')).catch(err => { if (noteLoadFailed('projects')) toast(err.message, 'error'); })
+        .finally(() => { delete s.busy['loading:projects']; update(); });
+    }
+    return h('div', { class: 'center-pad' }, loadingNote('projects', t('Lade Recherchen …')));
   }
   if (!zotivityProject()) return emptyState('search', t('Kein Projekt geöffnet'), t('Eine Recherche gehört zu einem Projekt – zuerst unter Einrichtung ein Projekt öffnen oder anlegen.'));
   const create = () => busy('create', async () => {

@@ -8,8 +8,8 @@ import * as api from '../../core/api.js';
 import { t } from '../../core/i18n.js';
 import { fmtInt, debounce } from '../../core/util.js';
 import { btn, iconBtn, card, field, textInput, textArea, select, segmented, checkbox, notice, emptyState, badge, progress, spinner } from '../../ui/components.js';
-import { R, rs, enc, busy, isBusy, invalidate, needsLoad, refreshSummary, flushSaves, sourceLabel, sourceBadges, statusBadge, authorsShort,
-  loadProject, borderlineText, aiInfo, aiBadge, aiVisible, workspace, targetName, serverText } from './common.js';
+import { R, rs, enc, busy, isBusy, invalidate, needsLoad, loadFailed, noteLoadFailed, loadOk, loadingNote, refreshSummary, flushSaves, sourceLabel,
+  sourceBadges, statusBadge, authorsShort, loadProject, borderlineText, aiInfo, aiBadge, aiVisible, workspace, targetName, serverText } from './common.js';
 import { draft } from './project.js';
 import { librarySelect } from './folders.js';
 
@@ -28,15 +28,17 @@ function poolPath(s, f) {
   return `${R}/projects/${s.pid}/pool${q.length ? '?' + q.join('&') : ''}`;
 }
 
-export function loadPool() {
+// auto: vom Zeichnen ausgelöst (nicht von einer Aktion) – dann nach einem Fehler nur einmal melden, nicht bei jedem Versuch
+export function loadPool({ auto = false } = {}) {
   const s = rs();
   const f = fst();
   const seq = (f.seq = (f.seq || 0) + 1);
   s.busy['loading:pool'] = true;
-  return api.get(poolPath(s, f)).then(r => { if (seq === f.seq) { s.pool = r; delete s.stale.pool; } })
-    .catch(err => toast(err.message, 'error')).finally(() => { delete s.busy['loading:pool']; update(); });
+  return api.get(poolPath(s, f)).then(r => { if (seq === f.seq) { s.pool = r; delete s.stale.pool; } loadOk('pool'); })
+    .catch(err => { if (noteLoadFailed('pool') || !auto) toast(err.message, 'error'); })
+    .finally(() => { delete s.busy['loading:pool']; update(); });
 }
-const reload = debounce(loadPool, 350);
+const reload = debounce(() => loadPool(), 350);
 
 const STAT_KEYS = ['count', 'label', 'matched', 'hidden', 'exception', 'reviewed', 'flagged', 'included', 'excluded'];
 async function savePrefilters(list) {
@@ -254,10 +256,11 @@ function recallCard() {
   const s = rs();
   const st = ui(`rs-recall-${s.pid}`, { data: undefined, text: null, edit: false });
   if (st.data === undefined || needsLoad('recall')) {
-    if (!s.busy['loading:recall']) {
+    if (!s.busy['loading:recall'] && !loadFailed('recall')) {
       s.busy['loading:recall'] = true;
-      api.get(`${R}/projects/${s.pid}/recall`).then(r => { st.data = r; s.recall = r; delete s.stale.recall; })
-        .catch(() => { st.data = { papers: [], warnings: 0 }; }).finally(() => { delete s.busy['loading:recall']; update(); });
+      api.get(`${R}/projects/${s.pid}/recall`).then(r => { st.data = r; s.recall = r; delete s.stale.recall; loadOk('recall'); })
+        .catch(() => { st.data = st.data || { papers: [], warnings: 0 }; noteLoadFailed('recall'); })
+        .finally(() => { delete s.busy['loading:recall']; update(); });
     }
   }
   const data = st.data;
@@ -362,6 +365,7 @@ function openInScreening(rid) {
   const s = rs();
   const sc = ui('rs-screen', {});
   sc.status = 'all'; sc.jumpTo = rid;
+  invalidate('queue');
   s.queue = null;  // andere Auswahl (alle): nicht die alte zeigen
   s.tab = 'screening';
   update();
@@ -370,9 +374,9 @@ function openInScreening(rid) {
 export function poolTab() {
   const s = rs();
   const p = s.project;
-  if (needsLoad('pool') && !s.busy['loading:pool']) loadPool();
+  if (needsLoad('pool') && !s.busy['loading:pool'] && !loadFailed('pool')) loadPool({ auto: true });
   const pool = s.pool;
-  if (!pool) return h('div', { class: 'view-body muted' }, t('Lade Pool …'));
+  if (!pool) return h('div', { class: 'view-body' }, loadingNote('pool', t('Lade Pool …')));
   const f = fst();
   const sum = p.summary || {};
   const labels = Object.fromEntries(pool.prefilters.map(x => [x.id, serverText(x.label)]));

@@ -1928,13 +1928,22 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
 
     @app.put("/api/reviews/{rid}/outline")
     def review_set_outline(rid: int, body: dict = Body(...)):
-        reviews.set_outline(rid, body.get("outline"))
+        """Gliederung speichern: {"outline": {…}, "origin": [bisherige Stelle je Abschnitt oder null]}. Geschriebener
+        Text bleibt bei seinem Abschnitt (origin sagt, welcher das ist; ohne die Angabe gilt die gleiche Überschrift)."""
+        _review(rid)
+        reviews.set_outline(rid, body.get("outline"), body.get("origin"))
         return _review(rid)
 
     @app.post("/api/reviews/{rid}/write")
-    def review_write(rid: int):
-        _review(rid)
-        return job_or_409("review", "Forschungsstand: Schreiben", lambda job: reviews.write(job, rid),
+    def review_write(rid: int, body: dict = Body(default={})):
+        """Fehlende Abschnitte schreiben; vorhandene bleiben. {"restart": true} schreibt den ganzen Text neu."""
+        from zotivity.rag.review import missing_sections
+
+        state = _review(rid).get("state") or {}
+        restart = bool((body or {}).get("restart"))
+        if not restart and state.get("outline") and not missing_sections(state):
+            raise HTTPException(400, "Alle Abschnitte sind schon geschrieben.")
+        return job_or_409("review", "Forschungsstand: Schreiben", lambda job: reviews.write(job, rid, restart=restart),
                           group="review")
 
     @app.post("/api/reviews/{rid}/sections/{index}/rewrite")
@@ -2088,13 +2097,17 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
             raise HTTPException(400, str(e)) from e
 
     @app.post("/api/update/install")
-    def update_install(body: dict = Body(...)):
+    def update_install(body: dict = Body(default={})):
+        """Update installieren: {"version": bestätigte Version}. Installer und Prüfsumme stammen aus dem Manifest der
+        eingestellten Update-Quelle, nie aus der Anfrage – sonst könnte jedes Programm auf dem Rechner den Dienst eine
+        beliebige Datei herunterladen und starten lassen."""
         from zotivity import updates
 
         if engine.jobs.running("index"):
             raise HTTPException(409, "Bitte zuerst die laufende Indexierung abbrechen oder abwarten.")
         try:
-            path = updates.download_installer(body.get("installer") or "", body.get("sha256") or "")
+            offer = updates.offer(engine.settings.update_url, str((body or {}).get("version") or ""))
+            path = updates.download_installer(offer["installer"], offer["sha256"])
         except updates.UpdateError as e:
             raise HTTPException(400, str(e)) from e
         except OSError as e:

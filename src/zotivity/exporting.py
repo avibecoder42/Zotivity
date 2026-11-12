@@ -169,6 +169,13 @@ def _message(engine: Engine, message_id: int) -> tuple[dict, str]:
 
 
 # ------------------------------------------------------------------------------------------- Zitationsdaten
+def _bib_sort_key(entry: str) -> str:
+    """Sortierschlüssel eines Verzeichniseintrags: der Text ohne Auszeichnung, ohne Gross-/Kleinschreibung und ohne
+    Akzente (Ö wie O) – sonst stünde „Özdemir“ hinter „Zimmermann“."""
+    text = unicodedata.normalize("NFKD", html.unescape(re.sub(r"<[^>]+>", "", entry)).strip())
+    return "".join(ch for ch in text if not unicodedata.combining(ch)).casefold()
+
+
 class Citations:
     """CSL-JSON, Kurzbelege, Literaturverzeichnis, BibTeX und Zotero-URIs für die Einträge eines Dokuments."""
 
@@ -197,6 +204,8 @@ class Citations:
             self.items.update(engine.store.removed_items(gone))
         self.csl: dict[tuple[str, str], dict] = {}
         self.bib_html: list[str] = []
+        self._bib_keys: set[tuple[str, str]] = set()  # Einträge, die Zotero für das Verzeichnis geliefert hat
+        self._bib_parts = 0  # Pakete, aus denen das Verzeichnis zusammengesetzt ist (jedes für sich sortiert)
         self.bibtex: dict[tuple[str, str], tuple[str, str]] = {}  # → (citekey, eintrag)
         self.uris: dict[tuple[str, str], str] = {}
         self.from_zotero = False
@@ -218,17 +227,32 @@ class Citations:
                 self.from_zotero = True
             except Exception as e:  # noqa: BLE001 - Rückfall auf gespeicherte Metadaten
                 log.info("Zitationsdaten aus Zotero nicht verfügbar: %s", e)
-            # Zotero sortiert je Bibliothek: Einträge aus mehreren Bibliotheken (eigene und Gruppen) zusammen ordnen
-            if len(by_lib) > 1 and self.bib_html and self.style_format != "numeric":
-                self.bib_html.sort(key=lambda e: html.unescape(re.sub(r"<[^>]+>", "", e)).strip().casefold())
         for k in self.keys:
             self.csl.setdefault(k, self._csl_fallback(k))
             self.uris.setdefault(k, self._uri_fallback(k))
             if k not in self.bibtex:
                 self.bibtex[k] = self._bibtex_fallback(k)
-        if not self.bib_html:
-            self.bib_html = [html.escape(self._bib_fallback(k)) for k in self._sorted_keys()]
+        # Jeder Eintrag steht im Verzeichnis: Was Zotero nicht geliefert hat (Abruf mittendrin gescheitert, Eintrag in
+        # Zotero gelöscht), kommt aus den gespeicherten Angaben
+        missing = [k for k in self._sorted_keys() if k not in self._bib_keys]
+        self.bib_html += [html.escape(self._bib_fallback(k)) for k in missing]
+        # Zotero sortiert jedes Paket (50 Einträge, je Bibliothek) für sich: mehrere Pakete zusammen ordnen. Ein einzelnes
+        # Paket bleibt, wie Zotero es liefert; numerische Stile ordnen nach der Reihenfolge der Belege.
+        if self._bib_parts + len(missing) > 1 and self.style_format != "numeric":
+            self.bib_html.sort(key=_bib_sort_key)
         self._unique_bibtex_keys()
+
+    def _bib_from_zotero(self, zot, lib: str, keys: list[str], locale: str) -> list[str] | None:
+        r = zot._request("GET", f"/api/{lib}/items", params={"itemKey": ",".join(keys), "format": "bib",
+                                                              "style": self.style, "locale": locale})
+        if r.status_code != 200:
+            return None
+        return re.findall(r'<div class="csl-entry"[^>]*>(.*?)</div>', r.text, re.S)
+
+    def _add_bib(self, entries: list[str], keys: list[tuple[str, str]]) -> None:
+        self.bib_html += entries
+        self._bib_keys.update(keys)
+        self._bib_parts += 1
 
     def _load_from_zotero(self, zot, by_lib: dict[str, list[str]]) -> None:
         locale = LOCALES[self.language]
@@ -242,10 +266,14 @@ class Citations:
                         key = str(entry.get("id", "")).split("/")[-1]
                         if key in batch:
                             self.csl[(lib, key)] = entry
-                r = zot._request("GET", f"/api/{lib}/items", params={"itemKey": ",".join(batch), "format": "bib",
-                                                                      "style": self.style, "locale": locale})
-                if r.status_code == 200:
-                    self.bib_html += re.findall(r'<div class="csl-entry"[^>]*>(.*?)</div>', r.text, re.S)
+                got = self._bib_from_zotero(zot, lib, batch, locale)
+                if got is not None and len(got) == len(batch):
+                    self._add_bib(got, [(lib, k) for k in batch])
+                elif len(batch) > 1:  # Paket unvollständig: je Eintrag einzeln, damit keiner still fehlt
+                    for key in batch:
+                        one = self._bib_from_zotero(zot, lib, [key], locale)
+                        if one:
+                            self._add_bib(one[:1], [(lib, key)])
             for key in keys:
                 r = zot._request("GET", f"/api/{lib}/items/{key}", params={"format": "bibtex"})
                 if r.status_code == 200 and r.text.strip().startswith("@"):

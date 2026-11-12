@@ -2,6 +2,33 @@
 
 All notable changes, newest first.
 
+## 1.2.2 – 2026-11-12
+
+Fixes from a review of the whole code with Claude Fable 5.2: the findings that could cost money or data.
+
+### Fixed
+- **Literature review: writing continues where it stopped.** After an error or a cancelled run, the next run wrote every
+  section again. It now keeps what is written and continues with the first missing section. **Rewrite** for the whole text
+  asks first.
+- **Literature review: Save outline keeps the written text.** Saving the outline deleted all sections, even after changing
+  only a word count. The text now stays with its section when you move, rename or change it; the app asks only if you removed
+  a section that already has text.
+- **Bibliography is complete and sorted.** A cited text that Zotero did not return was missing without notice; it now gets
+  an entry from the stored data. Exports with more than 50 entries are sorted as one list, no longer in blocks of 50.
+- **Database search: translating a PubMed string no longer changes the search silently.** Unknown field tags such as `[la]`
+  and unbalanced parentheses give a note, a tag applies to the whole phrase before it, and mixed AND/OR chains keep the
+  reading of PubMed.
+- **Database search: search protocol and flow diagram show the same numbers.** The protocol counted superseded runs and left
+  out decided records hidden by a prefilter.
+- **Database search: the same title alone no longer counts as "already in Zotero".** Year, DOI and PMID must not contradict,
+  as in the pool. Before, a preprint or a new edition could hide the record and be filed instead of it.
+- **Screening: the card stays on the same record** when the list reloads during an AI run, and a list that arrives late no
+  longer appears under another selection.
+- **Views no longer repeat a failed request without pause.** Search, the tabs of the database search and Settings → Expert now
+  wait before the next attempt and offer **Try again**.
+- **Update: only the installer of the configured update source.** Address and checksum came from the request; they now come
+  from the manifest of the update source, and nothing starts without a matching checksum.
+
 ## 1.2.1 – 2026-11-05
 
 ### Fixed

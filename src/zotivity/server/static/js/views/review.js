@@ -456,16 +456,44 @@ function stat(label, value, title) {
   return h('div', { class: 'stat', title }, h('div', { class: 'stat-value' }, value), h('div', { class: 'stat-label' }, label));
 }
 
+const wordsOf = sec => ((sec && sec.text) || '').split(/\s+/).filter(Boolean).length;
+
+// Abschnitte der Gliederung, zu denen noch kein Text steht (Schreiben abgebrochen oder Abschnitt später ergänzt)
+function missingSections(r) {
+  const planned = (r.state.outline && r.state.outline.sections) || [];
+  const written = r.state.sections || [];
+  return planned.map((sec, i) => ({ index: i, heading: sec.heading })).filter(x => !wordsOf(written[x.index]));
+}
+
+// Gliederung speichern. Geschriebener Text bleibt bei seinem Abschnitt: _from nennt dem Dienst die bisherige Stelle,
+// auch nach Verschieben oder Umbenennen. Nur der Text entfernter Abschnitte ginge verloren – danach wird gefragt.
+async function saveOutline(r) {
+  const s = st();
+  const o = s.outline;
+  const kept = new Set(o.sections.map(x => x._from).filter(x => x != null));
+  const lost = (r.state.sections || []).filter((x, i) => wordsOf(x) && !kept.has(i));
+  if (lost.length && !await confirmDialog(t('Geschriebenen Text löschen?'),
+    t('Zu den entfernten Abschnitten gibt es schon Text: {list}. Mit dem Speichern wird er gelöscht; der Text der übrigen Abschnitte bleibt.', { list: lost.map(x => `„${x.heading}“`).join(', ') }),
+    { ok: t('Speichern und Text löschen'), danger: true })) return;
+  const outline = { ...o, sections: o.sections.map(({ _from, ...sec }) => sec) };
+  await run(() => api.put(`/api/reviews/${r.id}/outline`, { outline, origin: o.sections.map(x => (x._from == null ? null : x._from)) }));
+  s.outlineDirty = false; toast(t('Gliederung gespeichert'), 'success', 2000); openReview(r.id, { keepTab: true });
+}
+
 function outlineEditor(r) {
   const s = st();
-  if (!s.outline) s.outline = JSON.parse(JSON.stringify(r.state.outline));
+  if (!s.outline) {
+    s.outline = JSON.parse(JSON.stringify(r.state.outline));
+    s.outline.sections.forEach((sec, i) => { sec._from = i; });  // bisherige Stelle: daran hängt der geschriebene Text
+  }
   const o = s.outline;
   const docs = Object.fromEntries((r.docs || []).map(d => [d.item_key, d]));
   const dirty = () => { s.outlineDirty = true; update(); };
   const move = (i, d) => { const [x] = o.sections.splice(i, 1); o.sections.splice(i + d, 0, x); dirty(); };
   const total = o.sections.reduce((a, x) => a + (Number(x.words) || 0), 0);
-  // Geschriebene Wörter je Abschnitt (nur solange die Gliederung nicht umgestellt ist)
-  const written = s.outlineDirty ? [] : (r.state.sections || []).map(x => (x.text || '').split(/\s+/).filter(Boolean).length);
+  // Geschriebene Wörter je Abschnitt – der Text bleibt bei seinem Abschnitt, auch wenn die Gliederung umgestellt wird
+  const texts = r.state.sections || [];
+  const written = o.sections.map(sec => (sec._from != null && wordsOf(texts[sec._from])) || null);
   return h('div', { class: 'stack' },
     field(t('Titel'), textInput({ value: o.title || '', onInput: v => { o.title = v; s.outlineDirty = true; }, onChange: () => update() })),
     h('div', { class: 'outline' }, o.sections.map((sec, i) => h('div', { key: i, class: 'outline-sec' },
@@ -479,7 +507,7 @@ function outlineEditor(r) {
           (sec.keys || []).map(k => h('span', { key: k, class: 'chip', title: docs[k] ? docs[k].title : t('unbekannter Text') }, h('span', null, docs[k] ? docs[k].citation : k),
             h('button', { class: 'chip-x', title: t('Entfernen'), onclick: () => { sec.keys = sec.keys.filter(x => x !== k); dirty(); } }, icon('x', 11)))))),
       h('div', { class: 'outline-tools' },
-        i < (r.state.sections || []).length && iconBtn('edit', t('Diesen Abschnitt neu schreiben'), () => rewriteSection(r, i), { disabled: s.outlineDirty || !!currentJob() }),
+        !s.outlineDirty && wordsOf(texts[i]) > 0 && iconBtn('edit', t('Diesen Abschnitt neu schreiben'), () => rewriteSection(r, i), { disabled: !!currentJob() }),
         iconBtn('chevronUp', t('Nach oben'), () => move(i, -1), { disabled: i === 0 }),
         iconBtn('chevronDown', t('Nach unten'), () => move(i, 1), { disabled: i === o.sections.length - 1 }),
         iconBtn('trash', t('Abschnitt entfernen'), () => { o.sections.splice(i, 1); dirty(); }))))),
@@ -488,23 +516,29 @@ function outlineEditor(r) {
       h('span', { class: 'muted small' }, t('insgesamt ca. {n} Wörter', { n: fmtInt(total) })),
       h('div', { class: 'spacer' }),
       s.outlineDirty && btn(t('Verwerfen'), { size: 'sm', kind: 'ghost', onClick: () => { s.outline = null; s.outlineDirty = false; update(); } }),
-      s.outlineDirty && btn(t('Gliederung speichern'), { size: 'sm', kind: 'primary', icon: 'check', onClick: async () => {
-        await run(() => api.put(`/api/reviews/${r.id}/outline`, { outline: o }));
-        s.outlineDirty = false; toast(t('Gliederung gespeichert'), 'success', 2000); openReview(r.id, { keepTab: true });
-      } })));
+      s.outlineDirty && btn(t('Gliederung speichern'), { size: 'sm', kind: 'primary', icon: 'check', onClick: () => saveOutline(r) })));
 }
 
 // 4. Schreiben: Gliederung, dann die Abschnitte – der fertige Text erscheint unter „Prüfen“
 function step4(r, job) {
   const s = st();
   const hasOutline = !!r.state.outline;
-  const written = (r.state.sections || []).length;
+  const planned = hasOutline ? r.state.outline.sections.length : 0;
+  const missing = hasOutline ? missingSections(r).length : 0;
+  const written = planned - missing;
   const outline = btn(hasOutline ? t('Gliederung neu erstellen') : t('Gliederung erstellen'), { kind: 'ai', icon: 'layers', disabled: !!job,
     onClick: async () => { if (hasOutline && !await confirmDialog(t('Gliederung neu erstellen?'), t('Die bisherige Gliederung und bereits geschriebene Abschnitte werden ersetzt.'), { ok: t('Neu erstellen'), ai: true })) return; s.outline = null; startJob(`/api/reviews/${r.id}/outline`, t('Gliederung erstellt')); } });
-  const write = hasOutline && btn(written ? t('Neu schreiben') : t('Abschnitte schreiben'), { kind: 'ai', icon: 'edit',
-    disabled: s.outlineDirty || !!job, why: s.outlineDirty ? t('Zuerst die Gliederung speichern.') : t('Es läuft bereits ein Auftrag.'),
+  const busy = { disabled: s.outlineDirty || !!job, why: s.outlineDirty ? t('Zuerst die Gliederung speichern.') : t('Es läuft bereits ein Auftrag.') };
+  // Fehlende Abschnitte schreiben: Was schon geschrieben ist, bleibt (auch nach einem Fehler oder Abbruch)
+  const resume = hasOutline && missing > 0 && btn(written ? t('Fehlende Abschnitte schreiben ({n})', { n: missing }) : t('Abschnitte schreiben'), { kind: 'ai', icon: 'edit', ...busy,
     onClick: () => startJob(`/api/reviews/${r.id}/write`, t('Forschungsstand geschrieben'), { nextTab: 5 }) });
-  const actions = [outline, write, written ? nextBtn(5, t('Weiter: Prüfen')) : null];
+  // Alles neu schreiben ersetzt den vorhandenen Text – nur nach Rückfrage
+  const rewrite = hasOutline && written > 0 && btn(t('Neu schreiben'), { kind: 'ai', icon: 'edit', ...busy,
+    onClick: async () => {
+      if (!await confirmDialog(t('Ganzen Text neu schreiben?'), t('Alle {n} Abschnitte werden neu geschrieben. Der vorhandene Text wird dabei ersetzt und lässt sich nicht zurückholen, auch nicht durch Abbrechen. Einen einzelnen Abschnitt schreibst du mit dem Stift in der Gliederung neu.', { n: planned }), { ok: t('Neu schreiben'), ai: true })) return;
+      startJob(`/api/reviews/${r.id}/write`, t('Forschungsstand geschrieben'), { nextTab: 5, body: { restart: true } });
+    } });
+  const actions = [outline, resume, rewrite, written ? nextBtn(5, t('Weiter: Prüfen')) : null];
   const body = h('div', { class: 'stack' },
     h('p', { class: 'muted' }, t('Aus allen Auswertungsblättern entsteht eine thematische Gliederung (nicht Text für Text). Du kannst sie anpassen, bevor die Abschnitte nacheinander geschrieben werden. Jede Aussage wird mit dem Text belegt, aus dem sie stammt. Der fertige Text erscheint unter „Prüfen“.')),
     hasOutline ? card(t('Gliederung'), 'layers', outlineEditor(r)) : null);
@@ -540,7 +574,9 @@ function checkWarnings(r, c, job) {
   const incomplete = c.incomplete_sections || [];
   const long = c.long_sections || [];
   const removed = c.removed_docs || [];
+  const missing = missingSections(r);
   const parts = [
+    missing.length && plural(missing.length, t('Abschnitt noch nicht geschrieben'), t('Abschnitte noch nicht geschrieben')),
     incomplete.length && plural(incomplete.length, t('unvollständiger Abschnitt'), t('unvollständige Abschnitte')),
     long.length && plural(long.length, t('zu langer Abschnitt'), t('zu lange Abschnitte')),
     c.unverified_quotes.length && plural(c.unverified_quotes.length, t('unklares Zitat'), t('unklare Zitate')),
@@ -550,6 +586,9 @@ function checkWarnings(r, c, job) {
   ].filter(Boolean);
   if (!parts.length) return null;
   const body = () => h('div', { class: 'stack' },
+    missing.length ? notice('warning', t('Diese Abschnitte der Gliederung sind noch nicht geschrieben: {list}. Der Text ist deshalb unvollständig.', { list: missing.map(x => `„${x.heading}“`).join(', ') }),
+      h('div', { class: 'notice-actions' }, btn(t('Fehlende Abschnitte schreiben ({n})', { n: missing.length }), { size: 'sm', kind: 'ai', icon: 'edit', disabled: !!job, why: t('Es läuft bereits ein Auftrag.'),
+        onClick: () => startJob(`/api/reviews/${r.id}/write`, t('Forschungsstand geschrieben')) }))) : null,
     incompleteCard(r, job),
     longCard(r, job),
     c.unknown_keys.length ? notice('error', t('Belege auf Texte, die nicht zur Auswahl gehören: {keys}. Diese Stellen bitte prüfen.', { keys: c.unknown_keys.join(', ') })) : null,
@@ -574,7 +613,8 @@ function step5(r, job) {
     btn(t('Kopieren'), { icon: 'copy', onClick: () => copyTarget({ kind: 'review', id: r.id }) }),
     btn(t('Exportieren …'), { kind: 'primary', icon: 'download', onClick: e => exportMenu(e, { kind: 'review', id: r.id }, name) }),
   ];
-  const clean = c && !c.unverified_quotes.length && !c.unknown_keys.length && !(c.incomplete_sections || []).length && !(c.removed_docs || []).length && !(c.long_sections || []).length;
+  const clean = c && !c.unverified_quotes.length && !c.unknown_keys.length && !(c.incomplete_sections || []).length && !(c.removed_docs || []).length && !(c.long_sections || []).length
+    && !missingSections(r).length;
   const body = h('div', { class: 'stack' },
     c ? h('div', { class: 'stats-row' },
       stat(c.planned_words ? t('Wörter (geplant: {n})', { n: fmtInt(c.planned_words) }) : t('Wörter'), fmtInt(c.words),

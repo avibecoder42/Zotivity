@@ -5,7 +5,7 @@ import { state, update, ui, run, toast } from '../../core/store.js';
 import * as api from '../../core/api.js';
 import { t } from '../../core/i18n.js';
 import { fmtInt } from '../../core/util.js';
-import { badge, paneProps, splitter } from '../../ui/components.js';
+import { badge, btn, notice, paneProps, splitter } from '../../ui/components.js';
 
 export const R = '/api/research';
 
@@ -19,6 +19,7 @@ const SERVER_TEXTS = [
   [/^andere Art als (.*)$/, a => t('andere Art als {a}', { a })],
   [/^(.+): Platzhalter \(\*\) hier nicht möglich – entfernt; Wortformen ggf\. ausschreiben\.$/, a => t('{a}: Platzhalter (*) hier nicht möglich – entfernt; Wortformen ggf. ausschreiben.', { a })],
   [/^Platzhalter entfernt \((.*)\)\. OpenAlex sucht mit Wortstämmen; Wortformen wie „teenagers“ zu „teen\*“ ggf\. ergänzen\.$/, a => t('Platzhalter entfernt ({a}). OpenAlex sucht mit Wortstämmen; Wortformen wie „teenagers“ zu „teen*“ ggf. ergänzen.', { a })],
+  [/^Feldkürzel (.+) kennt die Übersetzung nicht \(nur Titel, Titel\/Abstract und MeSH\)\. Die Begriffe davor .*$/, a => t('Feldkürzel {a} kennt die Übersetzung nicht (nur Titel, Titel/Abstract und MeSH). Die Begriffe davor werden als Freitext gesucht und engen die Suche falsch ein – bitte aus dem Suchstring entfernen und Sprache, Jahr oder Publikationstyp über die Einschränkungen der Suche setzen.', { a })],
   [/^(\S+) Treffer, geholt wurden die (\S+) relevantesten\.$/, (a, b) => t('{a} Treffer, geholt wurden die {b} relevantesten.', { a, b })],
   [/^PubMed liefert über die API höchstens (\S+) Datensätze – Suche eingrenzen\.$/, a => t('PubMed liefert über die API höchstens {a} Datensätze – Suche eingrenzen.', { a })],
   [/^swisscovery wertet mehrere Klammerblöcke nicht richtig aus: abgefragt wird der engste Block \((\S+) Treffer\); die übrigen prüft die App nach dem Abruf\. Die Trefferzahl ist eine Obergrenze\.$/, a => t('swisscovery wertet mehrere Klammerblöcke nicht richtig aus: abgefragt wird der engste Block ({a} Treffer); die übrigen prüft die App nach dem Abruf. Die Trefferzahl ist eine Obergrenze.', { a })],
@@ -49,6 +50,7 @@ export function openTab(id) {
   const s = rs();
   flushSaves();
   s.tab = id;
+  s.failed = {};  // Wechsel des Reiters: gescheiterte Abrufe gleich noch einmal versuchen
   invalidate('flow', 'fulltext');  // Stand kann sich geändert haben
   update();
 }
@@ -69,7 +71,7 @@ export const projectSources = () => ((rs().project && rs().project.settings && r
 
 export const rs = () => ui('research', {
   info: null, projects: null, pid: null, project: null, tab: 'project', zotero: {},
-  queries: null, runs: null, pool: null, queue: null, plan: null, flow: null, fulltext: null, busy: {}, stale: {},
+  queries: null, runs: null, pool: null, queue: null, plan: null, flow: null, fulltext: null, busy: {}, stale: {}, failed: {},
 });
 
 export const enc = encodeURIComponent;
@@ -120,7 +122,10 @@ export async function refreshSummary() {
 // Neu laden beim nächsten Zeichnen; bis dahin bleiben die bisherigen Daten stehen (kein Springen, Scrollposition bleibt)
 export function invalidate(...keys) {
   const s = rs();
-  for (const k of keys) if (s[k] != null) s.stale[k] = true;
+  for (const k of keys) {
+    if (s[k] != null) s.stale[k] = true;
+    delete s.failed[k];
+  }
 }
 
 export function needsLoad(key) {
@@ -128,11 +133,43 @@ export function needsLoad(key) {
   return s[key] == null || !!s.stale[key];
 }
 
+// Scheitert ein Abruf, bleibt der Wert leer, und das nächste Zeichnen würde sofort wieder fragen – bei einem anhaltenden
+// Fehler pausenlos, eine Anfrage und eine Fehlermeldung nach der anderen. Darum merkt sich die Ansicht den Fehler: Neu
+// geladen wird erst nach einer Pause (von selbst), auf „Erneut versuchen“, beim Wechsel des Reiters oder wenn eine
+// Aktion die Daten für veraltet erklärt (invalidate).
+export const RETRY_MS = 20000;
+
+export function loadFailed(key) {
+  const at = rs().failed[key];
+  return at != null && Date.now() - at < RETRY_MS;
+}
+
+// Fehler merken. true beim ersten Fehler in Folge: Nur dann lohnt eine Meldung, nicht bei jedem neuen Versuch.
+export function noteLoadFailed(key) {
+  const s = rs();
+  const first = s.failed[key] == null;
+  s.failed[key] = Date.now();
+  setTimeout(update, RETRY_MS + 200);  // nach der Pause neu zeichnen – die Ansicht versucht es dann noch einmal
+  return first;
+}
+
+export function loadOk(key) {
+  delete rs().failed[key];
+}
+
+// Platzhalter, solange Daten geladen werden; nach einem gescheiterten Abruf die Meldung mit „Erneut versuchen“
+export function loadingNote(key, text = t('Lade …')) {
+  const s = rs();
+  if (s.failed[key] == null) return h('div', { class: 'muted' }, text);
+  return notice('error', t('Die Daten konnten nicht geladen werden. Zotivity versucht es gleich von selbst noch einmal.'),
+    h('div', { class: 'notice-actions' }, btn(t('Erneut versuchen'), { size: 'sm', icon: 'refresh', onClick: () => { delete s.failed[key]; update(); } })));
+}
+
 export function openProject(pid, tab) {
   const s = rs();
   if (s.pid !== pid) {
     flushSaves();
-    Object.assign(s, { pid, project: null, queries: null, runs: null, pool: null, queue: null, plan: null, recall: null, flow: null, fulltext: null, stale: {} });
+    Object.assign(s, { pid, project: null, queries: null, runs: null, pool: null, queue: null, plan: null, recall: null, flow: null, fulltext: null, stale: {}, failed: {} });
     ui('rs-screen', {}).index = 0;
   }
   if (tab) s.tab = tab;
@@ -146,13 +183,14 @@ export function closeProject() {
   loadProjects().catch(() => {});
 }
 
-// Einmal laden, solange nichts invalidiert wurde
+// Einmal laden, solange nichts invalidiert wurde. Nach einem Fehler erst nach einer Pause wieder (siehe loadFailed).
 export function lazy(key, path, map = x => x) {
   const s = rs();
   const flag = `loading:${key}`;
-  if (!needsLoad(key) || s.busy[flag]) return s[key];
+  if (!needsLoad(key) || s.busy[flag] || loadFailed(key)) return s[key];
   s.busy[flag] = true;
-  api.get(path).then(r => { s[key] = map(r); delete s.stale[key]; }).catch(err => { s[key] = undefined; toast(err.message, 'error', 8000); })
+  api.get(path).then(r => { s[key] = map(r); delete s.stale[key]; loadOk(key); })
+    .catch(err => { s[key] = undefined; if (noteLoadFailed(key)) toast(err.message, 'error', 8000); })
     .finally(() => { delete s.busy[flag]; update(); });
   return s[key];
 }

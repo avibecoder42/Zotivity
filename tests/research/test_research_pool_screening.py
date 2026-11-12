@@ -133,6 +133,35 @@ def test_prefilters_and_zotero_match(service, zotero):
     assert service.summary(pid)["visible"] == 1
 
 
+def test_zotero_match_by_title_respects_years_and_ids(service, zotero):
+    """Ein gleicher Titel genügt nicht: Preprint und Artikel, Neuauflage oder „Letter to the editor“ sind andere Arbeiten
+    (Code-Prüfung 2026-11-11, E13) – sonst blendet der Vorfilter sie aus, und die Übergabe legt den fremden Eintrag ab."""
+    pid = make_project(service)["id"]
+    run = service.store.add_run(pid, kind="import", source="ris")
+    title = "Digital drama among adolescents in group chats"
+    service.store.add_records(pid, run, [
+        {"title": title, "year": 2024, "doi": "10.5/article"},                         # in Zotero liegt nur der Preprint
+        {"title": "Teasing and banter in WhatsApp groups", "year": 2019},              # in Zotero: Auflage von 2008
+        {"title": "Online conflict in classroom chats today", "year": 2021},           # gleiches Jahr, keine Kennungen
+        {"title": "Something completely different here", "doi": "10.5/same", "year": 2015},  # gleiche DOI, anderer Titel
+    ])
+    zotero.items = {
+        "PRE": {"key": "PRE", "data": {"title": title, "DOI": "10.5/preprint", "date": "2023-11-02"}},
+        "OLD": {"key": "OLD", "data": {"title": "Teasing and banter in WhatsApp groups", "date": "2008"}},
+        "NEW": {"key": "NEW", "data": {"title": "Online conflict in classroom chats today", "date": "March 2021"}},
+        "DOI": {"key": "DOI", "data": {"title": "Ein anderer Titel in Zotero", "extra": "DOI: 10.5/SAME", "date": "1999"}},
+    }
+    assert service.zotero_match(pid)["matches"] == 2
+    keys = {r["title"]: r["zotero_key"] for r in service.store.records(pid)}
+    assert keys == {title: "", "Teasing and banter in WhatsApp groups": "",
+                    "Online conflict in classroom chats today": "NEW", "Something completely different here": "DOI"}
+    # Zwei Einträge mit gleichem Titel in Zotero: Es zählt der, der nicht widerspricht
+    zotero.items["ART"] = {"key": "ART", "data": {"title": title, "DOI": "10.5/other", "date": "2024"}}
+    zotero.items["FIT"] = {"key": "FIT", "data": {"title": title, "date": "2024"}}
+    service.zotero_match(pid)
+    assert {r["title"]: r["zotero_key"] for r in service.store.records(pid)}[title] == "FIT"
+
+
 def test_handed_over_records_stay_visible(service):
     """Die Übergabe setzt den Zotero-Schlüssel – das darf gesichtete Treffer nicht nachträglich ausblenden."""
     pid = make_project(service)["id"]

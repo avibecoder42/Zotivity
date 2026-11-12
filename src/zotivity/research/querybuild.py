@@ -15,9 +15,24 @@ from __future__ import annotations
 
 import re
 
-TAGGED = re.compile(r"\[[A-Za-z][A-Za-z ]*(?::[A-Za-z]+)?\]\s*$")
-FIELD_TAG = re.compile(r"\[([A-Za-z][A-Za-z ]*)(?::[A-Za-z]+)?\]")
+# Feldkürzel in eckigen Klammern, kurz ([tiab], [mesh:noexp]) oder ausgeschrieben ([Title/Abstract], [MeSH Terms])
+TAGGED = re.compile(r"\[[A-Za-z][A-Za-z /-]*(?::[A-Za-z]+)?\]\s*$")
+FIELD_TAG = re.compile(r"\[([A-Za-z][A-Za-z /-]*?)(?::[A-Za-z]+)?\]")
 MESH_TAGS = {"mesh", "mh", "majr", "mesh terms", "mesh major topic", "sh"}
+TITLE_TAGS = {"ti", "title"}
+TEXT_TAGS = {"tiab", "title/abstract", "tw", "text word", "text words", "all", "all fields", "ab", "abstract"}
+KNOWN_TAGS = MESH_TAGS | TITLE_TAGS | TEXT_TAGS
+
+# Hinweise, wenn die Übersetzung etwas anders liest als PubMed – sonst ändert sich die Suche, ohne dass man es merkt
+UNKNOWN_TAGS_NOTE = ("Feldkürzel {tags} kennt die Übersetzung nicht (nur Titel, Titel/Abstract und MeSH). Die Begriffe "
+                     "davor werden als Freitext gesucht und engen die Suche falsch ein – bitte aus dem Suchstring "
+                     "entfernen und Sprache, Jahr oder Publikationstyp über die Einschränkungen der Suche setzen.")
+PAREN_NOTE = ("Die Klammern im Suchstring gehen nicht auf (eine schliessende zu viel oder eine öffnende nicht "
+              "geschlossen). Die Übersetzung hat sie ausgeglichen – bitte den Suchstring prüfen.")
+MIXED_NOTE = ("UND, ODER und NICHT stehen ohne Klammern nebeneinander. PubMed liest von links nach rechts; die "
+              "Übersetzung setzt die Klammern entsprechend.")
+MIXED_NOTE_OPENALEX = ("UND, ODER und NICHT stehen ohne Klammern nebeneinander. PubMed liest von links nach rechts, "
+                       "OpenAlex womöglich anders – bitte im Suchstring Klammern setzen.")
 
 
 def clean_terms(terms) -> list[str]:
@@ -179,13 +194,17 @@ TOKEN = re.compile(r'"[^"]*"|\(|\)|[^\s()"]+')
 def pubmed_to_openalex(query: str) -> dict:
     """Feldkürzel entfernen, Platzhalter streichen, Begriffe mit Bindestrich in Anführungszeichen setzen."""
     notes = []
-    tags = {m.group(1).lower() for m in FIELD_TAG.finditer(query)}
+    more: set[str] = set()
+    toks = _pm_tokens(query, more)
+    tags = {_tag_name(t) for t in toks}
     if tags & MESH_TAGS:
         notes.append("MeSH-Schlagwörter sind als Freitext übernommen – OpenAlex kennt keine MeSH.")
-    if "ti" in tags:
+    if tags & TITLE_TAGS:
         notes.append("Einschränkungen auf den Titel ([ti]) gelten in OpenAlex für Titel und Abstract. "
                      "Ein Ausschluss nur im Titel lässt sich im Pool als Vorfilter setzen.")
-    s = FIELD_TAG.sub("", query)
+    s = " ".join(_TRAILING_TAG.sub("", t) for t in toks)
+    if _mixed_chain(_parse_tokens(toks)):
+        more.add(MIXED_NOTE_OPENALEX)
     wild = sorted({w for w in re.findall(r"[\w-]+\*", s)})
     if wild:
         shown = ", ".join(wild[:8]) + (" …" if len(wild) > 8 else "")
@@ -202,7 +221,7 @@ def pubmed_to_openalex(query: str) -> dict:
             out.append(tok)
     s = " ".join(out).replace("( ", "(").replace(" )", ")")
     s = re.sub(r'""', '', s)
-    return {"source": "openalex", "string": re.sub(r"\s+", " ", s).strip(), "notes": notes}
+    return {"source": "openalex", "string": re.sub(r"\s+", " ", s).strip(), "notes": notes + sorted(more)}
 
 
 # ------------------------------------------------------------------------------------------- weitere Quellen
@@ -210,23 +229,77 @@ def pubmed_to_openalex(query: str) -> dict:
 # Leerzeichen heisst UND) und je Zielquelle neu geschrieben. Konzeptblöcke ergeben denselben Baum.
 
 OPS = ("AND", "OR", "NOT")
-PM_TOKEN = re.compile(r'"[^"]*"(?:\[[^\]]*\])?|\(|\)|[^\s()"]+(?:\[[^\]]*\])?')
+# Ein Stück: Begriff (in Anführungszeichen oder ein Wort) samt Feldkürzel – auch ausgeschrieben wie [MeSH Terms] –, oder eine Klammer
+PM_TOKEN = re.compile(r'"[^"]*"(?:\[[^\]]*\])?|\(|\)|[^\s()"\[\]]+(?:\[[^\]]*\])?')
+_TRAILING_TAG = re.compile(r"\[[^\]]*\]\s*$")
 SOURCE_NAMES = {"europepmc": "Europe PMC", "eric": "ERIC", "econbiz": "EconBiz", "semanticscholar": "Semantic Scholar",
                 "arxiv": "arXiv", "swisscovery": "swisscovery", "osf": "OSF"}
+
+
+def _tag_name(tok: str) -> str:
+    """Feldkürzel eines Stücks, klein und ohne Zusatz wie :noexp; leer, wenn es keins trägt."""
+    m = _TRAILING_TAG.search(tok)
+    return m.group(0).strip()[1:-1].split(":")[0].strip().lower() if m else ""
 
 
 def _split_tag(tok: str) -> tuple[str, str]:
     m = re.match(r"^(.*?)(?:\[([^\]]*)\])?$", tok, re.S)
     value, tag = m.group(1).strip(), (m.group(2) or "").split(":")[0].strip().lower()
-    if tag in ("ti", "title"):
+    if tag in TITLE_TAGS:
         return value, "ti"
     if tag in MESH_TAGS:
         return value, "mesh"
     return value, "tiab"
 
 
-def parse_pubmed(query: str) -> tuple:
-    toks = PM_TOKEN.findall(query or "")
+def _pm_tokens(query: str, notes: set | None = None) -> list[str]:
+    """PubMed-String in Stücke zerlegen, so wie PubMed ihn liest:
+
+    - Ein Feldkürzel gilt für alle Wörter davor bis zum letzten Operator: ``Internet Addiction Disorder[Mesh]`` ist ein
+      Schlagwort, nicht „Internet“ UND „Addiction“ UND das Schlagwort „Disorder“.
+    - Überzählige schliessende Klammern fallen weg (sonst ginge alles dahinter verloren), offene werden geschlossen.
+
+    ``notes`` erhält Hinweise auf unausgeglichene Klammern und auf Feldkürzel, die die Übersetzung nicht kennt."""
+    toks: list[str] = []
+    words: list[str] = []  # Wörter ohne Kürzel und Anführungszeichen seit dem letzten Operator
+    for t in PM_TOKEN.findall(query or ""):
+        word = t not in ("(", ")") and t.upper() not in OPS and not t.startswith('"')
+        if word and "[" not in t:
+            words.append(t)
+            continue
+        if word and words:
+            last, _, tag = t.partition("[")
+            t = f'"{" ".join([*words, last])}"[{tag}'
+            words = []
+        toks += words
+        words = []
+        toks.append(t)
+    toks += words
+    out, depth, surplus = [], 0, 0
+    for t in toks:
+        if t == "(":
+            depth += 1
+        elif t == ")":
+            if not depth:
+                surplus += 1
+                continue
+            depth -= 1
+        out.append(t)
+    out += [")"] * depth
+    if notes is not None:
+        if surplus or depth:
+            notes.add(PAREN_NOTE)
+        unknown = sorted({f"[{n}]" for n in map(_tag_name, out) if n and n not in KNOWN_TAGS})
+        if unknown:
+            notes.add(UNKNOWN_TAGS_NOTE.format(tags=", ".join(unknown)))
+    return out
+
+
+def parse_pubmed(query: str, notes: set | None = None) -> tuple:
+    return _parse_tokens(_pm_tokens(query, notes))
+
+
+def _parse_tokens(toks: list[str]) -> tuple:
     pos = [0]
 
     def peek():
@@ -295,6 +368,7 @@ class Target:
     wildcards = True       # * am Wortende erlaubt (nicht in Phrasen)
     quote_all = False      # jeden Begriff in Anführungszeichen (CQL)
     mesh = False           # kennt MeSH als Feld
+    left_to_right = False  # wertet Operatoren wie PubMed gleichrangig von links aus (CQL) – keine Klammern nötig
 
     def field(self, t: str, f: str, notes: set) -> str:
         return t
@@ -386,6 +460,7 @@ class SwisscoveryTarget(Target):
     source = "swisscovery"
     AND, OR, NOT = " and ", " or ", " not "
     quote_all = True
+    left_to_right = True
 
     def term(self, raw, f, notes):
         bare = raw.strip().strip('"').strip()
@@ -403,6 +478,21 @@ class SwisscoveryTarget(Target):
         return f'{index}="{bare}"'
 
 
+def _regroups(op: str, left: tuple) -> bool:
+    """Steht links von ``op`` eine Kette mit anderem Operator ohne Klammer (``a OR b AND c``)? PubMed liest sie von links
+    nach rechts, also ``(a OR b) AND c``; Quellen, in denen UND stärker bindet, läsen ``a OR (b AND c)``. Nur
+    ``a AND b NOT c`` ergibt in beiden Lesarten dasselbe."""
+    return left[0] in ("and", "or", "not") and left[0] != op and not (left[0] == "and" and op == "not")
+
+
+def _mixed_chain(node: tuple | None) -> bool:
+    if node is None or node[0] == "term":
+        return False
+    if node[0] == "group":
+        return _mixed_chain(node[1])
+    return _regroups(node[0], node[1]) or _mixed_chain(node[1]) or _mixed_chain(node[2])
+
+
 def emit(node: tuple | None, tgt: Target, notes: set) -> str:
     if node is None:
         return ""
@@ -418,6 +508,9 @@ def emit(node: tuple | None, tgt: Target, notes: set) -> str:
         return "" if op == "not" else right
     if not right:
         return left
+    if _regroups(op, left_node) and not tgt.left_to_right:
+        left = f"({left})"  # die Lesart von PubMed ausdrücklich machen
+        notes.add(MIXED_NOTE)
     if op == "not":
         return tgt.negate(left, right_node, right, notes)
     return left + (tgt.AND if op == "and" else tgt.OR) + right
@@ -464,7 +557,7 @@ def translate(query: str, to: str) -> dict:
     if to == "openalex":
         return pubmed_to_openalex(query)
     notes: set[str] = set()
-    tree = parse_pubmed(query)
+    tree = parse_pubmed(query, notes)
     if to == "osf":
         return {"source": to, "string": _osf_keywords(tree, notes), "notes": sorted(notes)}
     if to not in TARGETS:

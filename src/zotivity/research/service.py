@@ -18,7 +18,7 @@ from .pool import DEFAULT_PREFILTERS, evaluate, filter_pool, status_of, summariz
 from .ports import KEY_NCBI, KEY_OPENALEX, KEY_SEMANTICSCHOLAR, KEY_ZOTERO_WEB, ChatModel, KeyStore, ZoteroPort
 from .querybuild import TRANSLATABLE, build_all, clean_terms, parse_pubmed
 from .querybuild import translate as translate_query_string
-from .records import dedup_keys, dedup_keys_zotero, find_dois, norm_doi
+from .records import dedup_keys, find_dois, norm_doi, same_work, zotero_record
 from .sources import LIVE_SOURCES, SOURCES, SearchResult, source_label
 from .sources import catalog
 from .sources import ris as ris_mod
@@ -435,20 +435,32 @@ class ResearchService:
                 "abstracts_retry": sum(1 for r in records if self._needs_abstract(r, True))}
 
     def zotero_match(self, pid: int, backend: str | None = None) -> dict:
-        """Abgleich mit der Zotero-Zielbibliothek: welche Treffer sind schon da (DOI, PMID, Titel)?"""
+        """Abgleich mit der Zotero-Zielbibliothek: welche Treffer sind schon da (DOI, PMID, Titel)? Eine gleiche DOI
+        oder PMID genügt. Ein gleicher Titel zählt wie im Pool nur, wenn Jahr und Kennungen nicht widersprechen – sonst
+        gälte ein Preprint, eine Neuauflage oder ein „Letter to the editor“ als „schon in Zotero“, würde ausgeblendet
+        und bei der Übergabe durch den fremden Eintrag ersetzt."""
         p = self.store.project(pid)
         port = self.zotero_port(backend or p["zotero_backend"])
         lib = p["target_library"]
         index: dict[str, str] = {}
+        by_title: dict[str, list[tuple[str, dict]]] = {}
         n_items = 0
         for item in port.iter_items(lib):
             n_items += 1
-            for k in dedup_keys_zotero(item.get("data") or {}):
+            z = zotero_record(item.get("data") or {})
+            for k in dedup_keys(z):
                 index.setdefault(k, item["key"])
+                if k.startswith("title:"):
+                    by_title.setdefault(k, []).append((item["key"], z))
         self.store.replace_zotero_index(pid, lib, index)
         found = {}
         for rec in self._records(pid):
-            hit = next((index[k] for k in dedup_keys(rec.get("data") or {}) if k in index), None)
+            data = rec.get("data") or {}
+            keys = sorted(dedup_keys(data))
+            hit = next((index[k] for k in keys if not k.startswith("title:") and k in index), None)
+            if not hit:
+                hit = next((key for k in keys if k.startswith("title:")
+                            for key, z in by_title.get(k, []) if same_work(data, z)), None)
             if hit:
                 found[rec["id"]] = hit
         self.store.set_zotero_matches(pid, lib, found)

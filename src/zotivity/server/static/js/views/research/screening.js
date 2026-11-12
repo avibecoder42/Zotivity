@@ -10,8 +10,8 @@ import * as api from '../../core/api.js';
 import { t } from '../../core/i18n.js';
 import { fmtInt, debounce } from '../../core/util.js';
 import { btn, card, field, segmented, select, checkbox, toggle, emptyState, progress, badge, notice, textInput, spinner, paneProps, splitter } from '../../ui/components.js';
-import { R, rs, invalidate, needsLoad, refreshSummary, sourceBadges, folderLabel, statusBadge, borderlineText, aiInfo, aiBadge,
-  AI_LABELS, fmtUsd, aiVisible, tokenText, costOf, addUsed, noteUsage } from './common.js';
+import { R, rs, invalidate, needsLoad, loadFailed, noteLoadFailed, loadOk, loadingNote, refreshSummary, sourceBadges, folderLabel, statusBadge,
+  borderlineText, aiInfo, aiBadge, AI_LABELS, fmtUsd, aiVisible, tokenText, costOf, addUsed, noteUsage } from './common.js';
 import { listView, listSideCard } from './screening_list.js';
 import { icon } from '../../ui/icons.js';
 
@@ -20,22 +20,42 @@ const sc = () => ui('rs-screen', { status: 'open', index: 0, jumpTo: null, savin
 const isList = () => sc().view === 'list';
 const summaryLater = debounce(refreshSummary, 600);
 
+// Nach dem Nachladen zeigt die Karte denselben Treffer wie vorher, nicht dieselbe Nummer: In „offen“ fehlen dann die
+// inzwischen entschiedenen Treffer, und die Karte spränge sonst um so viele vor – ein Tastendruck träfe den falschen.
+// Ist der gezeigte Treffer selbst nicht mehr in der Liste, folgt der nächste aus der alten Liste, der es noch ist.
+function samePosition(old, items, index) {
+  if (old && old.items.length) {
+    const at = new Map(items.map((it, i) => [it.id, i]));
+    for (let i = Math.min(index, old.items.length - 1); i < old.items.length; i += 1) {
+      const j = at.get(old.items[i].id);
+      if (j != null) return j;
+    }
+  }
+  return Math.min(index, Math.max(0, items.length - 1));
+}
+
 function loadQueue() {
   const s = rs();
   const st = sc();
-  if (!needsLoad('queue') || s.busy['loading:queue']) return s.queue;
+  if (!needsLoad('queue') || s.busy['loading:queue'] || loadFailed('queue')) return s.queue;
   s.busy['loading:queue'] = true;
-  api.get(`${R}/projects/${s.pid}/screening?status=${st.status}`).then(r => {
-    s.queue = r;
-    delete s.stale.queue;
+  const pid = s.pid;
+  const status = st.status;
+  api.get(`${R}/projects/${pid}/screening?status=${status}`).then(r => {
+    // Inzwischen eine andere Auswahl oder Recherche: Antwort verwerfen, sonst stünde die alte Liste unter der neuen
+    // Auswahl. Das nächste Zeichnen lädt die richtige.
+    if (s.pid !== pid || st.status !== status) return;
     if (st.jumpTo != null) {
       const i = r.items.findIndex(it => it.id === st.jumpTo);
       st.index = i >= 0 ? i : Math.min(st.index, Math.max(0, r.items.length - 1));
       st.jumpTo = null;
     } else {
-      st.index = Math.min(st.index, Math.max(0, r.items.length - 1));
+      st.index = samePosition(s.queue, r.items, st.index);
     }
-  }).catch(err => { s.queue = undefined; toast(err.message, 'error'); })
+    s.queue = r;
+    delete s.stale.queue;
+    loadOk('queue');
+  }).catch(err => { s.queue = undefined; if (noteLoadFailed('queue')) toast(err.message, 'error'); })
     .finally(() => { delete s.busy['loading:queue']; update(); });
   return s.queue;
 }
@@ -46,6 +66,7 @@ const openOnly = status => status === 'open' || status === 'borderline' || statu
 function setStatus(v) {
   const st = sc();
   st.status = v; st.index = 0;
+  invalidate('queue');  // auch nach einem gescheiterten Abruf gleich laden
   rs().queue = null;  // andere Auswahl: nicht die alte zeigen
   update();
 }
@@ -95,11 +116,17 @@ function scrollCardTop() {
   requestAnimationFrame(() => { const el = document.querySelector('.rs-screen-card'); if (el) el.scrollTop = 0; });
 }
 
-// Nach einem Entscheid zum nächsten noch offenen Treffer (in „offen“) bzw. zum nächsten
-function advance() {
+// Nach einem Entscheid zum nächsten noch offenen Treffer (in „offen“) bzw. zum nächsten. Massgebend ist der entschiedene
+// Treffer, nicht die Nummer: Wurde die Liste während des Speicherns neu geladen und er fehlt darin schon, zeigt die
+// Karte bereits den nächsten.
+function advance(done) {
   const q = rs().queue;
   const st = sc();
-  let i = st.index + 1;
+  if (!q) return;
+  const at = q.items.findIndex(x => x.id === done.id);
+  if (at < 0) { scrollCardTop(); return; }
+  q.items[at].decision = done.decision;  // eine eben neu geladene Liste kennt den Entscheid noch nicht
+  let i = at + 1;
   if (openOnly(st.status)) while (i < q.items.length && isDecided(q.items[i])) i += 1;
   st.index = Math.min(i, q.items.length - 1);
   if (i >= q.items.length) toast(t('Ende der Liste erreicht.'), 'info', 2500);
@@ -119,7 +146,7 @@ async function decide(status, folder = null, reason = '') {
     it.decision = await run(() => api.post(`${R}/projects/${s.pid}/decisions`, { record_id: it.id, status, folder, reason,
       ai_shown: aiVisible() && !!(it.ai && it.ai.label), method: 'card' }));
     invalidate('plan', 'pool', 'recall');
-    advance();
+    advance(it);
     summaryLater();
   } finally {
     st.saving = false;
@@ -444,7 +471,7 @@ export function screeningTab() {
         list ? null : btn('', { icon: 'arrowLeft', size: 'sm', kind: 'ghost', title: t('zurück (K)'), onClick: () => go(-1) }),
         list ? null : btn('', { icon: 'arrowRight', size: 'sm', kind: 'ghost', title: t('weiter (J)'), onClick: () => go(1) })),
       aiBar(queue),
-      queue == null ? h('div', { class: 'muted' }, t('Lade …'))
+      queue == null ? loadingNote('queue')
         : list ? listView(queue, st.status)
         : it ? recordCard(it, queue)
           : emptyState('check', st.status === 'open' ? t('Alles gesichtet') : t('Keine Treffer in dieser Auswahl'),

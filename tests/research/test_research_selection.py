@@ -178,6 +178,28 @@ def test_flow_adds_up_and_says_when_fulltext_is_missing(svc):
     assert not protocol.flow(svc, pid)["fulltext_used"]
 
 
+def test_protocol_and_flow_show_the_same_numbers(svc, sim):
+    """Suchprotokoll und Flussdiagramm rechnen gleich (Code-Prüfung 2026-11-11, E12): Überholte Läufe zählen nicht zu den
+    abgerufenen Datensätzen, und entschiedene Treffer zählen auch dann zum Screening, wenn ein Vorfilter sie ausblendet."""
+    pid, ids = prepared(svc)
+    # Dieselbe Suche zweimal: Im Pool liegen nur die Treffer des letzten Laufs
+    q = svc.add_query(pid, "T2_Teasing", "pubmed", "teasing[tiab]")
+    svc.run_query(q["id"])
+    svc.run_query(q["id"])
+    # Ein Vorfilter blendet einen eingeschlossenen und den offenen Treffer aus
+    svc.update_project(pid, {"prefilters": [{"kind": "title", "pattern": "number 1 OR number 6", "active": True}]})
+    f = protocol.flow(svc, pid)
+    assert (f["identified"], f["pool"], f["duplicates"]) == (8, 8, 0)
+    assert (f["screened"], f["open"], f["sought"], f["excluded"], f["prefiltered"]) == (7, 2, 4, 1, 1)
+    md = protocol.markdown(svc, pid)
+    assert md.count(" – überholt |") == 1  # der erste der beiden Läufe
+    assert "Datensätze abgerufen: 8 (letzter Lauf je Suchstring und alle Importe;" in md
+    assert "eindeutige Datensätze im Pool: 8 " in md and "Duplikate entfernt: 0 (Abgleich" in md  # früher 10 und 2
+    assert "Nach Vorfilter zu sichten: 6; dazu 1 ausgeblendete Treffer mit Entscheid." in md
+    assert "Gesichtet: 5 von 7; eingeschlossen: 4; unsicher: 0; ausgeschlossen: 1." in md  # früher „eingeschlossen: 3“
+    assert "### Rollen (4)" in md  # die Liste der ausgewählten Literatur ist so lang wie die Zahl darüber
+
+
 def test_flow_escapes_user_text(svc):
     pid, ids = prepared(svc)
     svc.set_fulltext(pid, [ids[0]], "exclude", "<b>&böse")

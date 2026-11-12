@@ -154,6 +154,57 @@ def section_budget(planned: list, index: int, written_before: list[int]) -> int:
     return words
 
 
+def has_text(section: dict | None) -> bool:
+    return bool(section and (section.get("text") or "").strip())
+
+
+def missing_sections(state: dict) -> list[int]:
+    """Abschnitte der Gliederung, zu denen noch kein Text steht: nach einem Fehler oder Abbruch beim Schreiben, oder weil
+    der Abschnitt erst nach dem Schreiben in die Gliederung kam."""
+    planned = (state.get("outline") or {}).get("sections") or []
+    written = state.get("sections") or []
+    return [i for i in range(len(planned)) if i >= len(written) or not has_text(written[i])]
+
+
+_HEADING_LINE = re.compile(r"^(\s*#{1,6})[ \t]+.*$", re.M)
+
+
+def carry_sections(old: list[dict], outline_sections: list[dict], origin: list | None = None) -> tuple[list[dict], list[str]]:
+    """Geschriebene Abschnitte einer geänderten Gliederung zuordnen, damit beim Speichern kein Text verloren geht.
+
+    `origin` nennt je Abschnitt der neuen Gliederung seine bisherige Stelle (None = neu); das meldet der Editor der
+    Oberfläche, der weiss, was verschoben, umbenannt oder entfernt wurde. Ohne diese Angabe gilt die gleiche Überschrift,
+    zuerst an derselben Stelle. Rückgabe: die Abschnitte in der neuen Reihenfolge – mit leerem Text, wo noch keiner
+    steht – und die Überschriften der Texte, die keinen Abschnitt mehr haben (aus der Gliederung entfernt)."""
+    explicit = isinstance(origin, list) and len(origin) == len(outline_sections)
+    used: set[int] = set()
+    out: list[dict] = []
+    for i, sec in enumerate(outline_sections):
+        heading = sec.get("heading", "")
+        src = origin[i] if explicit else None
+        if explicit:
+            if not (isinstance(src, int) and not isinstance(src, bool) and 0 <= src < len(old)) or src in used:
+                src = None
+        else:
+            same = [j for j, o in enumerate(old) if j not in used and has_text(o) and o.get("heading", "") == heading]
+            src = i if i in same else (same[0] if same else None)
+        if src is None or not has_text(old[src]):
+            out.append({"heading": heading, "text": ""})
+            continue
+        used.add(src)
+        kept = dict(old[src])
+        if kept.get("heading", "") != heading:  # umbenannt: die Überschrift auch im Text nachführen
+            first = kept["text"].lstrip().splitlines()[0]
+            if _HEADING_LINE.match(first):
+                kept["text"] = _HEADING_LINE.sub(lambda m: f"{m.group(1)} {heading}", kept["text"], count=1)
+            kept["heading"] = heading
+        out.append(kept)
+    while out and not has_text(out[-1]):  # am Ende fehlende Abschnitte brauchen keinen Platzhalter
+        out.pop()
+    lost = [o.get("heading", "") for j, o in enumerate(old) if j not in used and has_text(o)]
+    return out, lost
+
+
 def unclosed_quote(text: str) -> bool:
     """Steht ein Zitat ohne schliessendes Anführungszeichen im Text (z. B. weil die Ausgabe abbrach)?"""
     for m in re.finditer("„", text):
@@ -1177,14 +1228,27 @@ class ReviewService:
         job.update(phase="Fertig", message=f"{len(data['sections'])} Abschnitte geplant")
         return data
 
-    def set_outline(self, review_id: int, outline: dict) -> None:
+    def set_outline(self, review_id: int, outline: dict, origin: list | None = None) -> dict:
+        """Gliederung speichern. Schon geschriebener Text bleibt bei seinem Abschnitt, auch wenn dieser verschoben,
+        umbenannt oder in Fokus und Wortzahl geändert wurde (siehe carry_sections). Verloren geht nur der Text von
+        Abschnitten, die aus der Gliederung entfernt wurden – danach fragt die Oberfläche vor dem Speichern."""
         review = self.store.get_review(review_id)
         state = review["state"]
-        if not isinstance(outline, dict) or not isinstance(outline.get("sections"), list):
+        if not isinstance(outline, dict) or not isinstance(outline.get("sections"), list) \
+                or not all(isinstance(s, dict) for s in outline["sections"]):
             raise ValueError("Ungültige Gliederung")
+        sections, lost = carry_sections(state.get("sections") or [], outline["sections"], origin)
         state["outline"] = outline
-        state["sections"] = []
+        state["sections"] = sections
+        # Die gespeicherte Prüfung nennt Abschnitte nach ihrer Stelle – nach dem Umstellen träfe „Neu schreiben“ den falschen
+        state.pop("check", None)
         self.store.update_review_state(review_id, state)
+        if sections:
+            try:
+                self.check(review_id)
+            except Exception as e:  # noqa: BLE001 - die Gliederung ist gespeichert; geprüft wird beim nächsten Mal
+                log.warning("Prüfung nach dem Speichern der Gliederung nicht möglich: %s", e)
+        return {"kept": sum(1 for s in sections if has_text(s)), "lost": lost}
 
     def _write_context(self, review_id: int, job: Job) -> tuple[dict, dict, dict, ChatModel, str, str, str]:
         review = self.store.get_review(review_id)
@@ -1216,7 +1280,7 @@ class ReviewService:
                       f"{sum(int(p or 500) for p in planned)} vorgesehen.")
         prompt = WRITE_PROMPT.format(
             question=review["question"], language=self._language(state), outline=outline_text,
-            previous="\n\n".join(s["text"] for s in before) or "(noch keine)", heading=sec.get("heading", ""),
+            previous="\n\n".join(s["text"] for s in before if has_text(s)) or "(noch keine)", heading=sec.get("heading", ""),
             focus=sec.get("focus", ""), words=words, low=round(0.8 * words), budget=budget,
             keys=", ".join(sec.get("keys", [])) or "alle passenden",
         )
@@ -1258,21 +1322,32 @@ class ReviewService:
         job.update(phase="Fertig", message=msg)
         return check
 
-    def write(self, job: Job, review_id: int) -> dict:
+    def write(self, job: Job, review_id: int, restart: bool = False) -> dict:
+        """Die Abschnitte schreiben, zu denen noch kein Text steht. Was schon geschrieben (und bezahlt) ist, bleibt:
+        Nach einem Fehler oder Abbruch geht der nächste Lauf beim ersten fehlenden Abschnitt weiter. Nur mit
+        restart=True wird der ganze Text neu geschrieben – die Oberfläche fragt vorher nach."""
         review, state, meta, model, effort, system, outline_text = self._write_context(review_id, job)
-        outline = state["outline"]
-        sections: list[dict] = []
-        job.update(phase="Schreiben", total=len(outline["sections"]), done=0)
-        for sec in outline["sections"]:
+        planned = state["outline"]["sections"]
+        sections: list[dict] = [] if restart else list(state.get("sections") or [])[:len(planned)]
+        todo = missing_sections({"outline": state["outline"], "sections": sections})
+        if not todo:
+            raise ValueError("Alle Abschnitte sind schon geschrieben.")
+        job.update(phase="Schreiben", total=len(planned), done=len(planned) - len(todo))
+        for i in todo:
             job.check()
+            sec = planned[i]
             job.update(message=f"Abschnitt: {sec.get('heading', '')}")
-            sections.append(self._write_section(review, state, model, effort, system, outline_text, sec, sections))
+            new = self._write_section(review, state, model, effort, system, outline_text, sec, sections[:i])
+            if i < len(sections):
+                sections[i] = new  # Lücke mitten im Text
+            else:
+                sections.append(new)
             state["sections"] = sections
             self.store.update_review_state(review_id, state)
             job.step()
         state["step"] = "written"
         self._finish_writing(job, review_id, state, meta, sum(len(s["text"].split()) for s in sections))
-        return {"sections": len(sections)}
+        return {"sections": len(sections), "written": len(todo)}
 
     def rewrite_section(self, job: Job, review_id: int, index: int) -> dict:
         """Nur einen Abschnitt neu schreiben (z. B. einen abgeschnittenen); die übrigen bleiben, wie sie sind."""
@@ -1391,9 +1466,12 @@ class ReviewService:
                 verified.append(quote[:120])
             else:
                 unverified.append({"quote": quote[:300], "keys": keys})
-        planned = [s.get("words") for s in (state.get("outline") or {}).get("sections", [])]
+        outline_secs = (state.get("outline") or {}).get("sections", [])
+        planned = [s.get("words") for s in outline_secs]
         incomplete = []
         for i, sec in enumerate(state.get("sections", [])):
+            if not has_text(sec):  # noch nicht geschrieben: steht unter missing_sections
+                continue
             reasons = incomplete_reasons(sec, planned[i] if i < len(planned) else None)
             if reasons:
                 incomplete.append({"index": i, "heading": sec.get("heading", ""), "reasons": reasons,
@@ -1417,6 +1495,9 @@ class ReviewService:
             "verified_quotes": len(verified),
             "unverified_quotes": unverified,
             "incomplete_sections": incomplete,
+            # in der Gliederung, aber noch ohne Text (Schreiben abgebrochen oder Abschnitt später ergänzt)
+            "missing_sections": [{"index": i, "heading": outline_secs[i].get("heading", "")}
+                                 for i in missing_sections(state)] if state.get("sections") else [],
             "checked_at": time.time(),
         }
         state["check"] = result
@@ -1531,30 +1612,52 @@ class ReviewService:
         return "\n".join(lines) + "\n"
 
     def _bibliography(self, keys: list[str], docs: dict, items: dict) -> str:
+        """Literaturverzeichnis aus Zotero (Pakete zu 50). Jeder zitierte Text bekommt einen Eintrag: Liefert Zotero für
+        ein Paket nicht alle (Paket gescheitert, Eintrag in Zotero gelöscht), wird je Eintrag einzeln gefragt, und was
+        dann noch fehlt, kommt aus den gespeicherten Angaben."""
         if not keys:
             return ""
+        by_lib: dict[str, list[str]] = {}
+        for k in keys:
+            by_lib.setdefault(docs[k]["lib"], []).append(k)
+        zot = None  # None: Zotero ist nicht erreichbar – nicht für jeden Eintrag neu versuchen
+
+        def from_zotero(lib: str, ks: list[str]) -> list[str] | None:
+            nonlocal zot
+            if zot is None:
+                return None
+            try:
+                r = zot._request("GET", f"/api/{lib}/items",
+                                 params={"itemKey": ",".join(ks), "format": "bib", "style": "apa"})
+            except Exception as e:  # noqa: BLE001
+                log.info("Literaturverzeichnis über Zotero nicht möglich: %s", e)
+                zot = None
+                return None
+            if r.status_code != 200:
+                return None
+            return [strip_bidi(html.unescape(re.sub(r"<[^>]+>", "", div))).strip()
+                    for div in re.findall(r'<div class="csl-entry"[^>]*>(.*?)</div>', r.text, re.S)]
+
+        def stored(k: str) -> str:
+            it = items.get((docs[k]["lib"], k), {})
+            return f"{author_year(it)}: {it.get('title', '')}. {it.get('publication', '')}".rstrip(". ") + "."
+
         try:
             zot = self.engine.zotero()
-            by_lib: dict[str, list[str]] = {}
-            for k in keys:
-                by_lib.setdefault(docs[k]["lib"], []).append(k)
-            entries = []
-            for lib, ks in by_lib.items():
-                for i in range(0, len(ks), 50):
-                    r = zot._request("GET", f"/api/{lib}/items",
-                                     params={"itemKey": ",".join(ks[i:i + 50]), "format": "bib", "style": "apa"})
-                    if r.status_code == 200:
-                        for div in re.findall(r'<div class="csl-entry"[^>]*>(.*?)</div>', r.text, re.S):
-                            entries.append(strip_bidi(html.unescape(re.sub(r"<[^>]+>", "", div))).strip())
-            if entries:
-                return "\n".join(f"- {e}" for e in sorted(entries))
         except Exception as e:  # noqa: BLE001
             log.info("Literaturverzeichnis über Zotero nicht möglich: %s", e)
-        lines = []
-        for k in keys:
-            it = items.get((docs[k]["lib"], k), {})
-            lines.append(f"- {author_year(it)}: {it.get('title', '')}. {it.get('publication', '')}".rstrip(". ") + ".")
-        return "\n".join(sorted(lines))
+        entries: list[str] = []
+        for lib, ks in by_lib.items():
+            for i in range(0, len(ks), 50):
+                batch = ks[i:i + 50]
+                got = from_zotero(lib, batch)
+                if got is not None and len(got) == len(batch):
+                    entries += got
+                    continue
+                for k in batch:  # Paket unvollständig: einzeln, damit kein Eintrag still fehlt
+                    one = from_zotero(lib, [k]) if len(batch) > 1 else got
+                    entries.append(one[0] if one else stored(k))
+        return "\n".join(f"- {e}" for e in sorted(entries, key=str.casefold))
 
     def save_to_zotero(self, review_id: int) -> str:
         review = self.store.get_review(review_id)

@@ -8,7 +8,7 @@ import { t } from '../../core/i18n.js';
 import { fmtInt, fmtDate, debounce, copyToClipboard } from '../../core/util.js';
 import { btn, iconBtn, card, field, textInput, textArea, select, checkbox, notice, emptyState, spinner, numberInput } from '../../ui/components.js';
 import { icon } from '../../ui/icons.js';
-import { R, rs, lazy, busy, isBusy, invalidate, refreshSummary, sourceLabel, isLive, projectSources, catalogEntry, limitsText, dropZone, readFileB64, workspace, serverText } from './common.js';
+import { R, rs, lazy, busy, isBusy, invalidate, loadingNote, refreshSummary, sourceLabel, isLive, projectSources, catalogEntry, limitsText, dropZone, readFileB64, workspace, serverText } from './common.js';
 
 const OSF_PROVIDERS = [{ value: 'psyarxiv', label: 'PsyArXiv' }, { value: 'socarxiv', label: 'SocArXiv' },
   { value: 'edarxiv', label: 'EdArXiv' }, { value: 'osf', label: 'OSF Preprints' }];
@@ -365,7 +365,7 @@ export function searchTab() {
           onClick: () => searchAll('*', live) }) : null),
       everything ? h('div', { class: 'row' }, spinner(14), h('span', null, `${everything.label}: ${everything.done}/${everything.total}`),
         btn(t('Anhalten'), { size: 'sm', kind: 'ghost', onClick: () => { st.batch = null; update(); } })) : null,
-      queries == null ? h('div', { class: 'muted' }, t('Lade …'))
+      queries == null ? loadingNote('queries')
         : order.length ? order.map(src => h('div', { key: src }, sourceCard(src, groups[src], soleLive)))
           : emptyState('search', t('Noch keine Suchstrings'), t('Aus der Suchstrategie übernehmen, von Hand einfügen oder als Textdateien laden.'))),
   [filesCard(), otherSourcesCard(),

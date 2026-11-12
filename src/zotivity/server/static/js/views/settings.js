@@ -85,7 +85,7 @@ function citationStyleCard() {
 
 function st() {
   return ui('settings', { tab: 'setup', keyProvider: null, keyDraft: '', models: {}, modelsLoading: {}, tests: {}, testing: {},
-    embModels: {}, embTesting: false, embTest: null, spaces: null, defaults: null, info: null, idxStats: null, update: null, checking: false });
+    embModels: {}, embTesting: false, embTest: null, spaces: null, defaults: null, info: null, idxStats: null, update: null, checking: false, loads: {} });
 }
 
 const catalogOf = id => (state.catalog ? state.catalog.providers.find(p => p.id === id) : null) || { id, label: id, chat_models: [], embedding_models: [] };
@@ -708,10 +708,22 @@ function presetCard() {
       btn(t('Preset importieren …'), { size: 'sm', kind: 'ghost', icon: 'download', onClick: importPreset }))));
 }
 
+// Abruf beim Zeichnen: höchstens einer zur Zeit, und nach einem Fehler erst nach einer Pause wieder. Sonst fragt der
+// Reiter bei einem anhaltenden Fehler pausenlos neu, weil jedes Zeichnen den Abruf wieder startet.
+const LOAD_RETRY_MS = 20000;
+function loadOnce(key, fn) {
+  const s = st();
+  const x = s.loads[key] || (s.loads[key] = { busy: false, failedAt: 0 });
+  if (x.busy || (x.failedAt && Date.now() - x.failedAt < LOAD_RETRY_MS)) return;
+  x.busy = true;
+  fn().then(() => { x.failedAt = 0; }).catch(() => { x.failedAt = Date.now(); setTimeout(update, LOAD_RETRY_MS + 200); })
+    .finally(() => { x.busy = false; update(); });
+}
+
 function advancedTab() {
   const s = st();
-  if (!s.defaults) { api.get('/api/settings/defaults').then(d => { s.defaults = d; update(); }).catch(() => {}); }
-  if (!state.presets) loadPresets();
+  if (!s.defaults) loadOnce('defaults', async () => { s.defaults = await api.get('/api/settings/defaults'); });
+  if (!state.presets) loadOnce('presets', async () => { if (!await loadPresets()) throw new Error('presets'); });
   const def = path => s.defaults ? path.split('.').reduce((o, k) => (o == null ? o : o[k]), s.defaults) : undefined;
   return [
     presetCard(),
@@ -751,7 +763,8 @@ export async function installUpdate(u) {
     t('Zotivity lädt den Installer, beendet sich und startet nach der Installation neu. Einstellungen, Index, Korpora und gespeicherte Schlüssel bleiben erhalten.'), { ok: t('Jetzt aktualisieren') });
   if (!ok) return;
   toast(t('Update wird geladen …'), 'info', 0);
-  const r = await run(() => api.post('/api/update/install', { installer: u.installer, sha256: u.sha256 }));
+  // Nur die bestätigte Version: Installer und Prüfsumme nimmt der Dienst aus dem Manifest der eingestellten Quelle
+  const r = await run(() => api.post('/api/update/install', { version: u.latest }));
   if (r.started) toast(t('Der Installer läuft – Zotivity wird gleich neu gestartet.'), 'success', 0);
   else toast(t('Installer gespeichert: {p}', { p: r.path }), 'info', 0);
 }

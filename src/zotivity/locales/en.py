@@ -190,6 +190,7 @@ MESSAGES: dict[str, str] = {
     "Gekürzt: {a} → {b} Wörter": "Shortened: {a} → {b} words",
     "Gekürzt: {a} → {b} Wörter; unverändert: {list}": "Shortened: {a} → {b} words; unchanged: {list}",
     "Kein Abschnitt ist länger als geplant.": "No section is longer than planned.",
+    "Alle Abschnitte sind schon geschrieben.": "All sections are already written.",
     "Ungültige Abschnitte": "Invalid sections",
     "Forschungsstand: Abschnitte kürzen": "Literature review: shorten sections",
     "Suchanfragen konnten nicht erzeugt werden: {e}": "Search queries could not be generated: {e}",
@@ -314,6 +315,12 @@ MESSAGES: dict[str, str] = {
     "Update-Information konnte nicht gelesen werden: {e}": "Update information could not be read: {e}",
     "Kein Installer angegeben.": "No installer specified.",
     "Die Prüfsumme des Installers stimmt nicht. Update abgebrochen.": "The installer checksum does not match. Update aborted.",
+    "Keine Update-Quelle eingetragen.": "No update source entered.",
+    "Die Update-Quelle bietet keine neuere Version an.": "The update source does not offer a newer version.",
+    "Die Update-Quelle bietet inzwischen eine andere Version an. Bitte erneut nach Updates suchen.":
+        "The update source now offers a different version. Please check for updates again.",
+    "Die Update-Information nennt keine gültige Prüfsumme (SHA-256). Update abgebrochen.":
+        "The update information contains no valid checksum (SHA-256). Update aborted.",
 
     # -- Programmfenster ---------------------------------------------------------------------------
     "Es läuft noch:": "Still running:",

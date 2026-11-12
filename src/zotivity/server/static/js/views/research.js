@@ -64,7 +64,7 @@ export function researchView() {
   watchZotero();
   if (s.projects && s.forProject !== state.projectId) {  // anderes Zotivity-Projekt: dessen Recherchen zeigen
     Object.assign(s, { projects: null, pid: null, project: null, queries: null, runs: null, pool: null, queue: null, plan: null,
-      recall: null, flow: null, fulltext: null, stale: {} });
+      recall: null, flow: null, fulltext: null, stale: {}, failed: {} });
   }
   if (!s.pid) return h('div', { class: 'view-wrap' }, projectList());
   if (!s.project) return h('div', { class: 'view-wrap' }, header(), h('div', { class: 'view-body muted' }, t('Lade Recherche …')));

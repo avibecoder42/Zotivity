@@ -6,7 +6,7 @@ import * as api from '../../core/api.js';
 import { t, language } from '../../core/i18n.js';
 import { fmtInt, copyToClipboard } from '../../core/util.js';
 import { btn, card, field, segmented, checkbox, notice, badge, emptyState, spinner, textArea, textInput } from '../../ui/components.js';
-import { R, rs, enc, lazy, busy, isBusy, invalidate, refreshSummary, loadProject, aiInfo, tokenText, noteUsage, saveLater, saveState, targetName } from './common.js';
+import { R, rs, enc, lazy, busy, isBusy, invalidate, loadingNote, refreshSummary, loadProject, aiInfo, tokenText, noteUsage, saveLater, saveState, targetName } from './common.js';
 import { estimateLine } from './project.js';
 
 const hst = () => ui('rs-handover', { backend: null, crossref: true, status: {}, preview: null });
@@ -31,8 +31,10 @@ function loadPlan() {
   const key = `plan:${backend}`;
   if ((s.plan && s.plan.backend === backend && !s.stale.plan) || s.busy[key]) return s.plan && s.plan.backend === backend ? s.plan : null;
   s.busy[key] = true;
-  api.get(`${R}/projects/${s.pid}/export/zotero?backend=${enc(backend)}`).then(r => { s.plan = r; delete s.stale.plan; })
-    .catch(err => { s.plan = { backend, error: err.message }; }).finally(() => { delete s.busy[key]; update(); });
+  // Auch ein gescheiterter Abruf gilt als Stand (mit Fehlermeldung): Sonst lüde jedes Zeichnen neu, solange der Fehler
+  // anhält – etwa bei geschlossenem Zotero nach einem Entscheid. Neu geladen wird auf „Erneut versuchen“.
+  api.get(`${R}/projects/${s.pid}/export/zotero?backend=${enc(backend)}`).then(r => { s.plan = r; })
+    .catch(err => { s.plan = { backend, error: err.message }; }).finally(() => { delete s.stale.plan; delete s.busy[key]; update(); });
   return null;
 }
 
@@ -97,7 +99,10 @@ function zoteroCard() {
     : h('span', { class: status.ok ? 'ok-text' : 'danger-text' }, status.message || (status.ok ? 'OK' : t('nicht erreichbar')));
   let body;
   if (!plan) body = h('div', { class: 'muted' }, t('Lade Plan …'));
-  else if (plan.error) body = notice('error', plan.error);
+  else if (plan.error) {
+    body = notice('error', plan.error, h('div', { class: 'notice-actions' },
+      btn(t('Erneut versuchen'), { size: 'sm', icon: 'refresh', onClick: () => { invalidate('plan'); delete st.status[backend]; update(); } })));
+  }
   else if (!plan.folders.length) body = notice('warning', t('Noch keine Ordner zugeordnet. Unter „Ziel & Ordner“ Ordner anlegen und Sammlungen festlegen.'));
   else {
     const tot = plan.totals;
@@ -158,7 +163,7 @@ function flowCard() {
   const s = rs();
   const flow = lazy('flow', `${R}/projects/${s.pid}/flow?lang=${language() === 'de' ? 'de' : 'en'}`);
   return card(t('Ablauf der Auswahl'), 'layers', h('div', { class: 'stack' },
-    flow ? h('div', { class: 'rs-flow', html: flow.svg }) : h('div', { class: 'muted' }, t('Lade …')),
+    flow ? h('div', { class: 'rs-flow', html: flow.svg }) : loadingNote('flow'),
     h('p', { class: 'muted small' }, t('Die Zahlen des Flussdiagramms nach PRISMA 2020, soweit Zotivity sie kennt. Die Volltextprüfung erfasst du unter „Volltexte“.'))),
   { actions: flow ? [btn(t('Als SVG speichern'), { size: 'sm', kind: 'ghost', icon: 'download', onClick: () => api.saveText('Ablauf_der_Auswahl.svg', flow.svg, 'image/svg+xml') })] : null });
 }

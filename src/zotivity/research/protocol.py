@@ -73,6 +73,7 @@ def flow(svc, pid: int) -> dict:
     settings = p.get("settings") or {}
     return {
         "identified": identified, "by_source": {source_label(k): v for k, v in sorted(by_source.items())},
+        "stale": stale,  # schon entschiedene Treffer, die nur noch aus überholten Suchen stammen
         "other_sources": settings.get("other_sources") or [],
         "duplicates": max(0, identified - len(items)), "pool": len(items), "prefiltered": len(before),
         "screened": len(screened), "excluded": status["exclude"], "maybe": status["maybe"], "open": status["open"],
@@ -243,11 +244,14 @@ def report_facts(svc, pid: int) -> str:
 
 
 def markdown(svc, pid: int) -> str:
-    """svc: ResearchService (für Vorfilter mit Prüfungen und Recall-Check)."""
+    """svc: ResearchService (für Vorfilter mit Prüfungen und Recall-Check). Die Zahlen zu gefundenen Datensätzen,
+    Duplikaten und Screening stammen aus derselben Rechnung wie das Flussdiagramm (flow) – beide stimmen überein."""
     store: Store = svc.store
     p = store.project(pid)
     runs = store.runs(pid)
+    current = store.current_runs(pid)
     items, prefilters = svc._pool_items(pid, p)
+    data = flow(svc, pid)
     visible = [it for it in items if not it["hidden_by"]]
     links = store.links(pid)
     today = dt.date.today().isoformat()
@@ -274,14 +278,21 @@ def markdown(svc, pid: int) -> str:
         name = f"`{r['name']}`" + (f" (v{r['version']})" if r.get("version") else "")
         if r["kind"] == "import":
             name += f" – Import {r['filename']}"
+        if r["id"] not in current:
+            name += " – überholt"
         date = r.get("searched_on") or r["run_at"][:16].replace("T", " ")
         L.append(f"| {date} | {source_label(r['source'])} | {name} | {_cell(_limits(r['limits']))} "
                  f"| {r['hits'] if r['hits'] is not None else ''} | {r['fetched']} | {r['new_records']} | {r['duplicates']} |")
-    fetched = sum(r["fetched"] for r in runs)
     by_source = Counter(s for it in items for s in it["sources"])
-    L += ["", f"Datensätze abgerufen: {fetched}; eindeutige Datensätze im Pool: {len(items)} "
+    # Der Pool folgt der letzten Suche je Suchstring: Überholte Läufe zählen nicht mit (sonst wären die Duplikate zu hoch)
+    basis = ""
+    if len(current) < len(runs):
+        basis = (" (letzter Lauf je Suchstring und alle Importe; „überholt“ sind Läufe, deren Suchstring später erneut "
+                 "ausgeführt oder gelöscht wurde"
+                 + (f"; dazu {data['stale']} schon entschiedene Treffer aus überholten Läufen" if data["stale"] else "") + ")")
+    L += ["", f"Datensätze abgerufen: {data['identified']}{basis}; eindeutige Datensätze im Pool: {data['pool']} "
               f"({', '.join(f'{source_label(s)} {n}' for s, n in sorted(by_source.items()))}); "
-              f"Duplikate entfernt: {fetched - len(items)} (Abgleich über DOI, PMID, OpenAlex-ID, Accession Number und Titel).", ""]
+              f"Duplikate entfernt: {data['duplicates']} (Abgleich über DOI, PMID, OpenAlex-ID, Accession Number und Titel).", ""]
     others = (p.get("settings") or {}).get("other_sources") or []
     if others:
         L += ["### Weitere Quellen", "", "| Quelle | Datum | Datensätze | Bemerkung |", "|---|---|---:|---|",
@@ -315,17 +326,19 @@ def markdown(svc, pid: int) -> str:
             L.append(f"| {label} | {st['matched']} | {st['exception']} | {st['hidden']} | {st['reviewed']} "
                      f"| {st['flagged']} | {st['included']} | {st['excluded']} |")
         unreviewed = sum(1 for it in items if it["hidden_by"] and not it["decision"] and not it["reviews"])
-        L += ["", f"Nach Vorfilter zu sichten: {len(visible)}. "
+        hidden_decided = data["screened"] - len(visible)
+        L += ["", f"Nach Vorfilter zu sichten: {len(visible)}"
+                  + (f"; dazu {hidden_decided} ausgeblendete Treffer mit Entscheid" if hidden_decided else "") + ". "
                   + (f"Ausgeblendet und nicht einzeln geprüft: {unreviewed}." if unreviewed
                      else "Alle ausgeblendeten Treffer wurden geprüft."), ""]
 
-    decided = [it for it in visible if it["decision"]]
-    status = Counter(it["decision"]["status"] for it in decided)
+    # Wie im Flussdiagramm: alle Treffer ausser den ausgeblendeten ohne Entscheid (entschiedene Ausgeblendete zählen mit)
+    decided = [it for it in items if it["decision"]]
     borderline = [it for it in items if it["borderline"]]
     no_abs = [it for it in visible if it["no_abstract"]]
     L += ["## Screening (Titel und Abstract)", "",
-          f"Gesichtet: {len(decided)} von {len(visible)}; eingeschlossen: {status['include']}; "
-          f"unsicher: {status['maybe']}; ausgeschlossen: {status['exclude']}. "
+          f"Gesichtet: {data['screened'] - data['open']} von {data['screened']}; eingeschlossen: {data['sought']}; "
+          f"unsicher: {data['maybe']}; ausgeschlossen: {data['excluded']}. "
           f"Grenzfälle: {len(borderline)} (davon aufgenommen: "
           f"{sum(1 for it in borderline if it['decision'] and it['decision']['status'] == 'include')}). "
           f"Ohne Abstract (nur Titel gesichtet): {len(no_abs)}.", ""]
@@ -341,7 +354,6 @@ def markdown(svc, pid: int) -> str:
         L += ["| Ausschlussgrund | Anzahl |", "|---|---:|", *[f"| {_cell(k)} | {v} |" for k, v in reasons.most_common()], ""]
     L += ["### Auswahlprozess", "", *_selection_lines(p, decided), ""]
 
-    data = flow(svc, pid)
     L += ["## Volltextprüfung", ""]
     if data["fulltext_used"]:
         L += [f"Volltexte gesucht: {data['sought']}; nicht beschaffbar: {data['not_retrieved']}; noch nicht beschafft: {data['missing']}; "

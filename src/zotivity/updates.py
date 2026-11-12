@@ -1,4 +1,5 @@
-"""Updates wie bei LLMplot: Ein Manifest (JSON) nennt Version, Installer und Prüfsumme.
+"""Updates wie bei LLMplot: Ein Manifest (JSON) nennt Version, Installer und Prüfsumme. Installiert wird nur, was das
+Manifest der eingestellten Update-Quelle anbietet, und nur mit passender Prüfsumme.
 
 Quelle ist eine HTTPS-Adresse oder ein lokaler bzw. Netzwerkpfad, z. B.::
 
@@ -12,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -72,11 +74,32 @@ def check(source: str) -> dict:
             "installer": installer, "sha256": manifest.get("sha256", ""), "notes": manifest.get("notes", "")}
 
 
-def download_installer(installer: str, sha256: str = "") -> Path:
+def offer(source: str, expect: str = "") -> dict:
+    """Das Update, das die eingestellte Quelle anbietet – nur das wird installiert: neuer als die laufende Version und
+    mit Prüfsumme. ``expect`` ist die Version, die in der Oberfläche bestätigt wurde; bietet die Quelle inzwischen eine
+    andere an, wird nichts installiert."""
+    info = check(source)
+    if not info.get("configured"):
+        raise UpdateError("Keine Update-Quelle eingetragen.")
+    if not info["available"]:
+        raise UpdateError("Die Update-Quelle bietet keine neuere Version an.")
+    if expect and str(expect) != info["latest"]:
+        raise UpdateError("Die Update-Quelle bietet inzwischen eine andere Version an. Bitte erneut nach Updates suchen.")
+    if not info["installer"]:
+        raise UpdateError("Kein Installer angegeben.")
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", str(info["sha256"] or "")):
+        raise UpdateError("Die Update-Information nennt keine gültige Prüfsumme (SHA-256). Update abgebrochen.")
+    return info
+
+
+def download_installer(installer: str, sha256: str) -> Path:
+    """Installer laden und gegen die Prüfsumme aus dem Manifest prüfen – ohne Prüfsumme wird nichts gestartet."""
     if not installer:
         raise UpdateError("Kein Installer angegeben.")
+    if not sha256:
+        raise UpdateError("Die Update-Information nennt keine gültige Prüfsumme (SHA-256). Update abgebrochen.")
     data = read_source(installer)
-    if sha256 and hashlib.sha256(data).hexdigest().lower() != sha256.lower():
+    if hashlib.sha256(data).hexdigest().lower() != sha256.lower():
         raise UpdateError("Die Prüfsumme des Installers stimmt nicht. Update abgebrochen.")
     tmp = Path(tempfile.gettempdir()) / f"Zotivity-Setup-{time.strftime('%Y%m%d%H%M%S')}.exe"
     tmp.write_bytes(data)

@@ -88,25 +88,37 @@ def dedup_keys(rec: dict) -> set[str]:
     return keys
 
 
-def dedup_keys_zotero(data: dict) -> set[str]:
-    """Schlüssel eines Zotero-Eintrags (data-Teil der API). DOI, PMID usw. stehen bei manchen Arten unter „Extra“."""
+def zotero_record(data: dict) -> dict:
+    """Ein Zotero-Eintrag (data-Teil der API) in der Form eines Datensatzes – nur, was der Abgleich braucht.
+    DOI, PMID usw. stehen bei manchen Arten unter „Extra“."""
     extra = data.get("extra", "") or ""
 
     def from_extra(label):
         m = re.search(rf"^{label}:\s*(\S+)", extra, re.M | re.I)
         return m.group(1) if m else ""
 
-    return dedup_keys({
-        "doi": data.get("DOI") or from_extra("DOI"),
-        "pmid": from_extra("PMID"),
-        "title": data.get("title", ""),
-    })
+    return {"doi": norm_doi(data.get("DOI") or from_extra("DOI")), "pmid": from_extra("PMID"),
+            "title": data.get("title", "") or "", "date": data.get("date", "") or ""}
 
 
 def years_conflict(a: dict, b: dict) -> bool:
     """Gleicher Titel, aber Jahre weit auseinander: wohl verschiedene Arbeiten (z. B. Erratum, Neuauflage)."""
     ya, yb = year_of(a), year_of(b)
     return bool(ya and yb and abs(ya - yb) > 1)
+
+
+def ids_conflict(a: dict, b: dict) -> bool:
+    """Gleicher Titel, aber verschiedene DOI bzw. PMID: verschiedene Arbeiten."""
+    for k in ("doi", "pmid"):
+        if a.get(k) and b.get(k) and str(a[k]).lower() != str(b[k]).lower():
+            return True
+    return False
+
+
+def same_work(a: dict, b: dict) -> bool:
+    """Darf ein gleicher Titel als dieselbe Arbeit gelten? Nur wenn Jahr und Kennungen nicht widersprechen – sonst sind
+    es etwa Preprint und Artikel, eine Neuauflage oder ein „Letter to the editor“ zum selben Titel."""
+    return not years_conflict(a, b) and not ids_conflict(a, b)
 
 
 def merge(base: dict, other: dict) -> dict:

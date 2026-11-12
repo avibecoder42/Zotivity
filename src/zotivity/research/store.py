@@ -31,7 +31,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .errors import NotFound
-from .records import dedup_keys, merge, normalize, years_conflict
+from .records import dedup_keys, merge, normalize, same_work
 
 SCHEMA_VERSION = 5
 SCHEMA = """
@@ -345,7 +345,7 @@ class Store:
                     match = strong[0]
                 elif weak:
                     other = json.loads(db.execute("SELECT data FROM record WHERE id = ?", (weak[0],)).fetchone()[0])
-                    if not years_conflict(rec, other) and not _ids_conflict(rec, other):
+                    if same_work(rec, other):
                         match = weak[0]
                 if match is None:
                     cur = db.execute("INSERT INTO record(project_id, created_at) VALUES(?, ?)", (pid, now()))
@@ -582,11 +582,3 @@ class Store:
 
     def logs(self, pid: int) -> list[dict]:
         return [_row(r, ("detail",)) for r in self.q("SELECT * FROM log WHERE project_id = ? ORDER BY id", (pid,))]
-
-
-def _ids_conflict(a: dict, b: dict) -> bool:
-    """Gleicher Titel, aber verschiedene DOI bzw. PMID: verschiedene Arbeiten."""
-    for k in ("doi", "pmid"):
-        if a.get(k) and b.get(k) and str(a[k]).lower() != str(b[k]).lower():
-            return True
-    return False

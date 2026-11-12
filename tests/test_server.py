@@ -83,6 +83,48 @@ def test_update_check_and_defaults(client, tmp_path):
     assert client.get("/api/settings/defaults").json()["retrieval"]["top_k"] == 15
 
 
+def test_update_installs_only_what_the_configured_source_offers(client, tmp_path, monkeypatch):
+    """Installer und Prüfsumme stammen aus dem Manifest der eingestellten Update-Quelle, nie aus der Anfrage – sonst
+    könnte jedes Programm auf dem Rechner den Dienst eine beliebige Datei starten lassen (Code-Prüfung 2026-11-11, A2)."""
+    import hashlib
+
+    from zotivity import updates
+
+    started = []
+    monkeypatch.setattr(updates, "run_installer", lambda path: started.append(Path(path)) or False)
+    monkeypatch.setattr(updates.tempfile, "gettempdir", lambda: str(tmp_path))
+    foreign = tmp_path / "fremd.exe"
+    foreign.write_bytes(b"fremdes Programm")
+
+    def install():  # so fragte die Oberfläche früher: Installer und (leere) Prüfsumme in der Anfrage
+        return client.post("/api/update/install", headers=H,
+                           json={"installer": str(foreign), "sha256": "", "version": "99.0.0"})
+
+    # Ohne eingestellte Quelle wird nichts geladen oder gestartet, was auch immer die Anfrage nennt
+    r = install()
+    assert r.status_code == 400 and "Update-Quelle" in r.text and not started
+
+    installer = tmp_path / "Zotivity-Setup-99.0.0.exe"
+    installer.write_bytes(b"echter Installer")
+    manifest = tmp_path / "zotivity-update.json"
+    good = {"version": "99.0.0", "url": installer.name, "sha256": hashlib.sha256(b"echter Installer").hexdigest()}
+    client.app.state.engine.settings_store.update({"update_url": str(manifest)})
+
+    for bad, message in (({**good, "sha256": ""}, "Prüfsumme"),                       # ohne Prüfsumme startet nichts
+                         ({**good, "sha256": "ab" * 32}, "Prüfsumme des Installers"),  # falsche Prüfsumme
+                         ({**good, "version": "0.0.1"}, "keine neuere Version"),       # kein Zurückstufen
+                         ({**good, "version": "99.1.0"}, "andere Version")):           # nicht das, was bestätigt wurde
+        manifest.write_text(json.dumps(bad))
+        r = install()
+        assert r.status_code == 400 and message in r.text, bad
+    assert not started
+
+    manifest.write_text(json.dumps(good))
+    r = install()
+    assert r.status_code == 200 and len(started) == 1
+    assert started[0].read_bytes() == b"echter Installer" and Path(r.json()["path"]) == started[0]
+
+
 def test_frontend_imports_resolve():
     """Ohne Build-Schritt: jeder Import muss auf eine vorhandene Datei und einen exportierten Namen zeigen."""
     root = Path(zotivity.__file__).parent / "server" / "static" / "js"
