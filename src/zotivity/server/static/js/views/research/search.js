@@ -8,7 +8,7 @@ import { t } from '../../core/i18n.js';
 import { fmtInt, fmtDate, debounce, copyToClipboard } from '../../core/util.js';
 import { btn, iconBtn, card, field, textInput, textArea, select, checkbox, notice, emptyState, spinner, numberInput } from '../../ui/components.js';
 import { icon } from '../../ui/icons.js';
-import { R, rs, lazy, busy, isBusy, invalidate, loadingNote, refreshSummary, sourceLabel, isLive, projectSources, catalogEntry, limitsText, dropZone, readFileB64, workspace, serverText } from './common.js';
+import { R, rs, lazy, busy, isBusy, invalidate, loadingNote, refreshSummary, sourceLabel, isLive, projectSources, catalogEntry, limitsText, dropZone, readFileB64, workspace, serverText, openTab } from './common.js';
 
 const OSF_PROVIDERS = [{ value: 'psyarxiv', label: 'PsyArXiv' }, { value: 'socarxiv', label: 'SocArXiv' },
   { value: 'edarxiv', label: 'EdArXiv' }, { value: 'osf', label: 'OSF Preprints' }];
@@ -315,15 +315,25 @@ function filesCard() {
   });
   const importRis = files => busy('import-ris', async () => {
     let total = { fetched: 0, new: 0, duplicates: 0 };
-    for (const f of files) {
-      const payload = await readFileB64(f);
-      const r = await api.post(`${R}/projects/${s.pid}/import`, { ...payload, source: st.risSource, name: st.risName || '',
-        string: st.risString || '', hits: st.risHits ?? null, searched_on: st.risDate || '' });
-      total = { fetched: total.fetched + r.fetched, new: total.new + r.new, duplicates: total.duplicates + r.duplicates };
+    const done = [];
+    try {
+      for (const f of files) {
+        const payload = await readFileB64(f);
+        const r = await api.post(`${R}/projects/${s.pid}/import`, { ...payload, source: st.risSource, name: st.risName || '',
+          string: st.risString || '', hits: st.risHits ?? null, searched_on: st.risDate || '' });
+        total = { fetched: total.fetched + r.fetched, new: total.new + r.new, duplicates: total.duplicates + r.duplicates };
+        done.push(f.name);
+      }
+    } finally {
+      // Bleibt in der Karte stehen (die Meldung unten verschwindet nach Sekunden) – auch, wenn eine spätere Datei scheitert
+      if (done.length) st.last = { pid: s.pid, files: done, ...total };
+      afterPoolChange();
     }
     toast(t('Import: {f} Datensätze, {n} neu im Pool, {d} schon da.', { f: fmtInt(total.fetched), n: fmtInt(total.new), d: fmtInt(total.duplicates) }), 'success', 6000);
-    afterPoolChange();
   });
+  // Bisher importierte Dateien (neueste zuerst): So ist auch später sichtbar, was schon im Pool ist
+  const imports = (runsOf(s) || []).filter(r => r.kind === 'import').slice().reverse();
+  const last = st.last && st.last.pid === s.pid ? st.last : null;
   return [
     card(t('RIS-Import'), 'upload', h('div', { class: 'stack-sm' },
       h('p', { class: 'muted small' }, t('Exporte aus Ovid PsycInfo, Web of Science oder EBSCO. Suchstring, Suchdatum und Trefferzahl stehen im Protokoll.')),
@@ -334,7 +344,18 @@ function filesCard() {
       field(t('Suchdatum'), textInput({ type: 'date', value: st.risDate, onInput: v => { st.risDate = v; update(); } }),
         { hint: t('Tag der Suche in der Datenbank, nicht des Imports.') }),
       field(t('Trefferzahl laut Datenbank'), numberInput({ value: st.risHits ?? '', nullable: true, int: true, min: 0, onChange: v => { st.risHits = v; update(); } })),
-      dropZone({ id: 'ris', label: t('.ris-Dateien hierher ziehen oder klicken'), accept: '.ris,.txt', onFiles: importRis, busyKey: 'import-ris' }))),
+      dropZone({ id: 'ris', label: t('.ris-Dateien hierher ziehen oder klicken'), accept: '.ris,.txt', onFiles: importRis, busyKey: 'import-ris' }),
+      isBusy('import-ris') ? h('div', { class: 'row small' }, spinner(13), t('Wird importiert …')) : null,
+      last ? notice('success', t('Importiert: {files} – {f} Datensätze, davon {n} neu im Pool und {d} schon da.', { files: last.files.join(', '),
+        f: fmtInt(last.fetched), n: fmtInt(last.new), d: fmtInt(last.duplicates) }),
+      h('div', { class: 'notice-actions' }, btn(t('Zum Pool'), { size: 'sm', icon: 'library', onClick: () => openTab('pool') }))) : null,
+      imports.length ? h('div', { class: 'stack-sm' },
+        h('b', { class: 'small' }, t('Bisher importiert ({n})', { n: fmtInt(imports.length) })),
+        imports.slice(0, 5).map(r => h('div', { key: r.id, class: 'small' }, h('b', null, r.filename || r.name),
+          h('span', { class: 'muted' }, ` · ${sourceLabel(r.source)} · ${r.searched_on || fmtDate(r.run_at)} · `
+            + t('{f} Datensätze, {n} neu', { f: fmtInt(r.fetched), n: fmtInt(r.new_records) })))),
+        imports.length > 5 ? h('div', null, btn(t('Alle im Protokoll'), { size: 'sm', kind: 'ghost', icon: 'history', onClick: () => showRuns(runsOf(s) || []) })) : null)
+        : null)),
     card(t('Suchstrings aus Dateien'), 'file', h('div', { class: 'stack-sm' },
       h('p', { class: 'muted small' }, t('Eine Textdatei je Suchstring. Name = Dateiname.')),
       field(t('Quelle'), select({ value: st.qsource, options: sourceChoices().map(v => ({ value: v, label: sourceLabel(v) })),
@@ -367,7 +388,10 @@ export function searchTab() {
         btn(t('Anhalten'), { size: 'sm', kind: 'ghost', onClick: () => { st.batch = null; update(); } })) : null,
       queries == null ? loadingNote('queries')
         : order.length ? order.map(src => h('div', { key: src }, sourceCard(src, groups[src], soleLive)))
-          : emptyState('search', t('Noch keine Suchstrings'), t('Aus der Suchstrategie übernehmen, von Hand einfügen oder als Textdateien laden.'))),
+          : emptyState('search', t('Noch keine Suchstrings'), (runs || []).some(r => r.kind === 'import')
+            // Nur RIS-Importe: Sie sind keine Suchstrings, sonst sähe es aus, als wäre nichts geschehen
+            ? t('Deine RIS-Importe stehen rechts unter „Bisher importiert“, ihre Datensätze sind im Pool. Suchstrings für direkt durchsuchbare Datenbanken kommen aus der Suchstrategie, von Hand oder aus Textdateien.')
+            : t('Aus der Suchstrategie übernehmen, von Hand einfügen oder als Textdateien laden.'))),
   [filesCard(), otherSourcesCard(),
     runs && runs.length ? h('div', { key: 'runs' }, btn(t('Protokoll der Läufe ({n})', { n: fmtInt(runs.length) }), { icon: 'history', onClick: () => showRuns(runs) })) : null]);
 }

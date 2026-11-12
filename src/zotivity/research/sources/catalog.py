@@ -30,10 +30,14 @@ ACCESS = {
 }
 
 
-def _s(id, label, disciplines, access, note, terms="", boolean="ja", key=None, live=None, recommended=False):
+def _s(id, label, disciplines, access, note, terms="", boolean="ja", key=None, live=None, recommended=False,
+       languages=()):
+    """``languages``: erfasst Literatur in diesen Sprachen (ausser Englisch), die in den englischsprachigen
+    Fachdatenbanken meist fehlt (Forschungsberichte, Bücher, Zeitschriften) – wird vorgeschlagen, wenn eine davon zu den
+    Sprachen der Literatur gehört."""
     return {"id": id, "label": label, "disciplines": disciplines, "access": access, "note": note, "terms": terms,
             "boolean": boolean, "key": key, "in_app": access == "live" if live is None else live,
-            "recommended": recommended}
+            "recommended": recommended, "languages": list(languages)}
 
 
 CATALOG = [
@@ -59,8 +63,8 @@ CATALOG = [
     _s("osf", "OSF-Preprints (PsyArXiv, SocArXiv, EdArXiv)", ["psych", "social", "edu"], "live",
        "Einfache Suche: alle Stichwörter müssen vorkommen, kein ODER.", "https://help.osf.io/", boolean="einfach"),
     _s("swisscovery", "swisscovery (Schweizer Hochschulbibliotheken)", ["books", "art"], "live",
-       "Bücher und Sammelbände; SRU, höchstens 10'000 Treffer je Suche, keine Massenexporte.",
-       "https://slsp.ch/en", boolean="ja (CQL)"),
+       "Bücher und Sammelbände, auch Berichte auf Deutsch, Französisch und Italienisch; SRU, höchstens 10'000 Treffer je Suche, keine Massenexporte.",
+       "https://slsp.ch/en", boolean="ja (CQL)", languages=("de", "fr", "it")),
     _s("core", "CORE", ["multi"], "live",
        "Open-Access-Volltexte. Phrasen werden nicht zuverlässig erkannt – noch nicht als Suchquelle eingebaut.",
        "https://core.ac.uk/services/api", boolean="eingeschränkt", live=False),
@@ -87,8 +91,11 @@ CATALOG = [
     _s("assia", "ASSIA", ["social"], "export", "ProQuest, nur mit Lizenz; RIS-Import."),
     _s("socabs", "Sociological Abstracts / Social Services Abstracts", ["social"], "export",
        "ProQuest, nur mit Lizenz; RIS-Import."),
-    _s("fis", "FIS Bildung (Fachportal Pädagogik)", ["edu"], "export",
-       "Deutschsprachige Bildungsforschung; keine API gefunden, RIS-Import."),
+    _s("fis", "FIS Bildung (Fachportal Pädagogik)", ["edu", "social"], "export",
+       "Deutschsprachige Bildungsforschung, auch Sozialpädagogik; keine API gefunden, RIS-Import.", languages=("de",)),
+    _s("ssoar", "SSOAR (Social Science Open Access Repository)", ["social", "edu", "psych"], "export",
+       "Deutschsprachige Sozialwissenschaften, Open Access (GESIS), auch Forschungsberichte; Suche auf ssoar.info, "
+       "Treffer exportieren und als RIS importieren.", "https://www.ssoar.info/", languages=("de",)),
     _s("philpapers", "PhilPapers", ["hum"], "license", "Schlüssel auf Antrag; strenge Bedingungen zur Weitergabe.",
        "https://philpapers.org/help/api/"),
     _s("philindex", "Philosopher's Index, MLA", ["hum"], "export", "EBSCO, nur mit Lizenz; RIS-Import."),
@@ -130,15 +137,62 @@ CATALOG = [
 BY_ID = {s["id"]: s for s in CATALOG}
 
 
-def suggest(disciplines: list[str]) -> list[str]:
+def suggest(disciplines: list[str], languages: list[str] | None = None) -> list[str]:
     """Vorschlag für die gewählten Disziplinen: alle offenen, eingebauten Quellen dieser Disziplinen, dazu OpenAlex
-    und die Fachdatenbanken, die nur per Export gehen (damit sie im Protokoll nicht fehlen)."""
+    und die Fachdatenbanken, die nur per Export gehen (damit sie im Protokoll nicht fehlen). Gehört eine andere Sprache
+    als Englisch zu den Sprachen der Literatur, kommen die Quellen dieser Disziplinen dazu, die Literatur in dieser
+    Sprache erfassen, und swisscovery (Bücher und Berichte aller Fächer)."""
     chosen = set(disciplines or [])
+    wanted = set(languages or []) - {"en"}
     out = []
     for s in CATALOG:
         if s["access"] == "never":
             continue
         fits = bool(chosen & set(s["disciplines"]))
-        if s["id"] == "openalex" or (fits and (s["in_app"] or s["access"] == "export")):
+        usable = s["in_app"] or s["access"] == "export"
+        speaks = bool(wanted & set(s["languages"]))
+        # Exportquellen für eine bestimmte Sprache (FIS Bildung, SSOAR) nur, wenn diese Sprache gesucht ist
+        if s["id"] == "openalex" or (fits and usable and (speaks or not s["languages"] or s["in_app"]))                 or (speaks and usable and "books" in s["disciplines"]):
             out.append(s["id"])
     return out
+
+
+# ------------------------------------------------------------------------------------- Sprachen der Literatur
+# Die Landessprachen der Schweiz und Englisch
+LITERATURE_LANGUAGES = {"de": "Deutsch", "fr": "Französisch", "it": "Italienisch", "en": "Englisch"}
+# Häufige Wörter, die es nur in einer der Sprachen gibt (gemeinsame wie „in“ zählen nicht)
+_WORDS = {
+    "de": {"und", "der", "die", "das", "ist", "nicht", "mit", "von", "für", "zu", "den", "im", "sich", "eine", "einer",
+           "einen", "eines", "auf", "wie", "werden", "wird", "welche", "welchen", "welcher", "bei", "aus", "oder", "dem",
+           "des", "zur", "zum", "über", "durch", "sind", "nach", "unter", "sowie", "haben", "hat"},
+    "fr": {"le", "les", "des", "du", "et", "est", "dans", "pour", "avec", "sur", "une", "comment", "quels", "quelles",
+           "qui", "que", "aux", "leur", "leurs", "chez", "par", "ou", "sont", "entre", "jeunes"},
+    "it": {"il", "lo", "gli", "della", "delle", "degli", "dei", "nel", "nella", "nei", "per", "con", "che", "una",
+           "come", "quali", "sono", "tra", "fra", "loro", "giovani", "è", "e", "o"},
+    "en": {"the", "and", "of", "to", "is", "for", "with", "on", "are", "how", "what", "by", "from", "or", "among",
+           "between", "do", "does", "which", "their", "this", "that"},
+}
+
+
+def question_language(text: str) -> str:
+    """Sprache der Fragestellung (de, fr, it, en) nach häufigen Wörtern; im Zweifel Englisch."""
+    words = [w.strip(".,;:!?()«»„“\"'").lower() for w in (text or "").split()]
+    score = {lang: sum(w in vocab for w in words) for lang, vocab in _WORDS.items()}
+    if any(c in (text or "").lower() for c in "äöüß"):
+        score["de"] += 1
+    best = max(("de", "fr", "it"), key=lambda lang: score[lang])
+    return best if score[best] > score["en"] else "en"
+
+
+def clean_languages(languages) -> list[str]:
+    return [code for code in LITERATURE_LANGUAGES if code in (languages or [])]
+
+
+def literature_languages(project: dict) -> list[str]:
+    """Sprachen der gesuchten Literatur: wie im Projekt gewählt; sonst Englisch und, ist die Fragestellung deutsch,
+    französisch oder italienisch, auch diese Sprache (solche Studien haben oft keinen englischen Titel oder Abstract)."""
+    chosen = clean_languages((project.get("settings") or {}).get("languages"))
+    if chosen:
+        return chosen
+    text = " ".join(str(project.get(k) or "") for k in ("question", "description", "title"))
+    return clean_languages({question_language(text), "en"})

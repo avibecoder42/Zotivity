@@ -3,7 +3,7 @@
 import { h } from '../../core/vdom.js';
 import { update, ui, run, toast, confirmDialog } from '../../core/store.js';
 import * as api from '../../core/api.js';
-import { t } from '../../core/i18n.js';
+import { t, languageName } from '../../core/i18n.js';
 import { fmtDate } from '../../core/util.js';
 import { btn, card, field, textInput, textArea, checkbox, notice, emptyState, badge } from '../../ui/components.js';
 import { icon } from '../../ui/icons.js';
@@ -141,6 +141,26 @@ function selectionCard() {
       { hint: t('Für Protokoll und Bericht: wie gesichtet wurde und wie Uneinigkeit gelöst wurde.') })));
 }
 
+// Sprachen der gesuchten Literatur (Landessprachen der Schweiz und Englisch): KI-Suchbegriffe und Datenbankvorschlag
+// folgen ihnen. Ohne eigene Wahl stellt der Dienst sie nach der Sprache der Fragestellung ein (languages_auto).
+const LANGUAGES = () => ['de', 'fr', 'it', 'en'].map(code => ({ code, label: languageName(code) }));
+
+function languagesField() {
+  const s = rs();
+  const settings = s.project.settings || {};
+  const current = settings.languages || ['en'];
+  const toggle = async (code, on) => {
+    const next = LANGUAGES().map(l => l.code).filter(c => (c === code ? on : current.includes(c)));
+    if (!next.length) { toast(t('Mindestens eine Sprache wählen.'), 'warning'); return; }
+    const p = await run(() => api.put(`${R}/projects/${s.pid}`, { settings: { languages: next } }));
+    if (rs().pid === s.pid) { s.project.settings = p.settings; update(); }
+  };
+  return field(t('Sprachen der Literatur'), h('div', { class: 'row wrap' },
+    LANGUAGES().map(l => checkbox({ key: l.code, label: l.label, checked: current.includes(l.code), onChange: on => toggle(l.code, on) }))),
+  { hint: (settings.languages_auto ? t('Nach der Sprache der Fragestellung eingestellt.') + ' ' : '')
+    + t('Die KI schlägt Suchbegriffe in diesen Sprachen vor und, für andere Sprachen als Englisch, auch Datenbanken mit Literatur in diesen Sprachen.') });
+}
+
 export function projectTab() {
   const st = draft();
   const d = st.d;
@@ -156,7 +176,8 @@ export function projectTab() {
           field(t('Einschlusskriterien'), textArea({ value: d.criteria_in, rows: 5, onInput: v => set('criteria_in', v) }),
             { hint: t('Eine Zeile je Kriterium.') }),
           field(t('Ausschlusskriterien'), textArea({ value: d.criteria_out, rows: 5, onInput: v => set('criteria_out', v) }),
-            { hint: t('Eine Zeile je Grund – im Screening als Ausschlussgründe zur Wahl.') })))),
+            { hint: t('Eine Zeile je Grund – im Screening als Ausschlussgründe zur Wahl.') })),
+        languagesField())),
       selectionCard(),
       h('p', { class: 'muted small' }, t('Änderungen werden automatisch gespeichert.')),
       draftBar({ withDelete: true })));
@@ -184,10 +205,11 @@ async function saveSettings(patch) {
 
 function suggestionFor(disciplines) {
   const st = ui('rs-dbs', { key: null, list: [] });
+  const langs = ((rs().project.settings || {}).languages || []).join(',');  // bei Deutsch: deutschsprachige Quellen dazu
   const key = disciplines.slice().sort().join(',');
-  if (st.key !== key) {
-    st.key = key;
-    api.get(`${R}/sources/suggest?disciplines=${enc(key)}`).then(r => { st.list = r.sources; update(); }).catch(() => {});
+  if (st.key !== `${key}|${langs}`) {
+    st.key = `${key}|${langs}`;
+    api.get(`${R}/sources/suggest?disciplines=${enc(key)}&languages=${enc(langs)}`).then(r => { st.list = r.sources; update(); }).catch(() => {});
   }
   return st.list;
 }
@@ -313,6 +335,7 @@ function databasesCard() {
           checkbox({ checked: chosen.has(c.id), label: c.label, onChange: v => toggleSource(c.id, v) }),
           h('div', { class: 'rs-db-meta' },
             suggested.includes(c.id) && badge(t('Vorschlag'), 'accent'),
+            (c.languages || []).length ? badge(c.languages.map(languageName).join(', '), 'neutral') : null,
             access === 'live' && !c.in_app && badge(t('noch nicht eingebaut'), 'neutral'),
             c.boolean && c.boolean !== 'ja' && h('span', { class: 'muted small' }, t('Boolesch: {b}', { b: c.boolean })),
             h('span', { class: 'muted small' }, c.disciplines.includes('multi') ? info.disciplines.multi

@@ -126,13 +126,33 @@ def _ovid_term(term: str) -> str:
     return f'"{t}"' if " " in t and "*" not in t else t  # Ovid: benachbarte Wörter gelten ohnehin als Phrase
 
 
+# Ovid liest and, or, not und Abstandsoperatoren auch mitten in einem Begriff als Operator: „information and
+# communication technolog*“ wurde zu „(… or information) and communication technolog*“ und engte damit den ganzen Block
+# ein. In Anführungszeichen gelten sie als Wörter; Trunkierung (*) funktioniert dort ebenfalls (in Ovid PsycInfo geprüft).
+OVID_OPERATORS = re.compile(r"\b(?:and|or|not|adj\d*|near\d*|freq)\b", re.I)
+
+
+def _psycinfo_term(term: str) -> str:
+    t = _ovid_term(term)
+    if not t.startswith('"') and " " in t and OVID_OPERATORS.search(t):
+        return f'"{t}"'
+    return t
+
+
+OVID_LINES_NOTE = ("Jede Zeile einzeln in Advanced Search eingeben (Keyword-Modus, „Map Term to Subject Heading“ aus); "
+                   "die letzte Zeile kombiniert sie – ihre Nummern an den eigenen Suchverlauf anpassen.")
+OVID_HEADINGS_NOTE = ("Meldet Ovid „The subject heading … is invalid in this database“, gibt es dieses Schlagwort in "
+                      "PsycInfo nicht, und Ovid sucht ohne es weiter. Den gültigen Begriff unter Search Tools (Map Term "
+                      "oder Tree) suchen und in der Zeile ersetzen.")
+
+
 def build_ovid(blocks: list[dict]) -> dict:
     inc, exc = _split(blocks)
     lines, inc_n, exc_n = [], [], []
     for group, numbers in ((inc, inc_n), (exc, exc_n)):
         for b in group:
             suffix = ".ti." if b.get("field") == "ti" else ".ti,ab,id."
-            terms = [_ovid_term(t) for t in clean_terms(b.get("terms"))]
+            terms = [_psycinfo_term(t) for t in clean_terms(b.get("terms"))]
             parts = []
             if terms:
                 parts.append(f"({' or '.join(terms)}){suffix}" if len(terms) > 1 else f"{terms[0]}{suffix}")
@@ -144,16 +164,25 @@ def build_ovid(blocks: list[dict]) -> dict:
         if exc_n:
             combo += " not " + (" or ".join(map(str, exc_n)) if len(exc_n) == 1 else f"({' or '.join(map(str, exc_n))})")
         lines.append(combo)
-    notes = ["Jede Zeile einzeln in Advanced Search eingeben (Keyword-Modus, „Map Term to Subject Heading“ aus); "
-             "die letzte Zeile kombiniert sie."] if lines else []
+    notes = [OVID_LINES_NOTE] if lines else []
+    if lines and any(clean_terms(b.get("psycinfo")) for b in inc + exc):
+        notes.append(OVID_HEADINGS_NOTE)
     return {"source": "psycinfo", "string": "\n".join(lines), "lines": lines, "notes": notes}
+
+
+def _wos_term(term: str) -> str:
+    """Web of Science verknüpft Wörter ohne Anführungszeichen mit AND, statt sie als Phrase zu suchen: „social medi*“
+    fand jeden Text mit „social“ und „medi…“ irgendwo im Thema (in einer echten Suche 3 172 statt 84 Treffer). Darum
+    stehen mehrteilige Begriffe in Anführungszeichen, auch mit Sternchen – das funktioniert dort (geprüft)."""
+    t = FIELD_TAG.sub("", _bare(term)).strip()
+    return f'"{t}"' if " " in t else t
 
 
 def build_wos(blocks: list[dict]) -> dict:
     inc, exc = _split(blocks)
 
     def block(b):
-        terms = [_ovid_term(t) for t in clean_terms(b.get("terms"))]
+        terms = [_wos_term(t) for t in clean_terms(b.get("terms"))]
         if not terms:
             return ""
         tag = "TI" if b.get("field") == "ti" else "TS"

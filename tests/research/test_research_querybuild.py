@@ -38,9 +38,29 @@ def test_ovid_lines():
     ]
 
 
+def test_ovid_quotes_terms_with_operators():
+    """„information and communication technolog*“ ohne Anführungszeichen liest Ovid als UND-Verknüpfung, die den ganzen
+    Block einengt; in Anführungszeichen gilt „and“ als Wort, und die Trunkierung funktioniert weiter."""
+    r = build("psycinfo", [{"name": "Medien", "terms": ["digital medi*", "information and communication technolog*",
+                                                         "ICT", "adj thinking", "Dungeons and Dragons"],
+                            "psycinfo": ["Social Media"]}])
+    assert r["lines"] == ['(digital medi* or "information and communication technolog*" or ICT or "adj thinking" or '
+                          '"Dungeons and Dragons").ti,ab,id. or exp Social Media/']
+    assert "Nummern" in r["notes"][0]
+    assert any("invalid in this database" in n for n in r["notes"])  # Schlagwörter: Hinweis auf Ovids Meldung
+    assert not any("invalid" in n for n in build("psycinfo", [{"name": "x", "terms": ["teen*"]}])["notes"])
+
+
 def test_wos():
     assert build("wos", BLOCKS)["string"] == ('TS=(adolescen* OR teen* OR "young people") AND '
                                               'TS=(cyber-aggression OR "online harassment") NOT TI=(cyberbully*)')
+
+
+def test_wos_quotes_phrases_with_wildcards():
+    """Ohne Anführungszeichen verknüpft Web of Science die Wörter mit AND („social medi*“ = social AND medi*)."""
+    s = build("wos", [{"name": "Medien", "terms": ["social medi*", "information and communication technolog*", "ICT",
+                                                    "group home*"]}])["string"]
+    assert s == 'TS=("social medi*" OR "information and communication technolog*" OR ICT OR "group home*")'
 
 
 def test_empty_and_unknown():

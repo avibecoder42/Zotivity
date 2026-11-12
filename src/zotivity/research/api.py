@@ -229,8 +229,9 @@ def make_router(svc: ResearchService) -> APIRouter:
         return svc.ai_blocks(pid, body.blocks, body.focus)
 
     @r.get("/sources/suggest")
-    def suggest_sources(disciplines: str = ""):
-        return {"sources": svc.suggest_sources([d for d in disciplines.split(",") if d])}
+    def suggest_sources(disciplines: str = "", languages: str = ""):
+        return {"sources": svc.suggest_sources([d for d in disciplines.split(",") if d],
+                                               [x for x in languages.split(",") if x])}
 
     # -- Projekte ------------------------------------------------------------------------------------
     @r.get("/projects")

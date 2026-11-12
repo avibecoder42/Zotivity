@@ -160,7 +160,9 @@ def sources_system() -> str:
         if s["access"] == "never":
             continue
         disc = ", ".join(catalog.DISCIPLINES[d] for d in s["disciplines"])
-        rows.append(f"- {s['id']}: {s['label']} | {disc} | {catalog.ACCESS[s['access']]} | {s['note']}")
+        langs = ", ".join(catalog.LITERATURE_LANGUAGES[c] for c in s.get("languages") or [])
+        langs = f" | Literatur auf {langs}" if langs else ""
+        rows.append(f"- {s['id']}: {s['label']} | {disc} | {catalog.ACCESS[s['access']]} | {s['note']}{langs}")
     disciplines = "\n".join(f"- {k}: {v}" for k, v in catalog.DISCIPLINES.items())
     return "\n".join([
         "Du berätst Forschende bei der Wahl von Literaturdatenbanken für eine systematische Recherche. Du schlägst nur "
@@ -170,14 +172,22 @@ def sources_system() -> str:
         "",
         "Wähle die Disziplinen, die die Fragestellung berührt, und die Datenbanken, die für eine gründliche Suche "
         "nötig sind – auch solche, die nur per RIS-Import gehen, wenn sie fachlich zentral sind. Nimm OpenAlex als "
-        "breite Basis dazu. Begründe jede Datenbank mit genau einem Satz, bezogen auf die Fragestellung. In note höchstens "
-        "zwei Sätze zu Lücken oder Besonderheiten (z. B. graue Literatur, Sprachen).",
+        "breite Basis dazu. Gehört eine andere Sprache als Englisch zu den Sprachen der Literatur, nimm auch die "
+        "Datenbanken dazu, die Literatur in dieser Sprache erfassen und fachlich passen – solche Studien und Berichte "
+        "fehlen in den englischsprachigen Fachdatenbanken meist. Begründe jede Datenbank mit genau einem Satz, bezogen auf die "
+        "Fragestellung. In note höchstens zwei Sätze zu Lücken oder Besonderheiten (z. B. graue Literatur, Sprachen).",
     ])
+
+
+def languages_line(project: dict) -> str:
+    names = [catalog.LITERATURE_LANGUAGES[c] for c in catalog.literature_languages(project)]
+    return f"Sprachen der Literatur: {', '.join(names)}"
 
 
 def sources_prompt(project: dict) -> str:
     return "\n".join([
         f"Projekt: {project.get('title', '')}",
+        languages_line(project),
         f"Fragestellung: {project.get('question') or '–'}",
         f"Kurzbeschreibung: {project.get('description') or '–'}",
         "Einschlusskriterien:", *_bullets(project.get("criteria_in")),
@@ -229,7 +239,26 @@ BLOCKS_SCHEMA = {
 }
 
 
-def blocks_system() -> str:
+def _and_join(names: list[str]) -> str:
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " und " + names[-1]
+
+
+def _terms_rule(languages) -> str:
+    """Sprache der Suchbegriffe nach den Sprachen der Literatur. Schlagwörter (MeSH, PsycInfo) gibt es nur englisch."""
+    languages = catalog.clean_languages(languages) or ["en"]
+    if languages == ["en"]:
+        return "- Suchbegriffe auf Englisch, der Sprache der Datenbanken."
+    others = _and_join([catalog.LITERATURE_LANGUAGES[c] for c in languages if c != "en"])
+    tail = (" Studien in diesen Sprachen haben oft keinen englischen Titel oder Abstract und fehlen sonst. Wortformen "
+            "mit * abdecken (Jugendlich*, jeune*, giovan*). MeSH- und PsycInfo-Schlagwörter bleiben englisch.")
+    if "en" not in languages:
+        return f"- Suchbegriffe auf {others} (gesucht ist nur Literatur in diesen Sprachen)." + tail
+    return (f"- Suchbegriffe auf Englisch und auf {others}: in jedem Block die englischen Begriffe und dazu die "
+            "gebräuchlichen Begriffe in jeder dieser Sprachen (z. B. social media, soziale Medien, médias sociaux, "
+            "media sociali).") + tail
+
+
+def blocks_system(languages=("en",)) -> str:
     return "\n".join([
         "Du hilfst Forschenden, für eine systematische Literaturrecherche Konzeptblöcke zu bilden. Du schlägst nur vor; "
         "die Forschenden prüfen und wählen. Namen, Begründungen und Hinweise auf Deutsch.",
@@ -240,8 +269,7 @@ def blocks_system() -> str:
         "Regeln:",
         "- 2 bis 4 Einschlussblöcke (kind \"include\"), typisch Population, Phänomen, Kontext. Nur Blöcke, die die "
         "Fragestellung verlangt – jeder weitere Block mit UND verkleinert die Treffermenge.",
-        "- Suchbegriffe auf Englisch, der Sprache der Datenbanken. Deutsche Begriffe nur, wenn die Fragestellung "
-        "ausdrücklich deutschsprachige Literatur verlangt.",
+        _terms_rule(languages),
         "- Je Block 5 bis 25 Begriffe: Synonyme, Schreibvarianten (cyberbullying, cyber-bullying), Fach- und "
         "Alltagsbegriffe. * für beliebige Endung, wo sinnvoll (adolescen*), mit mindestens vier Buchstaben vor dem *. "
         "Phrasen aus mehreren Wörtern ohne Anführungszeichen.",
@@ -259,6 +287,7 @@ def blocks_system() -> str:
 def blocks_prompt(project: dict, existing: list[dict] | None = None) -> str:
     lines = [
         f"Projekt: {project.get('title', '')}",
+        languages_line(project),
         f"Fragestellung: {project.get('question') or '–'}",
         f"Kurzbeschreibung: {project.get('description') or '–'}",
         "Einschlusskriterien:", *_bullets(project.get("criteria_in")),

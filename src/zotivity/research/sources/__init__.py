@@ -24,6 +24,7 @@ SOURCES = {
     "assia": "ASSIA",
     "socabs": "Sociological Abstracts",
     "fis": "FIS Bildung",
+    "ssoar": "SSOAR",
     "ris": "RIS-Import",
 }
 # mit Trefferzahl-Vorschau und direkter Suche

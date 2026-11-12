@@ -203,6 +203,41 @@ def test_catalog_suggestions():
     assert all(set(x["disciplines"]) <= set(catalog.DISCIPLINES) for x in catalog.CATALOG)
 
 
+def test_german_literature_adds_german_sources_and_terms():
+    """Deutschsprachige Studien fehlen in den englischsprachigen Fachdatenbanken und haben oft keinen englischen Titel:
+    Gehört Deutsch zu den Sprachen der Literatur, kommen deutschsprachige Quellen und deutsche Suchbegriffe dazu."""
+    from zotivity.research import ai
+
+    english = catalog.suggest(["social", "psych"])
+    assert not {"fis", "ssoar", "swisscovery"} & set(english)  # ohne Deutsch wie bisher
+    german = catalog.suggest(["social", "psych"], ["de", "en"])
+    assert {"fis", "ssoar", "swisscovery"} <= set(german) and set(english) <= set(german)
+    assert catalog.suggest(["econ"], ["de"]) == ["openalex", "econbiz", "swisscovery"]
+    # Ohne eigene Wahl nach der Sprache der Fragestellung
+    de_project = {"question": "Wie nutzen Fachpersonen in der stationären Jugendhilfe digitale Medien?", "settings": {}}
+    en_project = {"question": "How do practitioners in residential youth care use digital media?", "settings": {}}
+    assert catalog.literature_languages(de_project) == ["de", "en"]
+    assert catalog.literature_languages(en_project) == ["en"]
+    short = {"question": "Wie nutzen Jugendliche in Heimen digitale Medien?", "settings": {}}  # „in“ zählt nicht
+    assert catalog.literature_languages(short) == ["de", "en"]
+    fr = {"question": "Comment les jeunes en foyer utilisent-ils les médias numériques ?", "settings": {}}
+    it = {"question": "Come usano i giovani nelle comunità i media digitali?", "settings": {}}
+    assert catalog.literature_languages(fr) == ["fr", "en"] and catalog.literature_languages(it) == ["it", "en"]
+    # Französisch: swisscovery (auch französische Berichte), aber nicht die rein deutschsprachigen Exportquellen
+    french = catalog.suggest(["social"], ["fr", "en"])
+    assert "swisscovery" in french and not {"fis", "ssoar"} & set(french)
+    assert "Englisch und auf Deutsch, Französisch und Italienisch" in ai.blocks_system(["de", "fr", "it", "en"])
+    assert "Suchbegriffe auf Französisch (gesucht ist nur" in ai.blocks_system(["fr"])
+    assert catalog.literature_languages({**en_project, "settings": {"languages": ["de", "xx"]}}) == ["de"]
+    assert "Englisch und auf Deutsch" in ai.blocks_system(["de", "en"])
+    assert "Suchbegriffe auf Englisch, der Sprache der Datenbanken." in ai.blocks_system(["en"])
+    assert "Jugendlich*" not in ai.blocks_system(["en"])
+    assert "Sprachen der Literatur: Deutsch, Englisch" in ai.blocks_prompt(de_project)
+    assert "andere Sprache als Englisch" in ai.sources_system()
+    assert "Literatur auf Deutsch, Französisch, Italienisch" in ai.sources_system()  # swisscovery
+    assert "Sprachen der Literatur: Deutsch, Englisch" in ai.sources_prompt(de_project)
+
+
 def test_swisscovery_blocks_wildcards_years(sim):
     """Der Katalog wertet mehrere Klammerblöcke falsch aus: abgefragt wird der engste Block, der Rest nachträglich."""
     from zotivity.research.sources import swisscovery as sc

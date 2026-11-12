@@ -2,6 +2,35 @@
 
 All notable changes, newest first.
 
+## 1.2.4 – 2026-11-12
+
+Search strings for Ovid PsycInfo and Web of Science, checked in real searches, and literature in German, French and
+Italian in the database search.
+
+### Added
+- **Database search: languages of the literature.** Under Research question you choose German, French, Italian and/or
+  English. The AI then suggests search terms in these languages – each block also gets terms in the other languages,
+  because such studies often have no English title or abstract – and databases with literature in these languages.
+  Without a choice, English and the language of the research question are set. Before, the AI suggested English terms
+  only.
+- **SSOAR** (Social Science Open Access Repository) in the database catalogue, via RIS import. The database list shows
+  which sources cover German, French or Italian literature (FIS Bildung, SSOAR, swisscovery).
+
+### Fixed
+- **Web of Science: terms of several words are searched as phrases.** Without quotation marks Web of Science links the
+  words with AND, so "social medi*" found every record with "social" and "medi…" anywhere in the topic. Such terms are
+  now quoted, also with an asterisk, which Web of Science accepts. In a real search this gave 84 instead of 3,172 hits.
+- **Ovid PsycInfo: terms with "and" stay together.** A term such as "information and communication technolog*" was read
+  by Ovid as an AND search and narrowed the whole block without any message. Terms with and, or, not or proximity
+  operators are now quoted; truncation works inside the quotes.
+- **Ovid PsycInfo: clearer notes.** The combining line needs the numbers of your own search history, and a new note
+  explains Ovid's message "The subject heading … is invalid in this database" and where to find the valid term.
+- **RIS import shows what was added.** After dropping a file, only a message flashed at the bottom. The RIS import card
+  now keeps the result (records, new in the pool, already there) with **Go to pool**, and lists the files imported so
+  far. Without search strings, the left side no longer looks as if nothing had happened.
+- **Project page: the next step names the missing synchronisation.** For a corpus whose library is not synchronised
+  yet, the line said the texts were searchable; it now asks to synchronise first.
+
 ## 1.2.3 – 2026-11-12
 
 Importing a project on another computer.

@@ -2471,7 +2471,8 @@ export default {
   'OpenAlex kennt keine Platzhalter (*): entfernt. OpenAlex sucht mit Wortstämmen, ggf. Wortformen ergänzen (z. B. adolescent, adolescents, adolescence).': 'OpenAlex has no wildcards (*): removed. OpenAlex searches by word stems; add word forms if needed (e.g. adolescent, adolescents, adolescence).',
   'MeSH-Schlagwörter gibt es in OpenAlex nicht – nur die Freitextbegriffe werden verwendet.': 'OpenAlex has no MeSH headings – only the free-text terms are used.',
   'OpenAlex sucht hier in Titel und Abstract; Einschränkungen auf den Titel gelten nicht. Ausschlüsse nur im Titel lassen sich im Pool als Vorfilter setzen.': 'OpenAlex searches title and abstract here; restrictions to the title do not apply. Exclusions in the title only can be set as prefilters in the pool.',
-  'Jede Zeile einzeln in Advanced Search eingeben (Keyword-Modus, „Map Term to Subject Heading“ aus); die letzte Zeile kombiniert sie.': 'Enter each line separately in Advanced Search (keyword mode, “Map Term to Subject Heading” off); the last line combines them.',
+  'Jede Zeile einzeln in Advanced Search eingeben (Keyword-Modus, „Map Term to Subject Heading“ aus); die letzte Zeile kombiniert sie – ihre Nummern an den eigenen Suchverlauf anpassen.': 'Enter each line separately in Advanced Search (keyword mode, “Map Term to Subject Heading” off); the last line combines them – adjust its numbers to your own search history.',
+  'Meldet Ovid „The subject heading … is invalid in this database“, gibt es dieses Schlagwort in PsycInfo nicht, und Ovid sucht ohne es weiter. Den gültigen Begriff unter Search Tools (Map Term oder Tree) suchen und in der Zeile ersetzen.': 'If Ovid reports “The subject heading … is invalid in this database”, PsycInfo has no such subject heading and Ovid searches without it. Look up the valid term under Search Tools (Map Term or Tree) and replace it in the line.',
   'MeSH-Schlagwörter fehlen in WoS – Freitext ergänzen, falls nötig.': 'Web of Science has no MeSH headings – add free text if needed.',
   'MeSH-Schlagwörter sind als Freitext übernommen – OpenAlex kennt keine MeSH.': 'MeSH headings were taken over as free text – OpenAlex has no MeSH.',
   'Einschränkungen auf den Titel ([ti]) gelten in OpenAlex für Titel und Abstract. Ein Ausschluss nur im Titel lässt sich im Pool als Vorfilter setzen.': 'Restrictions to the title ([ti]) apply to title and abstract in OpenAlex. An exclusion in the title only can be set as a prefilter in the pool.',
@@ -2591,4 +2592,17 @@ export default {
   'Für {libs} gibt es noch keinen Abgleich mit Zotero. Bis dahin fehlen in den Forschungsständen Autor, Jahr und PDF der Quellen.': '{libs} has not been synchronised with Zotero yet. Until then, literature reviews lack the author, year and PDF of their sources.',
   'Zotivity gleicht {libs} jetzt mit Zotero ab. Bis das fertig ist, fehlen in den Forschungsständen Autor, Jahr und PDF der Quellen.': 'Zotivity is now synchronising {libs} with Zotero. Until that is finished, literature reviews lack the author, year and PDF of their sources.',
   'Zuerst {libs} mit Zotero abgleichen – erst danach kennt Zotivity die Texte der Korpora.': 'Synchronise {libs} with Zotero first – only then does Zotivity know the texts of the corpora.',
+  // 1.2.4: Rückmeldung nach dem RIS-Import
+  'Wird importiert …': 'Importing …',
+  'Importiert: {files} – {f} Datensätze, davon {n} neu im Pool und {d} schon da.': 'Imported: {files} – {f} records, {n} of them new in the pool and {d} already there.',
+  'Zum Pool': 'Go to pool',
+  'Bisher importiert ({n})': 'Imported so far ({n})',
+  '{f} Datensätze, {n} neu': '{f} records, {n} new',
+  'Alle im Protokoll': 'All in the log',
+  'Deine RIS-Importe stehen rechts unter „Bisher importiert“, ihre Datensätze sind im Pool. Suchstrings für direkt durchsuchbare Datenbanken kommen aus der Suchstrategie, von Hand oder aus Textdateien.': 'Your RIS imports are listed on the right under “Imported so far”; their records are in the pool. Search strings for databases that can be searched directly come from the search strategy, by hand or from text files.',
+  // 1.2.4: Sprachen der Literatur (Recherche)
+  'Sprachen der Literatur': 'Languages of the literature',
+  'Mindestens eine Sprache wählen.': 'Choose at least one language.',
+  'Nach der Sprache der Fragestellung eingestellt.': 'Set from the language of the research question.',
+  'Die KI schlägt Suchbegriffe in diesen Sprachen vor und, für andere Sprachen als Englisch, auch Datenbanken mit Literatur in diesen Sprachen.': 'The AI suggests search terms in these languages and, for languages other than English, also databases with literature in these languages.',
 };

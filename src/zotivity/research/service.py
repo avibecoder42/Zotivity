@@ -114,8 +114,8 @@ class ResearchService:
         }
 
     @staticmethod
-    def suggest_sources(disciplines: list[str]) -> list[str]:
-        return catalog.suggest(disciplines)
+    def suggest_sources(disciplines: list[str], languages: list[str] | None = None) -> list[str]:
+        return catalog.suggest(disciplines, languages)
 
     # ------------------------------------------------------------------------------------------ Projekte
     def list_projects(self) -> list[dict]:
@@ -136,6 +136,9 @@ class ResearchService:
         s.setdefault("selection_note", "")  # wie gesichtet wurde, wie Uneinigkeit gelöst wurde (PRISMA #8)
         s.setdefault("other_sources", [])  # Websites, Register, Referenzlisten … (PRISMA #6)
         s.setdefault("report_info", {})  # Registrierung, Förderung, Interessenkonflikte (PRISMA #24–26)
+        # Sprachen der Literatur (Suchbegriffe und Datenbanken der KI); ohne Wahl nach der Sprache der Fragestellung
+        s["languages_auto"] = not catalog.clean_languages(s.get("languages"))
+        s["languages"] = catalog.literature_languages({**p, "settings": s})
         return s
 
     def get_project(self, pid: int) -> dict:
@@ -167,6 +170,13 @@ class ResearchService:
             if "sources" in data["settings"]:  # „nicht erlaubt“ ist nie wählbar
                 data["settings"]["sources"] = [s for s in data["settings"]["sources"]
                                                if s in catalog.BY_ID and catalog.BY_ID[s]["access"] != "never"]
+            data["settings"].pop("languages_auto", None)  # wird beim Lesen berechnet
+            if "languages" in data["settings"]:  # leer = wieder nach der Sprache der Fragestellung
+                langs = catalog.clean_languages(data["settings"]["languages"])
+                if langs:
+                    data["settings"]["languages"] = langs
+                else:
+                    data["settings"].pop("languages")
             if "reviewers" in data["settings"]:
                 names = [" ".join(str(x).split()) for x in data["settings"]["reviewers"] or []]
                 data["settings"]["reviewers"] = list(dict.fromkeys(x for x in names if x))[:MAX_REVIEWERS]
@@ -757,7 +767,8 @@ class ResearchService:
         if kind == "sources":
             text, schema = ai_mod.sources_system() + ai_mod.sources_prompt(p), ai_mod.sources_schema()
         elif kind == "blocks":
-            text = ai_mod.blocks_system() + ai_mod.blocks_prompt(p, blocks if blocks is not None else self.store.blocks(pid))
+            text = ai_mod.blocks_system(catalog.literature_languages(p)) + ai_mod.blocks_prompt(
+                p, blocks if blocks is not None else self.store.blocks(pid))
             schema = ai_mod.BLOCKS_SCHEMA
         elif kind == "folders":
             items, _ = self._pool_items(pid, p)
@@ -886,7 +897,8 @@ class ResearchService:
         existing = blocks if blocks is not None else self.store.blocks(pid)
         before = self._snapshot()
         prompt = ai_mod.blocks_prompt(p, existing) + (ai_mod.blocks_focus(focus) if focus else "")
-        out = ai_mod.parse_blocks(chat.complete_json(ai_mod.blocks_system(), prompt, ai_mod.BLOCKS_SCHEMA))
+        out = ai_mod.parse_blocks(chat.complete_json(ai_mod.blocks_system(catalog.literature_languages(p)), prompt,
+                                                     ai_mod.BLOCKS_SCHEMA))
         if focus:  # genau ein Block, unter dem bisherigen Namen
             name = str(focus.get("name") or "").strip()
             same = [b for b in out["blocks"] if b["name"].lower() == name.lower()] or out["blocks"][:1]
