@@ -2590,4 +2590,5 @@ export default {
   'Für {libs} gibt es noch keinen Abgleich mit Zotero.': '{libs} has not been synchronised with Zotero yet.',
   'Für {libs} gibt es noch keinen Abgleich mit Zotero. Bis dahin fehlen in den Forschungsständen Autor, Jahr und PDF der Quellen.': '{libs} has not been synchronised with Zotero yet. Until then, literature reviews lack the author, year and PDF of their sources.',
   'Zotivity gleicht {libs} jetzt mit Zotero ab. Bis das fertig ist, fehlen in den Forschungsständen Autor, Jahr und PDF der Quellen.': 'Zotivity is now synchronising {libs} with Zotero. Until that is finished, literature reviews lack the author, year and PDF of their sources.',
+  'Zuerst {libs} mit Zotero abgleichen – erst danach kennt Zotivity die Texte der Korpora.': 'Synchronise {libs} with Zotero first – only then does Zotivity know the texts of the corpora.',
 };

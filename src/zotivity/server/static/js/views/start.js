@@ -182,6 +182,7 @@ function nextStep(st) {
   let text;
   let action = null;
   const open = corpora.reduce((a, c) => a + (c.stats.documents - nIndexed(c.stats)), 0);
+  const unsynced = unsyncedLibraries(project());
   if (!corpora.length && !research.length) {
     text = t('Neues Vorhaben: neue Literatur in Fachdatenbanken suchen oder eine vorhandene Sammlung aus Zotero als Korpus aufnehmen.');
     action = [btn(t('Zur Recherche'), { size: 'sm', onClick: () => navigate('research') }), btn(t('Zu den Korpora'), { size: 'sm', onClick: () => navigate('corpora') })];
@@ -190,6 +191,10 @@ function nextStep(st) {
     text = chosen ? t('Die Recherche hat {n} Texte ausgewählt. Nach der Übergabe an Zotero lässt sich ihre Sammlung als Wissenskorpus aufnehmen.', { n: fmtInt(chosen) })
       : t('Die Recherche läuft. Sobald Texte in Zotero liegen, lassen sie sich als Wissenskorpus aufnehmen.');
     action = chosen ? btn(t('Zu den Korpora'), { size: 'sm', onClick: () => navigate('corpora') }) : btn(t('Zur Recherche'), { size: 'sm', onClick: () => navigate('research') });
+  } else if (unsynced.length) {
+    // Ohne Abgleich kennt Zotivity die Texte nicht (0 von 0) – „durchsuchbar“ wäre falsch. Den Knopf hat der Hinweis darüber.
+    text = t('Zuerst {libs} mit Zotero abgleichen – erst danach kennt Zotivity die Texte der Korpora.', { libs: libNames(unsynced) })
+      + (status && !status.zotero.local_api ? ` ${t('Dafür muss Zotero laufen.')}` : '');
   } else if (open > 0) {
     text = status && !status.zotero.local_api ? t('{n} Texte warten aufs Indexieren. Dafür muss Zotero laufen.', { n: fmtInt(open) }) : t('{n} Texte warten aufs Indexieren.', { n: fmtInt(open) });
     action = btn(t('Zum Index'), { size: 'sm', onClick: () => navigate('index') });
