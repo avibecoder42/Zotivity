@@ -66,8 +66,41 @@ def test_deleted_before_this_version_is_fetched_from_zotero(zengine, fake_zotero
     with zengine.store.write() as con:  # wie früher: ohne Kurzangaben entfernt, in Zotero noch abrufbar
         con.execute("DELETE FROM items WHERE key='ITEMD001'")
     zengine.store.duplicates_gen += 1
+    fake_zotero.items["ITEMD001"]["data"]["deleted"] = 1  # im Papierkorb von Zotero
     assert references.missing(zengine.store) == {("users/0", "ITEMD001")}
     result = references.repair(zengine)
     assert result["replaced"] == 1 and result["reviews"] == 1 and result["messages"] == 1 and not result["unresolved"]
     assert "ITEMD001" not in zengine.store.get_review(rid)["state"]["sections"][0]["text"]
     assert references.repair(zengine) == {"replaced": 0, "unresolved": []}  # nichts mehr zu tun
+
+
+def test_living_item_is_not_taken_for_deleted(zengine, fake_zotero):
+    """Fehlt ein Eintrag im Katalog, den Zotero noch führt (nicht im Papierkorb), gilt er nicht als gelöscht."""
+    rid = setup(zengine, fake_zotero)
+    with zengine.store.write() as con:
+        con.execute("DELETE FROM items WHERE key='ITEMD001'")
+    zengine.store.duplicates_gen += 1
+    result = references.repair(zengine)
+    assert result["replaced"] == 0 and result["unresolved"] == [("users/0", "ITEMD001")]
+    assert zengine.store.removed_items([("users/0", "ITEMD001")]) == {}
+    assert "ITEMD001" in zengine.store.get_review(rid)["state"]["sections"][0]["text"]
+
+
+def test_unsynced_library_is_not_taken_for_deleted(zengine, fake_zotero):
+    """Projekt auf einem anderen Rechner importiert, Bibliothek noch nicht abgeglichen: Die Einträge fehlen nur im
+    Katalog. Nichts wird als gelöscht abgelegt, kein Beleg auf eine andere Kopie umgestellt, die Prüfung meldet nichts
+    – der Forschungsstand nennt die Bibliothek, damit die Oberfläche den Abgleich anbietet."""
+    rid = setup(zengine, fake_zotero)
+    with zengine.store.write() as con:
+        con.execute("DELETE FROM items WHERE key='ITEMD001'")
+    zengine.store.duplicates_gen += 1
+    zengine.store.reset_library("users/0")  # wie auf einem Rechner, der die Bibliothek noch nie abgeglichen hat
+    assert references.missing(zengine.store) == set()
+    assert references.repair(zengine) == {"replaced": 0, "unresolved": []}
+    assert zengine.store.removed_items([("users/0", "ITEMD001")]) == {}
+    svc = ReviewService(zengine)
+    assert [u["lib"] for u in svc.get(rid)["unsynced_libraries"]] == ["users/0"]
+    assert "ITEMD001" in zengine.store.get_review(rid)["state"]["sections"][0]["text"]
+    assert svc.check(rid)["removed_docs"] == []
+    run_index(zengine)  # der Abgleich bringt den Eintrag zurück
+    assert svc.get(rid)["unsynced_libraries"] == [] and zengine.store.item("users/0", "ITEMD001")

@@ -1,10 +1,10 @@
 // Anwendungsrahmen: Navigationsleiste, Kopfzeilen, Statusleiste, Meldungen, Dialoge, Quellen-Vorschau.
 import { h } from '../core/vdom.js';
-import { state, update, ui, closeModal, dismiss, providerLabel, project, toast } from '../core/store.js';
+import { state, update, ui, closeModal, dismiss, providerLabel, project, toast, runningJob, syncLibraries } from '../core/store.js';
 import * as api from '../core/api.js';
 import { t } from '../core/i18n.js';
 import { icon } from '../ui/icons.js';
-import { btn, iconBtn, renderMenu, spinner, progressRing, openMenu, fitToWindow } from '../ui/components.js';
+import { btn, iconBtn, notice, renderMenu, spinner, progressRing, openMenu, fitToWindow } from '../ui/components.js';
 import { fmtInt, fmtDuration, copyToClipboard } from '../core/util.js';
 import { canZoom, currentZoom, setZoom, stepZoom, ZOOMS } from '../core/zoom.js';
 import { guideView } from './guide.js';
@@ -168,6 +168,23 @@ export function openSourcePopover(el, source) {
   const r = el.getBoundingClientRect();
   state.popover = { x: r.left, y: r.bottom + 6, source };
   update();
+}
+
+// Bibliotheken ohne Abgleich mit Zotero (z. B. nach dem Import eines Projekts auf einem anderen Rechner): Hinweis mit
+// „Jetzt abgleichen“. libs: [{lib, name}]; text: der Hinweis (Namen der Bibliotheken über libNames).
+export const libNames = libs => libs.map(l => l.name).join(', ');
+
+function syncNotice(libs, text) {
+  if (!libs || !libs.length) return null;
+  const job = runningJob('catalog');
+  return notice('warning', h('span', null, text, job ? ` ${t('Abgleich läuft …')}` : ''),
+    h('div', { class: 'notice-actions' }, btn(t('Jetzt abgleichen'), { size: 'sm', icon: 'refresh', busy: !!job,
+      onClick: () => syncLibraries(libs) })));
+}
+
+export function unsyncedNotice(libs) {
+  if (!libs || !libs.length) return null;
+  return syncNotice(libs, t('Für {libs} gibt es noch keinen Abgleich mit Zotero. Bis dahin fehlen in den Forschungsständen Autor, Jahr und PDF der Quellen.', { libs: libNames(libs) }));
 }
 
 // Auswahl beim Klick auf einen Beleg im Forschungsstand: Eintrag in Zotero zeigen oder PDF öffnen

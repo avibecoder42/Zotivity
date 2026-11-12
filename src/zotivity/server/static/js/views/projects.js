@@ -1,12 +1,12 @@
 // Projekte: Anlegen, Wechseln, Umbenennen, als Datei exportieren/importieren, Duplizieren, Archivieren, Löschen.
 import { h } from '../core/vdom.js';
 import { state, update, toast, run, ui, openModal, closeModal, loadProjects, openProject, loadCorpora, openProjects,
-  archivedProjects, loadSettings, loadStatus, loadSetup } from '../core/store.js';
+  archivedProjects, loadSettings, loadStatus, loadSetup, followSync, unsyncedLibraries } from '../core/store.js';
 import * as api from '../core/api.js';
 import { t } from '../core/i18n.js';
 import { icon } from '../ui/icons.js';
 import { field, textInput, textArea, checkbox, notice, select } from '../ui/components.js';
-import { navigate } from './shell.js';
+import { navigate, unsyncedNotice, libNames } from './shell.js';
 import { projectEmbeddingOptions } from './embedmodels.js';
 
 export const COLORS = ['#4a43c4', '#0b7285', '#2f7d4f', '#a35c00', '#b3261e', '#7a3fb0', '#2563a8', '#6b5e4f'];
@@ -103,6 +103,10 @@ export function importProject() {
     await loadCorpora();
     await openProject(r.project_id);
     navigate('start');
+    // Bibliotheken, die Zotivity auf diesem Rechner noch nicht kennt: Der Dienst hat ihren Abgleich gleich gestartet
+    // (wenn Zotero lief) – ohne ihn zeigen Forschungsstände bei den Quellen weder Autor noch Jahr
+    if (r.sync_job) followSync(r.sync_job);
+    const syncing = () => r.sync_job && ['queued', 'running'].includes((state.jobs[r.sync_job.id] || r.sync_job).status);
     openModal({
       title: t('Projekt „{name}“ importiert', { name: r.name }),
       body: () => h('div', { class: 'stack' },
@@ -112,6 +116,8 @@ export function importProject() {
         r.missing_sources.length ? notice('warning', h('span', null, t('Diese Sammlungen gibt es in deinem Zotero nicht – die Korpora finden dafür nichts:'),
           h('ul', null, r.missing_sources.map(m => h('li', { key: m }, m))))) : null,
         !r.checked ? notice('info', t('Zotero war nicht erreichbar; ob alle Sammlungen vorhanden sind, zeigt sich beim nächsten Abgleich.')) : null,
+        syncing() ? notice('info', t('Zotivity gleicht {libs} jetzt mit Zotero ab. Bis das fertig ist, fehlen in den Forschungsständen Autor, Jahr und PDF der Quellen.', { libs: libNames(r.unsynced_libraries) }))
+          : unsyncedNotice(unsyncedLibraries(state.projects.find(p => p.id === r.project_id))),
         notice('info', t('Der Index wird nicht mitgeliefert. Neue Texte erscheinen nach „Index → Alle Korpora indexieren“.'))),
       actions: [{ label: t('OK'), kind: 'primary', onClick: closeModal }],
     });

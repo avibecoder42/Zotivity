@@ -94,6 +94,15 @@ class Engine:
     def libraries_of(sources: list[str]) -> list[str]:
         return sorted({s.split(":", 1)[0] for s in sources if ":" in s})
 
+    def unsynced_libraries(self, libs) -> list[dict]:
+        """Bibliotheken ohne Abgleich mit Zotero, [{lib, name}]: Zotivity kennt ihre Einträge noch nicht (z. B. nach
+        dem Import eines Projekts auf einem anderen Rechner) – Belege zeigen dann weder Autor noch Jahr."""
+        from zotivity.zotero.tree import lib_label
+
+        names = self.store.library_names()
+        return [{"lib": lib, "name": lib_label(lib, names.get(lib))} for lib in sorted(set(libs))
+                if not self.store.library_state(lib).get("synced_at")]
+
     def make_filter(self, filters: dict | None) -> SearchFilter:
         """Filter aus der Oberfläche. Korpora werden in ihre Quellen aufgelöst:
         'corpus_id' (einer), 'corpus_ids' (mehrere, Vereinigung) oder 'project_id' (alle Korpora des Projekts)."""

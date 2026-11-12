@@ -156,6 +156,30 @@ def test_project_export_import_roundtrip(client):
     assert client.get("/api/library/searches").json()["searches"] == []
     bad =client.post("/api/projects/import", content=b"kein zip", headers=H)
     assert bad.status_code == 400 and "zllm" in bad.json()["detail"]
+    assert imported["unsynced_libraries"] == [] and imported["sync_job"] is None  # derselbe Rechner: alles bekannt
+
+
+def test_import_on_new_machine_syncs_libraries(client):
+    """Anderer Rechner: Zotivity kennt die Bibliotheken der Korpora noch nicht – der Import startet ihren Abgleich,
+    sonst zeigten die Forschungsstände bei den Quellen weder Autor noch Jahr."""
+    p = client.post("/api/projects", json={"name": "Umzug"}, headers=H).json()
+    client.post("/api/corpora", json={"name": "Alles A", "sources": ["users/0:COLA0001"], "project_id": p["id"]},
+                headers=H)
+    data = client.get(f"/api/projects/{p['id']}/export").content
+    store = client.app.state.engine.store
+    store.reset_library("users/0")  # wie auf einem Rechner, der die Bibliothek noch nie abgeglichen hat
+    corpus = next(c for c in client.get("/api/corpora").json()["corpora"] if c["name"] == "Alles A")
+    assert [u["lib"] for u in corpus["unsynced_libraries"]] == ["users/0"]
+    imported = client.post("/api/projects/import", content=data, headers=H).json()
+    assert [u["lib"] for u in imported["unsynced_libraries"]] == ["users/0"]
+    assert imported["sync_job"] and wait(client, imported["sync_job"])["status"] == "done"
+    assert store.library_state("users/0")["synced_at"]
+    corpus = next(c for c in client.get("/api/corpora").json()["corpora"] if c["name"] == "Alles A")
+    assert corpus["unsynced_libraries"] == []
+    # Abgleich nur bestimmter Bibliotheken (Knopf „Jetzt abgleichen“); Ungültiges wird abgelehnt
+    job = client.post("/api/library/sync", json={"libraries": ["users/0"]}, headers=H).json()
+    assert wait(client, job)["status"] == "done"
+    assert client.post("/api/library/sync", json={"libraries": ["../x"]}, headers=H).status_code == 400
 
 
 # ---------------------------------------------------------------------------------- Presets

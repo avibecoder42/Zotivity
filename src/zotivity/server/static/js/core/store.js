@@ -19,6 +19,7 @@ export const state = {
   tree: null,          // Abbild der Zotero-Bibliotheken
   keys: null,          // gespeicherte Schlüssel (maskiert)
   jobs: {},            // laufende/zuletzt beobachtete Aufträge nach ID
+  catalogGen: 0,       // zählt beendete Abgleiche und Indexierungen: Ansichten mit Kurzbelegen laden danach neu
   toasts: [],
   modal: null,
   menu: null,          // Kontextmenü / Combobox-Liste
@@ -166,7 +167,7 @@ export async function loadStatus() {
       if (j.kind === 'index') runningIndexJobs.add(j.id);
       if (j.kind === 'catalog') runningCatalogJobs.add(j.id);
     }
-    if (ended) loadCorpora();
+    if (ended) { state.catalogGen++; loadCorpora(); }
     // Aufträge, die inzwischen beendet sind, aber von niemandem beobachtet wurden: Endstand nachladen
     for (const j of Object.values(state.jobs)) {
       if (['queued', 'running'].includes(j.status) && !running.has(j.id)) {
@@ -216,6 +217,13 @@ export function projectCorpora() {
   const p = project();
   if (!p) return [];
   return state.corpora.filter(c => p.corpus_ids.includes(c.id));
+}
+
+// Bibliotheken der Korpora eines Projekts ohne Abgleich mit Zotero: [{lib, name}]
+export function unsyncedLibraries(p) {
+  const out = new Map();
+  if (p) for (const c of state.corpora) if (p.corpus_ids.includes(c.id)) for (const l of c.unsynced_libraries || []) out.set(l.lib, l);
+  return [...out.values()];
 }
 
 export async function openProject(id) {
@@ -300,6 +308,26 @@ export function watchJob(id, onUpdate) {
 
 export function runningJob(kind) {
   return Object.values(state.jobs).find(j => j.kind === kind && ['queued', 'running'].includes(j.status)) || null;
+}
+
+// Bibliotheken abgleichen, die Zotivity noch nicht kennt (z. B. nach dem Import eines Projekts auf einem anderen
+// Rechner). libs: [{lib, name}]. Danach laden Korpora und Ansichten mit Kurzbelegen neu (catalogGen).
+export async function syncLibraries(libs) {
+  let job;
+  try { job = await api.post('/api/library/sync', { libraries: libs.map(l => l.lib) }); }
+  catch (err) { toast(err.message, 'error'); return null; }
+  return followSync(job);
+}
+
+// Abgleich bis zum Ende beobachten (auch einen, den der Dienst selbst gestartet hat, etwa beim Import)
+export async function followSync(job) {
+  state.jobs[job.id] = job; update();
+  const j = await watchJob(job.id);
+  state.catalogGen++;
+  await loadCorpora();
+  if (j.status === 'done') toast(t('Abgleich mit Zotero fertig.'), 'success', 4000);
+  else if (j.status === 'error') toast(t('Abgleich fehlgeschlagen: {e}', { e: j.error || '' }), 'error', 9000);
+  return j;
 }
 
 export function providerLabel(id) {

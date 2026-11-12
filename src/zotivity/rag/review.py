@@ -468,9 +468,13 @@ class ReviewService:
         if not review:
             raise KeyError(review_id)
         docs = self.store.review_docs(review_id)
+        # Bibliotheken ohne Abgleich (z. B. nach dem Import auf einem anderen Rechner): Ihre Einträge fehlen nur im
+        # Katalog – die Oberfläche bietet den Abgleich an, umgestellt wird nichts
+        unsynced = self.engine.unsynced_libraries(d["lib"] for d in docs)
+        waiting = {u["lib"] for u in unsynced}
         # Texte, die in Zotero gelöscht wurden: Belege auf eine noch vorhandene Kopie desselben Werks umstellen
         present = self.store.items((d["lib"], d["item_key"]) for d in docs)
-        if any((d["lib"], d["item_key"]) not in present for d in docs):
+        if any((d["lib"], d["item_key"]) not in present and d["lib"] not in waiting for d in docs):
             from zotivity import references
 
             try:
@@ -488,6 +492,7 @@ class ReviewService:
             d["has_sheet"] = self.store.get_sheet(d["lib"], d["item_key"]) is not None
             d["zotero_select"] = zotero_select_url(d["lib"], d["item_key"])
         review["docs"] = docs
+        review["unsynced_libraries"] = unsynced
         # Prüfung aus einer älteren Version (ohne unvollständige oder zu lange Abschnitte, gelöschte Texte): auffrischen
         check = review["state"].get("check")
         if check and any(k not in check for k in ("incomplete_sections", "removed_docs", "long_sections")) \
@@ -1478,12 +1483,14 @@ class ReviewService:
                                    "words": len(sec.get("text", "").split()),
                                    "planned": planned[i] if i < len(planned) else None})
         # Belege auf Texte, die in Zotero gelöscht wurden und keine Kopie mehr haben (references.repair stellt die
-        # übrigen beim Öffnen um)
+        # übrigen beim Öffnen um). Bibliotheken ohne Abgleich zählen nicht: Dort fehlt der Eintrag nur im Katalog.
         cited_items = self._items((docs[k]["lib"], k) for k in used)
+        waiting = {u["lib"] for u in self.engine.unsynced_libraries(docs[k]["lib"] for k in used)}
         removed = [{"key": k, "lib": docs[k]["lib"],
                     "citation": author_year(cited_items[(docs[k]["lib"], k)]) if (docs[k]["lib"], k) in cited_items else k,
                     "title": (cited_items.get((docs[k]["lib"], k)) or {}).get("title", "")}
-                   for k in sorted(used) if (cited_items.get((docs[k]["lib"], k)) or {"removed": True}).get("removed")]
+                   for k in sorted(used) if docs[k]["lib"] not in waiting
+                   and (cited_items.get((docs[k]["lib"], k)) or {"removed": True}).get("removed")]
         result = {
             "words": count_words(text),
             "planned_words": sum(int(p or 0) for p in planned),

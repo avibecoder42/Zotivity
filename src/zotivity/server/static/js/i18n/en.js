@@ -2582,4 +2582,12 @@ export default {
   'Die Regel wählt zuerst die Kopie mit lesbarem Text, dann eine mit Datei, unter gleichwertigen die aus dem Korpus, dann die mit gelesenem Text und erkannten Seitenzahlen, dann die aus dieser Bibliothek.': 'The rule first picks a copy with readable text, then one with a file; among equally good copies the one from the corpus, then the one with text already read and detected page numbers, then the one from this library.',
   '{n} von {m} Texten verarbeitet.': '{n} of {m} texts processed.',
   'Stand jetzt in „{name}“: {t} · {i} indexiert · {e} einzubetten · {p} offen · Probleme: {x}': 'Status now in “{name}”: {t} · {i} indexed · {e} to embed · {p} open · problems: {x}',
+  // 1.2.3: Abgleich nach dem Import eines Projekts
+  'Abgleich mit Zotero fertig.': 'Synchronisation with Zotero finished.',
+  'Abgleich fehlgeschlagen: {e}': 'Synchronisation failed: {e}',
+  'Abgleich läuft …': 'Synchronising …',
+  'Abgleich mit Zotero fehlt': 'Not synchronised with Zotero',
+  'Für {libs} gibt es noch keinen Abgleich mit Zotero.': '{libs} has not been synchronised with Zotero yet.',
+  'Für {libs} gibt es noch keinen Abgleich mit Zotero. Bis dahin fehlen in den Forschungsständen Autor, Jahr und PDF der Quellen.': '{libs} has not been synchronised with Zotero yet. Until then, literature reviews lack the author, year and PDF of their sources.',
+  'Zotivity gleicht {libs} jetzt mit Zotero ab. Bis das fertig ist, fehlen in den Forschungsständen Autor, Jahr und PDF der Quellen.': 'Zotivity is now synchronising {libs} with Zotero. Until that is finished, literature reviews lack the author, year and PDF of their sources.',
 };

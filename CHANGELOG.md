@@ -2,6 +2,23 @@
 
 All notable changes, newest first.
 
+## 1.2.3 – 2026-11-12
+
+Importing a project on another computer.
+
+### Fixed
+- **Import starts the synchronisation with Zotero.** A project file holds no titles, authors or years, only which Zotero
+  collections a corpus uses. Until Zotivity had synchronised those libraries on the new computer, literature reviews showed
+  "n.a. n.d." instead of author and year and found no PDF. If Zotero is running, the import now starts this synchronisation
+  right away; the import dialog says so.
+- **Notice with "Synchronise now".** As long as a library of the project is not synchronised, the project page and the
+  literature review say so and offer **Synchronise now**; the project tile shows "Not synchronised with Zotero". The review
+  reloads by itself once the synchronisation is finished.
+- **Texts of a library that is not synchronised no longer count as deleted.** Opening a literature review before the
+  synchronisation stored the cited texts as deleted in Zotero and could switch their citations to a copy of the same work in
+  another library. Now only libraries that are synchronised count, and only entries that Zotero reports as deleted are stored
+  as such. The check no longer reports these texts as deleted either.
+
 ## 1.2.2 – 2026-11-12
 
 Fixes from a review of the whole code with Claude Fable 5.2: the findings that could cost money or data.

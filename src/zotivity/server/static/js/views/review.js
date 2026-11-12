@@ -10,7 +10,7 @@ import { icon } from '../ui/icons.js';
 import { btn, iconBtn, card, foldCard, notice, spinner, progress, field, textInput, textArea, select, segmented, numberInput, checkbox, badge, emptyState, multiSelect, paneProps, splitter } from '../ui/components.js';
 import { fmtInt, fmtAgo, fmtDate, fmtDuration, fmtNum, plural, nTexts, nIndexed } from '../core/util.js';
 import { markdown } from '../core/markdown.js';
-import { navigate, viewHeader, openCitePopover } from './shell.js';
+import { navigate, viewHeader, openCitePopover, unsyncedNotice } from './shell.js';
 import { exportMenu, copyTarget } from './exports.js';
 import { coverageNotice } from './embedmodels.js';
 
@@ -31,7 +31,7 @@ const DECISIONS = () => ({
 function st() {
   return ui('review', { list: null, openId: null, review: null, loading: false, tab: null, filter: 'all', estimate: null,
     outline: null, outlineDirty: false, form: null, presetCorpus: null, jobId: null,
-    queries: null, queriesDirty: false, editTitle: null, text: null, promptOpen: false, sheets: {}, sheetOpen: {} });
+    queries: null, queriesDirty: false, editTitle: null, text: null, promptOpen: false, sheets: {}, sheetOpen: {}, catalogGen: 0 });
 }
 
 async function loadList() {
@@ -44,7 +44,7 @@ async function openReview(id, { keepTab = false } = {}) {
   const s = st();
   s.openId = id;
   if (id === 'new') { s.review = null; s.form = newForm(); update(); return; }
-  s.loading = true; update();
+  s.loading = true; s.catalogGen = state.catalogGen; update();
   try {
     const r = await api.get(`/api/reviews/${id}`);
     if (s.openId !== id) return;
@@ -659,9 +659,16 @@ function reviewDetail() {
   const job = currentJob() || (runningJob('review') && s.jobId == null ? runningJob('review') : null);
   const names = corpusIds(r).map(id => (state.corpora.find(c => c.id === id) || { name: t('gelöschter Korpus') }).name);
   if (job && !s.jobId) { s.jobId = job.id; watchJob(job.id).then(() => { s.jobId = null; openReview(r.id, { keepTab: true }); }); }
+  // Quellen aus Bibliotheken ohne Abgleich (z. B. nach dem Import auf einem anderen Rechner): Hinweis; nach einem
+  // Abgleich oder einer Indexierung neu laden – dann zeigen die Belege Autor und Jahr
+  const unsynced = r.unsynced_libraries || [];
+  if (unsynced.length && s.catalogGen !== state.catalogGen && !s.loading && !s.outlineDirty && !s.queriesDirty && s.editTitle === null) {
+    openReview(r.id, { keepTab: true });  // nicht während ungespeicherter Änderungen (openReview verwirft sie)
+  }
   const { actions, body } = [step1, step2, step3, step4, step5][active - 1](r, job);
   return h('div', { class: 'review-detail' },
     stepper(r, active),
+    unsyncedNotice(unsynced),
     h('div', { class: 'review-bar' },
       h('button', { type: 'button', class: 'prompt-toggle', 'aria-expanded': s.promptOpen ? 'true' : 'false', title: s.promptOpen ? undefined : r.question,
         onclick: () => { s.promptOpen = !s.promptOpen; if (!s.promptOpen) s.editTitle = null; update(); } },

@@ -2,12 +2,12 @@
 // die Übersicht des aktiven Projekts. Ein Klick auf ein Projekt öffnet es und hebt es hervor – die Reihenfolge bleibt.
 // Die Einrichtung (das Technische) steht in setup.js; hier der Arbeitsablauf des Projekts.
 import { h } from '../core/vdom.js';
-import { state, update, ui, project, projectCorpora, openProject, openProjects, archivedProjects } from '../core/store.js';
+import { state, update, ui, project, projectCorpora, openProject, openProjects, archivedProjects, unsyncedLibraries } from '../core/store.js';
 import * as api from '../core/api.js';
 import { t } from '../core/i18n.js';
 import { icon } from '../ui/icons.js';
 import { btn, iconBtn, notice, openMenu, paneProps, splitter } from '../ui/components.js';
-import { navigate } from './shell.js';
+import { navigate, unsyncedNotice, libNames } from './shell.js';
 import { rs, openProject as openResearch, summaryLine } from './research/common.js';
 import { fmtAgo, fmtInt, plural, nIndexed } from '../core/util.js';
 import { projectBadge, projectColor, newProjectDialog, importProject, editProjectDialog, exportProject, projectMenuItems,
@@ -75,6 +75,7 @@ function startReorder(e, p) {
 function projectTile(p) {
   const active = p.id === state.projectId;
   const dropping = drag.over === p.id && drag.id !== p.id;
+  const unsynced = unsyncedLibraries(p);  // z. B. nach dem Import auf einem anderen Rechner
   return h('div', { key: p.id, class: ['project-tile', active && 'active', drag.id === p.id && 'dragging', dropping && (drag.after ? 'drop-after' : 'drop-before')],
     role: 'button', tabindex: 0, 'aria-current': active ? 'true' : null, 'data-pid': p.id,
     style: { '--pc': projectColor(p) }, title: `${p.name}${p.description ? `\n${p.description}` : ''}\n${t('Ziehen, um die Reihenfolge zu ändern')}`,
@@ -85,6 +86,8 @@ function projectTile(p) {
   h('div', { class: 'project-tile-text' },
     h('div', { class: 'project-tile-name' }, p.name),
     h('div', { class: 'project-tile-meta' }, tileCounts(p)),
+    unsynced.length ? h('div', { class: 'project-tile-meta warn-text', title: t('Für {libs} gibt es noch keinen Abgleich mit Zotero.', { libs: libNames(unsynced) }) },
+      icon('alert', 12), ' ', t('Abgleich mit Zotero fehlt')) : null,
     h('div', { class: 'project-tile-date' }, fmtAgo(p.activity_at))),
   iconBtn('more', t('Projekt-Aktionen'), e => { e.stopPropagation(); menuAt(e, projectMenuItems(p)); }));
 }
@@ -144,9 +147,11 @@ function corporaOverview() {
   return h('div', { class: 'recent-list' }, corpora.map(c => {
     const x = c.stats;
     const pct = x.documents ? Math.round(100 * nIndexed(x) / x.documents) : 0;
+    const unsynced = (c.unsynced_libraries || []).length > 0;
     return h('button', { key: c.id, type: 'button', class: 'recent-item corpus-row', onclick: () => { ui('corporaNav', {}).open = c.id; navigate('corpora'); } },
       icon('corpus', 16), h('span', { class: 'recent-name' }, c.name),
       h('span', { class: 'mini-progress inline', title: t('{p} % indexiert', { p: pct }) }, h('i', { style: { width: pct + '%' } })),
+      unsynced ? h('span', { class: 'recent-date warn-text' }, t('noch nicht abgeglichen')) :
       h('span', { class: ['recent-date', x.to_embed && 'warn-text'], title: x.to_embed === 1 ? t('1 Text ist gelesen, aber für das aktive Embedding-Modell noch nicht eingebettet.')
         : x.to_embed ? t('{n} Texte sind gelesen, aber für das aktive Embedding-Modell noch nicht eingebettet.', { n: fmtInt(x.to_embed) }) : null },
         x.to_embed ? t('{a}/{b} Texte · {e} einzubetten', { a: fmtInt(nIndexed(x)), b: fmtInt(x.documents), e: fmtInt(x.to_embed) })
@@ -210,6 +215,8 @@ function projectOverview(st) {
         btn(t('Bearbeiten'), { size: 'sm', kind: 'ghost', icon: 'edit', onClick: () => editProjectDialog(p) }),
         btn(t('Als Datei speichern'), { size: 'sm', kind: 'ghost', icon: 'download', title: t('Projekt als .zoty-Datei exportieren (Sicherung, anderer Rechner)'), onClick: () => exportProject(p) }),
         btn(t('Archivieren'), { size: 'sm', kind: 'ghost', icon: 'archive', title: t('Projekt ins Archiv verschieben – es lässt sich jederzeit zurückholen'), onClick: () => archiveProject(p) }))),
+    // Bibliotheken ohne Abgleich (z. B. nach dem Import auf einem anderen Rechner): Hinweis mit „Jetzt abgleichen“
+    unsyncedNotice(unsyncedLibraries(p)),
     st.research ? nextStep(st) : null,
     h('div', { class: 'start-cards' },
       actionCard('litsearch', t('Recherche'), t('Neue Literatur in Fachdatenbanken suchen, sichten und nach Zotero übernehmen.'), () => navigate('research')),

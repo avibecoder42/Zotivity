@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zotivity"
-version = "1.2.2"
+version = "1.2.3"
 description = "Comprehensive scholarly work with your Zotero library: database search, screening, cited answers and checked literature reviews (formerly ZotLLM)."
 readme = "README.md"
 license = "MIT"

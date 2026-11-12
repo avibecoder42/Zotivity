@@ -8,6 +8,10 @@ Jahr, DOI) behält Zotivity in der Tabelle removed_items (Store.delete_items). r
 - Sonst bleibt der Beleg lesbar (Kurzangaben aus removed_items) und die Prüfung des Forschungsstands meldet ihn.
 Fehlen die Kurzangaben (Eintrag vor dieser Version entfernt), holt repair() sie bei laufendem Zotero aus dessen
 Papierkorb – die lokale Schnittstelle liefert gelöschte Einträge weiterhin.
+
+Als gelöscht gilt ein Eintrag nur, wenn seine Bibliothek schon abgeglichen ist. Sonst kennt Zotivity ihn bloss noch
+nicht – etwa nach dem Import eines Projekts auf einem anderen Rechner; ohne diese Grenze würden lebende Einträge als
+gelöscht abgelegt und Belege auf eine Kopie in einer anderen Bibliothek umgestellt.
 """
 
 from __future__ import annotations
@@ -36,7 +40,12 @@ def cited_keys(store) -> set[Key]:
 
 
 def missing(store, keys: set[Key] | None = None) -> set[Key]:
+    """Zitierte Einträge, die im Katalog fehlen – nur aus Bibliotheken, die schon abgeglichen sind."""
     keys = cited_keys(store) if keys is None else keys
+    if not keys:
+        return set()
+    synced = {lib for lib in {k[0] for k in keys} if store.library_state(lib).get("synced_at")}
+    keys = {k for k in keys if k[0] in synced}
     if not keys:
         return set()
     present = store.items(keys)
@@ -44,7 +53,8 @@ def missing(store, keys: set[Key] | None = None) -> set[Key]:
 
 
 def fetch_from_zotero(engine, keys: set[Key]) -> int:
-    """Kurzangaben gelöschter Einträge aus Zotero holen (Papierkorb). Nur bei laufendem Zotero."""
+    """Kurzangaben gelöschter Einträge aus Zotero holen (Papierkorb). Nur bei laufendem Zotero und nur Einträge, die
+    Zotero als gelöscht meldet (data.deleted) – einen lebenden Eintrag bringt der nächste Abgleich."""
     if not keys:
         return 0
     zot = engine.zotero()
@@ -59,7 +69,8 @@ def fetch_from_zotero(engine, keys: set[Key]) -> int:
             break
         if r.status_code == 200:
             item = r.json()
-            if (item.get("data") or {}).get("itemType") not in ("attachment", "note", "annotation"):
+            data = item.get("data") or {}
+            if data.get("deleted") and data.get("itemType") not in ("attachment", "note", "annotation"):
                 engine.store.put_removed_item(lib, item)
                 n += 1
     return n

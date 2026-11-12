@@ -37,6 +37,7 @@ MESSAGES: dict[str, str] = {
     # -- Aufträge: Titel ---------------------------------------------------------------------------
     "Ollama: {model} herunterladen": "Ollama: download {model}",
     "Suchkatalog abgleichen": "Synchronising search catalogue",
+    "Bibliotheken abgleichen": "Synchronising libraries",
     "Indexierung aller Korpora": "Indexing all corpora",
     "Indexierung: {name}": "Indexing: {name}",
     # gleich lange Vorlagen: die spezifischere zuerst (die Sortierung ist stabil)
@@ -307,6 +308,7 @@ MESSAGES: dict[str, str] = {
     "Löschen fehlgeschlagen: {e}": "Deletion failed: {e}",
     "Die Datei ist zu gross.": "The file is too large.",
     "Keine gültige Projektdatei (.zoty oder .zllm).": "Not a valid project file (.zoty or .zllm).",
+    "Keine gültige Bibliothek angegeben.": "No valid library given.",
     "Unbekanntes Dateiformat – stammt die Datei aus einer neueren Zotivity-Version?":
         "Unknown file format – does the file come from a newer Zotivity version?",
     "Update-Quellen müssen HTTPS oder ein lokaler bzw. Netzwerkpfad sein.":

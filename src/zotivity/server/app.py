@@ -908,6 +908,7 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
         times = [t for k, t in activity.items() if k in scope] + [stats.get("last_read_at")]
         last = max((t for t in times if t), default=None)
         return {**c, "sources_info": describe_sources(engine, c["sources"]), "libraries": libs, "synced": synced,
+                "unsynced_libraries": engine.unsynced_libraries(libs),
                 "project_ids": engine.store.corpus_project_ids(c["id"]), "last_indexed_at": last, "stats": stats}
 
     def _corpus(cid: int) -> dict:
@@ -1123,9 +1124,20 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
         return {"synced_at": float(at) if at else None, "facets": facets(engine.store),
                 "job": job.as_dict() if job else None}
 
+    LIBRARY_ID = re.compile(r"users/0|groups/\d+")
+
     @app.post("/api/library/sync")
     def library_sync(body: dict = Body(default={})):
+        """Suchkatalog abgleichen (alle Bibliotheken) – oder mit `libraries` nur diese, etwa die eines importierten
+        Projekts, die Zotivity noch nicht kennt."""
         full = bool(body.get("full"))
+        libs = body.get("libraries")
+        if libs is not None:
+            libs = sorted({str(x) for x in libs if LIBRARY_ID.fullmatch(str(x))}) if isinstance(libs, list) else []
+            if not libs:
+                raise HTTPException(400, "Keine gültige Bibliothek angegeben.")
+            return job_or_409("catalog", "Bibliotheken abgleichen",
+                              lambda job: indexer.sync_metadata(job, full=full, libraries=libs), group="catalog")
         return job_or_409("catalog", "Suchkatalog abgleichen", lambda job: indexer.sync_catalog(job, full=full),
                           group="catalog")
 
@@ -1254,9 +1266,26 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
 
     @app.post("/api/projects/import")
     async def project_import(request: Request):
+        """Projekt importieren. Kennt Zotivity die Bibliotheken seiner Korpora noch nicht (anderer Rechner), startet
+        gleich ihr Abgleich – sonst zeigen Forschungsstände bis zum nächsten Abgleich weder Autor noch Jahr."""
         from zotivity.projects_io import import_project
 
-        return import_project(engine, await request.body())
+        result = import_project(engine, await request.body())
+        p = engine.store.project(result["project_id"]) or {"corpus_ids": []}
+        sources = [s for cid in p["corpus_ids"] for s in engine.corpus_sources(cid)]
+        unsynced = engine.unsynced_libraries(engine.libraries_of(sources))
+        result["unsynced_libraries"] = unsynced
+        result["sync_job"] = None
+        # Nur mit erreichbarem Zotero und ohne laufende Indexierung (die gleicht ihre Bibliotheken selbst ab)
+        if unsynced and result.get("checked") and not engine.jobs.running("index"):
+            libs = [u["lib"] for u in unsynced]
+            try:
+                result["sync_job"] = engine.jobs.start(
+                    "catalog", "Bibliotheken abgleichen", lambda job: indexer.sync_metadata(job, libraries=libs),
+                    group="catalog").as_dict()
+            except RuntimeError:  # ein Abgleich läuft schon – die Ansichten bieten ihn danach erneut an
+                pass
+        return result
 
     # -- Zitierstile (aus Zotero) -------------------------------------------------------------------
     def _style_analysis(style_id: str, data_dir) -> dict:
