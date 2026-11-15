@@ -1,6 +1,6 @@
 // Einrichtung: das Technische, einmal je Computer (Zotero, Sprachmodell, Embedding, auf Wunsch Schreibzugriff, Plugin,
-// Schlüssel für Datenbanken). Steht unter Einstellungen → Einrichtung; dorthin führt der erste Start. Den Arbeitsablauf
-// zeigt die Anleitung (guide.js); wenn später etwas fehlt, meldet das die Statusleiste oder die Stelle, die es braucht.
+// Schlüssel für Datenbanken). Steht als erster Teil in der Anleitung (guide.js; dorthin führt der erste Start) und
+// unter Einstellungen → Einrichtung; fehlt später etwas, zeigen das der Punkt bei der Anleitung und die Statusleiste.
 import { h } from '../core/vdom.js';
 import { state, openModal, closeModal, loadSetup, loadStatus, ui } from '../core/store.js';
 import { t } from '../core/i18n.js';
@@ -49,7 +49,8 @@ function stepAction(step) {
   }
 }
 
-export function setupCard() {
+// embedded: in der Anleitung, die den Titel schon trägt – dann nur Fortschritt und „Neu prüfen“
+export function setupCard({ embedded = false } = {}) {
   const s = state.setup;
   if (!s) return h('div', { class: 'card' }, spinner(16));
   const steps = s.steps.filter(x => x.group === 'technical');
@@ -58,7 +59,7 @@ export function setupCard() {
   let firstOpen = true;
   return h('section', { class: 'card setup-card' },
     h('div', { class: 'card-head' },
-      h('h3', null, icon('check', 16), s.ready ? t('Alles eingerichtet') : t('Einrichtung')),
+      embedded ? null : h('h3', null, icon('check', 16), s.ready ? t('Alles eingerichtet') : t('Einrichtung')),
       h('span', { class: 'muted small' }, t('{a} von {b} erledigt', { a: done, b: required.length })),
       h('div', { class: 'card-actions' }, iconBtn('refresh', t('Neu prüfen'), () => { loadStatus(); loadSetup(); }))),
     h('div', { class: 'setup-progress' }, h('div', { style: { width: `${Math.round(100 * done / required.length)}%` } })),

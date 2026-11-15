@@ -521,14 +521,12 @@ function databasesTab() {
     researchKeyRows(k => k.id !== 'zotero-web')))];
 }
 
+// Dieselbe Karte wie im ersten Teil der Anleitung – wer später ein Modell oder einen Schlüssel ändert, sucht hier
 function setupTab() {
-  const s = state.setup;
-  const first = !!(s && s.first_run);
   return [
-    first ? h('p', null, t('Willkommen. Hier richtest du einmal ein, was Zotivity auf diesem Computer braucht. Jeder Schritt lässt sich überspringen und später hier nachholen.')) : null,
     setupCard(),
-    h('div', { class: 'row wrap' }, h('p', { class: 'muted small grow' }, t('Einmal je Computer. Wie es danach weitergeht, zeigt die Anleitung.')),
-      btn(t('Weiter: Anleitung'), { kind: 'primary', icon: 'arrowRight', onClick: () => navigate('guide') }))];
+    h('div', { class: 'row wrap' }, h('p', { class: 'muted small grow' }, t('Einmal je Computer. Die Einrichtung steht auch zuoberst in der Anleitung, darunter der Arbeitsablauf.')),
+      btn(t('Zur Anleitung'), { icon: 'arrowRight', onClick: () => navigate('guide') }))];
 }
 
 // ------------------------------------------------------------------ Sprache

@@ -126,7 +126,7 @@ Claude Desktop (MCP)  ←→      – MCP server
    contains a `.sha256` file to check the download. It is **not code-signed yet**, so Windows SmartScreen warns
    ("Unknown publisher"): click *More info → Run anyway*. If that option is missing (e.g. on managed PCs), right-click
    the downloaded file → *Properties* → tick *Unblock* → *OK*, then start it again.
-2. Open Zotivity from the Start menu. The first start leads to *Settings → Setup*; after that, the *Guide* shows the workflow.
+2. Open Zotivity from the Start menu. The first start leads to the *Guide*: setup first, the workflow below.
 
 Zotivity runs embedding models itself (llama.cpp is included in the installer); the models are downloaded later with
 a button in the settings. Optional: [Ollama](https://ollama.com) for local language models. The Microsoft Edge
@@ -180,9 +180,10 @@ A **project** bundles knowledge corpora, chats and literature reviews. The switc
 
 ## First steps
 
-The first start leads to *Settings → Setup*: the technical part, once per computer, and any step can be skipped. From there
-you go to the **Guide**, the top entry of the navigation bar: create a project, database search (optional), create and index
-a corpus, work with the corpora – with links and the status in the active project. After that, Zotivity reopens the last
+The first start leads to the **Guide**, the top entry of the navigation bar. It has two parts: first **Setup** – the
+technical part, once per computer, and any step can be skipped – then the **Workflow**: create a project, database search
+(optional), create and index a corpus, work with the corpora – with links and the status in the active project. Once
+everything is set up, Setup is collapsed; it is also under Settings. After that, Zotivity reopens the last
 project in the view used last. All side panels can be resized (double-click: default width), and in the program window the
 whole interface can be zoomed.
 

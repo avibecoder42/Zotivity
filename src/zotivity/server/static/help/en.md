@@ -20,14 +20,12 @@ Warning notices (brown background) can be hidden with the × at the top right. N
 
 ### The usual workflow
 
-The **Guide**, the top entry of the navigation bar, shows the workflow, with links into the views and the status in the active project:
+The **Guide**, the top entry of the navigation bar, has two parts: first **Setup** (once per computer, see the chapter Setup), then the **Workflow** for each project, with links into the views and the status in the active project:
 
 1. **Create a project**
 2. **Database search** (optional) – if you already have a collection in Zotero, go straight to step 3
 3. **Create and index a corpus**
 4. **Work with the corpora** – Ask and Literature review
-
-The technical part belongs to Setup (see the chapter Setup).
 
 ### Keyboard shortcuts
 
@@ -55,9 +53,9 @@ Closing the window quits Zotivity completely. If indexing, a catalog sync or a l
 
 ## Setup
 
-Setup covers only the technical part and happens once per computer: Zotero, language model, embedding model and, if you like, write access, the plugin and keys for databases. On the first start Zotivity opens **Settings → Setup** for this; any step can be skipped and says what it is needed for. **Next: guide** leads to the workflow. After that, Zotivity always reopens the last open project in the view used last, even if Zotero is not running.
+Setup covers only the technical part and happens once per computer: Zotero, language model, embedding model and, if you like, write access, the plugin and keys for databases. On the first start Zotivity opens the **Guide**; its first part is Setup, followed by the workflow. Any step can be skipped and says what it is needed for. After that, Zotivity always reopens the last open project in the view used last, even if Zotero is not running.
 
-The checklist stays available under **Settings → Setup**. If something is missing later, the status bar or the place that needs it says so; if a language model or embedding model is missing, the Settings entry shows a dot. The **Guide** and the **Next step** line on the project page show how the work continues.
+The checklist is at the top of the Guide and under **Settings → Setup**. Once everything needed is set up, it is collapsed in the Guide (**Details** expands it). If something is missing later, the status bar or the place that needs it says so; if a language model or embedding model is missing, Setup expands in the Guide and the Guide entry shows a dot. The **Guide** and the **Next step** line on the project page show how the work continues.
 
 ### Connecting Zotero
 

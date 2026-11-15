@@ -128,7 +128,7 @@ Claude Desktop (MCP) ←→        – MCP-Server
    warnt Windows SmartScreen («Unbekannter Herausgeber»): *Weitere Informationen → Trotzdem ausführen*. Fehlt diese
    Möglichkeit (z. B. auf verwalteten Geschäfts-PCs), die heruntergeladene Datei mit rechter Maustaste → *Eigenschaften*
    → *Zulassen* ankreuzen → *OK* und erneut starten.
-2. Zotivity aus dem Startmenü öffnen. Der erste Start führt zu *Einstellungen → Einrichtung*, danach zeigt die *Anleitung* den Ablauf.
+2. Zotivity aus dem Startmenü öffnen. Der erste Start führt zur *Anleitung*: zuerst die Einrichtung, darunter der Arbeitsablauf.
 
 Embedding-Modelle führt Zotivity selbst aus (llama.cpp ist im Installationsprogramm enthalten); die Modelle selbst
 werden erst in den Einstellungen per Knopf heruntergeladen. Optional: [Ollama](https://ollama.com) für lokale
@@ -186,9 +186,10 @@ zeigt das aktive Projekt; *Projekt*, *Recherche*, *Korpora*, *Fragen* und *Forsc
 
 ## Erste Schritte
 
-Der erste Start führt zu *Einstellungen → Einrichtung*: das Technische, einmal je Computer, jeder Schritt lässt sich
-überspringen. Von dort geht es zur **Anleitung**, dem obersten Eintrag der Navigationsleiste: Projekt anlegen, Recherche
-(optional), Korpus anlegen und indexieren, mit den Korpora arbeiten – mit Links und dem Stand im aktiven Projekt. Danach
+Der erste Start führt zur **Anleitung**, dem obersten Eintrag der Navigationsleiste. Sie hat zwei Teile: zuerst die
+**Einrichtung** – das Technische, einmal je Computer, jeder Schritt lässt sich überspringen –, dann den **Arbeitsablauf**:
+Projekt anlegen, Recherche (optional), Korpus anlegen und indexieren, mit den Korpora arbeiten – mit Links und dem Stand
+im aktiven Projekt. Ist alles eingerichtet, ist die Einrichtung eingeklappt; sie steht auch unter Einstellungen. Danach
 öffnet Zotivity das zuletzt offene Projekt in der zuletzt benutzten Ansicht. Alle Seitenleisten lassen sich in
 der Breite ziehen (Doppelklick: Standardbreite), und im Programmfenster lässt sich die ganze Oberfläche zoomen.
 

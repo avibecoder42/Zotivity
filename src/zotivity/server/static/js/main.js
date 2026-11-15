@@ -116,19 +116,18 @@ async function boot() {
   }
   applyLanguage();
   await Promise.all([loadStatus(), loadSetup(), loadCorpora(), loadProjects(), loadPresets(), loadKeys().catch(() => {})]);
-  // Weiter, wo zuletzt gearbeitet wurde: im zuletzt offenen Projekt und in dessen letzter Ansicht. Nur beim ersten Start
-  // geht es zu Einstellungen → Einrichtung (von dort weiter zur Anleitung) – läuft später z. B. Zotero nicht, meldet das
-  // die Statusleiste. Ein Aufruf aus Zotero (?view=…) springt danach direkt in die gewünschte Ansicht
+  // Weiter, wo zuletzt gearbeitet wurde: im zuletzt offenen Projekt und in dessen letzter Ansicht (auch die Anleitung).
+  // Nur beim ersten Start geht es zur Anleitung, deren erster Teil die Einrichtung ist – fehlt später etwas, zeigt das der
+  // Punkt bei der Anleitung oder die Statusleiste. Ein Aufruf aus Zotero (?view=…) springt danach direkt in die Ansicht
   let lastView = null;
   try { lastView = localStorage.getItem('zllm.view'); } catch { /* privat */ }
   if (state.setup && state.setup.first_run) {
-    ui('settings', {}).tab = 'setup';
-    state.view = 'settings';
+    state.view = 'guide';
   } else if (state.projectId) {
     await openProject(state.projectId);
-    state.view = lastView === 'search' || VIEWS.some(v => v.id === lastView) ? lastView : 'start';
+    state.view = ['search', 'guide'].includes(lastView) || VIEWS.some(v => v.id === lastView) ? lastView : 'start';
   } else {
-    state.view = 'start';
+    state.view = lastView === 'guide' ? 'guide' : 'start';
   }
   state.ready = true;
   state.bootError = null;

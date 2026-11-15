@@ -2,6 +2,16 @@
 
 All notable changes, newest first.
 
+## 1.2.5 – 2026-11-15
+
+### Changed
+- **The Guide now has two parts: Setup and Workflow.** Setup (Zotero, language model, embedding model and the optional
+  steps, once per computer) moved from Settings to the top of the Guide; the four steps of the workflow follow below. The
+  first start opens the Guide, later starts the view used last, the Guide included. Once everything needed is set up,
+  Setup is collapsed to one line (**Details** expands it); if something is missing later, it expands by itself and the
+  Guide entry in the navigation bar shows a dot. A closed Zotero is shown as a note, not as missing setup. Setup also
+  stays under Settings → Setup.
+
 ## 1.2.4 – 2026-11-12
 
 Search strings for Ovid PsycInfo and Web of Science, checked in real searches, and literature in German, French and

@@ -572,6 +572,14 @@ details.fold-plain > summary { cursor: pointer; color: var(--ink-2); font-size: 
 .start-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 @container (max-width: 600px) { .start-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .guide-inner { max-width: 900px; margin: 0 auto; }
+/* Anleitung in zwei Teilen (Einrichtung, Arbeitsablauf): je ein abgesetzter Block mit grosser Nummer */
+.guide-intro { margin: 0; color: var(--ink-2); line-height: 1.5; }
+.guide-section { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+.guide-section-head { display: flex; align-items: center; gap: 12px; }
+.guide-section-head h2 { margin: 0; font-size: 17px; }
+.guide-section-num { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 16px; background: var(--accent-fill); color: #fff; }
+.guide-setup-done { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 9px; background: var(--surface); border: 1px solid var(--line); }
+.guide-setup-done > .icon { flex: none; color: var(--ok); }
 .guide-step { align-items: start; padding: 12px; border-color: var(--line); background: var(--surface); }
 .guide-title { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--accent); cursor: pointer; text-align: left; }
 .guide-title:hover { text-decoration: underline; }

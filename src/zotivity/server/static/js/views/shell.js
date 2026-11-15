@@ -7,7 +7,7 @@ import { icon } from '../ui/icons.js';
 import { btn, iconBtn, notice, renderMenu, spinner, progressRing, openMenu, fitToWindow } from '../ui/components.js';
 import { fmtInt, fmtDuration, copyToClipboard } from '../core/util.js';
 import { canZoom, currentZoom, setZoom, stepZoom, ZOOMS } from '../core/zoom.js';
-import { guideView } from './guide.js';
+import { guideView, setupMissing } from './guide.js';
 import { startView } from './start.js';
 import { askView } from './ask.js';
 import { searchView } from './search.js';
@@ -59,9 +59,9 @@ export function viewHeader(title, subtitle, actions = [], extra = null) {
 }
 
 function rail() {
-  const setup = state.setup;
-  // Fehlt Technisches (ausser Zotero, das die Statusleiste zeigt): Punkt bei den Einstellungen
-  const missing = setup ? setup.steps.filter(s => !s.done && !s.optional && s.group === 'technical' && s.id !== 'zotero').length : 0;
+  // Fehlt Technisches (ausser Zotero, das die Statusleiste zeigt): Punkt bei der Anleitung, deren erster Teil die
+  // Einrichtung ist
+  const missing = setupMissing().length;
   const indexJob = Object.values(state.jobs).find(j => j.kind === 'index' && j.status === 'running');
   const p = project();
   const item = (v, shortcut) => h('button', {
@@ -69,14 +69,14 @@ function rail() {
     title: `${v.label().replace('­', '')}${v.hint ? ` – ${v.hint()}` : ''} (${shortcut})`,
     onclick: () => navigate(v.id), 'aria-current': state.view === v.id ? 'page' : null,
   }, icon(v.icon, 21), h('span', null, v.label()),
-  v.id === 'index' && indexJob ? h('span', { class: 'rail-dot busy', title: t('Indexierung läuft') }) : null,
-  v.id === 'settings' && missing ? h('span', { class: 'rail-dot', title: t('Einrichtung nicht abgeschlossen') }) : null);
+  v.id === 'index' && indexJob ? h('span', { class: 'rail-dot busy', title: t('Indexierung läuft') }) : null);
   return h('nav', { class: 'rail', 'aria-label': t('Navigation') },
     // Ganz oben unter dem Programmsymbol: die Anleitung
     h('button', { type: 'button', class: ['rail-item', 'rail-home', state.view === 'guide' && 'active'],
-      title: t('Anleitung – vom Projekt bis zum fertigen Text'), onclick: () => navigate('guide'),
+      title: t('Anleitung – Einrichtung und Arbeitsablauf'), onclick: () => navigate('guide'),
       'aria-current': state.view === 'guide' ? 'page' : null },
-    h('img', { src: '/static/img/icon.svg', alt: '', width: 28, height: 28 }), h('span', null, t('Anleitung'))),
+    h('img', { src: '/static/img/icon.svg', alt: '', width: 28, height: 28 }), h('span', null, t('Anleitung')),
+    missing ? h('span', { class: 'rail-dot', title: t('Einrichtung nicht abgeschlossen') }) : null),
     h('button', { type: 'button', class: 'rail-project', title: p ? t('Projekt: {name} – wechseln (Strg+P)', { name: p.name }) : t('Projekt wählen (Strg+P)'),
       onclick: e => openProjectSwitcher(e.currentTarget) },
     projectBadge(p, 34), h('span', { class: 'rail-project-name' }, p ? p.name : t('Projekt')), icon('chevronDown', 12, 'rail-project-caret')),

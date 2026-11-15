@@ -20,14 +20,12 @@ Warnhinweise (braun hinterlegt) lassen sich mit dem × oben rechts ausblenden. H
 
 ### Der übliche Ablauf
 
-Den Ablauf zeigt die **Anleitung**, der oberste Eintrag der Navigationsleiste, mit Links in die Ansichten und dem Stand im aktiven Projekt:
+Die **Anleitung**, der oberste Eintrag der Navigationsleiste, hat zwei Teile: zuerst die **Einrichtung** (einmal je Computer, siehe Kapitel Einrichtung), dann den **Arbeitsablauf** für jedes Vorhaben, mit Links in die Ansichten und dem Stand im aktiven Projekt:
 
 1. **Projekt anlegen**
 2. **Recherche** (optional) – wer schon eine Sammlung in Zotero hat, geht direkt zu Schritt 3
 3. **Korpus anlegen und indexieren**
 4. **Mit den Korpora arbeiten** – Fragen und Forschungsstand
-
-Das Technische gehört zur Einrichtung (siehe Kapitel Einrichtung).
 
 ### Tastenkürzel
 
@@ -55,9 +53,9 @@ Schliessen des Fensters beendet Zotivity ganz. Läuft gerade eine Indexierung, e
 
 ## Einrichtung
 
-Die Einrichtung umfasst nur das Technische und geschieht einmal je Computer: Zotero, Sprachmodell, Embedding-Modell, auf Wunsch Schreibzugriff, Plugin und Schlüssel für Datenbanken. Beim ersten Start öffnet Zotivity dafür **Einstellungen → Einrichtung**; jeder Schritt lässt sich überspringen und nennt, wofür er nötig ist. **Weiter: Anleitung** führt zum Arbeitsablauf. Danach öffnet Zotivity immer das zuletzt offene Projekt in der zuletzt benutzten Ansicht, auch wenn Zotero gerade nicht läuft.
+Die Einrichtung umfasst nur das Technische und geschieht einmal je Computer: Zotero, Sprachmodell, Embedding-Modell, auf Wunsch Schreibzugriff, Plugin und Schlüssel für Datenbanken. Beim ersten Start öffnet Zotivity die **Anleitung**; ihr erster Teil ist die Einrichtung, darunter folgt der Arbeitsablauf. Jeder Schritt lässt sich überspringen und nennt, wofür er nötig ist. Danach öffnet Zotivity immer das zuletzt offene Projekt in der zuletzt benutzten Ansicht, auch wenn Zotero gerade nicht läuft.
 
-Die Checkliste bleibt unter **Einstellungen → Einrichtung** erreichbar. Fehlt später etwas, meldet das die Statusleiste oder die Stelle, die es braucht; fehlt ein Sprachmodell oder Embedding-Modell, trägt der Eintrag Einstellungen einen Punkt. Wie es mit der Arbeit weitergeht, zeigen die **Anleitung** und auf der Projektseite die Zeile **Nächster Schritt**.
+Die Checkliste steht zuoberst in der Anleitung und unter **Einstellungen → Einrichtung**. Ist alles Nötige eingerichtet, ist sie in der Anleitung eingeklappt (**Details** klappt sie auf). Fehlt später etwas, meldet das die Statusleiste oder die Stelle, die es braucht; fehlt ein Sprachmodell oder Embedding-Modell, klappt die Einrichtung in der Anleitung auf, und der Eintrag Anleitung trägt einen Punkt. Wie es mit der Arbeit weitergeht, zeigen die **Anleitung** und auf der Projektseite die Zeile **Nächster Schritt**.
 
 ### Zotero verbinden
 
