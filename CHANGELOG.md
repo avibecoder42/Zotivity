@@ -25,6 +25,8 @@ All notable changes, newest first.
 ### Changed
 - **Search options under Ask no longer override later changes.** A change under Settings → Expert or a preset switch
   drops the session values: what was set last wins. "Max. per text" goes up to 50.
+- **Texts in a corpus (Index): open work first.** Open texts and problems are at the top of the list, indexed texts
+  at the bottom.
 
 ## 1.2.6 – 2026-11-16
 
