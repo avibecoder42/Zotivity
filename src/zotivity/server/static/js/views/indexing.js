@@ -313,12 +313,13 @@ function documentsPanel(running) {
           oninput: e => { s.docsFilter = e.target.value; update(); } })),
         iconBtn('refresh', t('Neu laden'), () => { s.docsFor = null; update(); }))),
     h('div', { class: 'index-panel-body' }, d === null ? h('div', { class: 'pad' }, spinner(16)) : [
+      // Was noch zu tun ist, oben: Offen und Probleme, dann Einzubetten und Zu aktualisieren, zuletzt Indexiert
       groups.current.length ? docList(t('In Arbeit'), groups.current, 'current', true, curInfo) : null,
-      docList(d.model ? t('Indexiert (mit {m} durchsuchbar)', { m: d.model }) : t('Indexiert'), groups.indexed, 'indexed', true),
-      groups.to_embed.length ? docList(t('Einzubetten (für {m})', { m: d.model || '' }), groups.to_embed, 'to_embed', groups.to_embed.length < 200) : null,
-      groups.refresh.length ? docList(t('Zu aktualisieren (durchsuchbar, wird neu gelesen)'), groups.refresh, 'refresh', false) : null,
       docList(t('Offen (wird beim nächsten Lauf gelesen)'), groups.pending, 'pending', groups.pending.length > 0 && groups.pending.length < 200),
       docList(t('Probleme (ohne Text oder Fehler)'), groups.problems, 'problems', groups.problems.length > 0),
+      groups.to_embed.length ? docList(t('Einzubetten (für {m})', { m: d.model || '' }), groups.to_embed, 'to_embed', groups.to_embed.length < 200) : null,
+      groups.refresh.length ? docList(t('Zu aktualisieren (durchsuchbar, wird neu gelesen)'), groups.refresh, 'refresh', false) : null,
+      docList(d.model ? t('Indexiert (mit {m} durchsuchbar)', { m: d.model }) : t('Indexiert'), groups.indexed, 'indexed', true),
     ]),
     splitter('index', { def: INDEX_PANE, min: 260, max: 760, side: 'right' }));
 }
