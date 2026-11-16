@@ -71,20 +71,34 @@ def test_llm_choice_healed_on_start(zengine):
     assert (llm.helper_provider, llm.helper_model) == ("gemini", "gemini-flash-latest")
 
 
-def test_update_check_and_defaults(client, tmp_path):
+def test_update_check_and_defaults(client, tmp_path, monkeypatch):
+    from zotivity import updates
+
+    # Ohne Umgebungsvariable gilt fest das Manifest des neuesten Releases auf GitHub (hier ohne Netz geprüft)
+    monkeypatch.delenv("ZOTIVITY_UPDATE_URL", raising=False)
+    assert updates.source() == updates.UPDATE_URL
+    assert updates.UPDATE_URL == "https://github.com/avibecoder42/Zotivity/releases/latest/download/zotivity-update.json"
+    assert client.get("/api/app/info").json()["releases_url"] == "https://github.com/avibecoder42/Zotivity/releases"
+
     manifest = tmp_path / "zotivity-update.json"
     manifest.write_text(json.dumps({"version": "99.0.0", "url": "Zotivity-Setup-99.0.0.exe", "sha256": "ab"}))
-    r = client.post("/api/update/check", json={"url": str(manifest)}, headers=H).json()
+    monkeypatch.setenv("ZOTIVITY_UPDATE_URL", str(manifest))
+    r = client.post("/api/update/check", json={}, headers=H).json()
     assert r["available"] and r["latest"] == "99.0.0"
     assert Path(r["installer"]) == tmp_path / "Zotivity-Setup-99.0.0.exe"
-    # Ohne Quelle: nicht eingerichtet; unverschlüsseltes HTTP wird abgelehnt
-    assert client.post("/api/update/check", json={}, headers=H).json()["configured"] is False
-    assert client.post("/api/update/check", json={"url": "http://example.org/u.json"}, headers=H).status_code == 400
+    # Weder Anfrage noch Einstellungen ändern die Quelle (Code-Prüfung 2026-11-11, A2/A3)
+    r = client.post("/api/update/check", json={"url": "https://example.org/u.json"}, headers=H).json()
+    assert r["latest"] == "99.0.0"
+    client.app.state.engine.settings_store.update({"update_url": "https://example.org/u.json"})
+    assert client.post("/api/update/check", json={}, headers=H).json()["latest"] == "99.0.0"
+    # Unverschlüsseltes HTTP wird abgelehnt
+    monkeypatch.setenv("ZOTIVITY_UPDATE_URL", "http://example.org/u.json")
+    assert client.post("/api/update/check", json={}, headers=H).status_code == 400
     assert client.get("/api/settings/defaults").json()["retrieval"]["top_k"] == 15
 
 
 def test_update_installs_only_what_the_configured_source_offers(client, tmp_path, monkeypatch):
-    """Installer und Prüfsumme stammen aus dem Manifest der eingestellten Update-Quelle, nie aus der Anfrage – sonst
+    """Installer und Prüfsumme stammen aus dem Manifest der festen Update-Quelle, nie aus der Anfrage – sonst
     könnte jedes Programm auf dem Rechner den Dienst eine beliebige Datei starten lassen (Code-Prüfung 2026-11-11, A2)."""
     import hashlib
 
@@ -100,15 +114,15 @@ def test_update_installs_only_what_the_configured_source_offers(client, tmp_path
         return client.post("/api/update/install", headers=H,
                            json={"installer": str(foreign), "sha256": "", "version": "99.0.0"})
 
-    # Ohne eingestellte Quelle wird nichts geladen oder gestartet, was auch immer die Anfrage nennt
+    # Ohne lesbare Quelle wird nichts geladen oder gestartet, was auch immer die Anfrage nennt
+    manifest = tmp_path / "zotivity-update.json"
+    monkeypatch.setenv("ZOTIVITY_UPDATE_URL", str(manifest))
     r = install()
     assert r.status_code == 400 and "Update-Quelle" in r.text and not started
 
     installer = tmp_path / "Zotivity-Setup-99.0.0.exe"
     installer.write_bytes(b"echter Installer")
-    manifest = tmp_path / "zotivity-update.json"
     good = {"version": "99.0.0", "url": installer.name, "sha256": hashlib.sha256(b"echter Installer").hexdigest()}
-    client.app.state.engine.settings_store.update({"update_url": str(manifest)})
 
     for bad, message in (({**good, "sha256": ""}, "Prüfsumme"),                       # ohne Prüfsumme startet nichts
                          ({**good, "sha256": "ab" * 32}, "Prüfsumme des Installers"),  # falsche Prüfsumme

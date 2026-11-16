@@ -2,6 +2,24 @@
 
 All notable changes, newest first.
 
+## 1.2.6 – 2026-11-16
+
+### Added
+- **Updates from GitHub.** At start-up Zotivity asks GitHub for the latest release and offers to update (can be
+  switched off under Settings → Program & data). **Check for updates** asks at any time; **Versions on GitHub** opens
+  the releases page. Each release now carries the update information `zotivity-update.json`. The update source is
+  fixed: the free update-source field is gone, so nobody can slip in a foreign installer through the settings. GitHub
+  sees the computer's IP address, nothing else. This version still has to be installed by hand once.
+- **Project export keeps the PDF pages of citations.** A literature review imported on another computer opens each
+  citation on the right PDF page in Zotero even before the texts are indexed there – provided it is the same PDF file
+  (same attachment and checksum). Clicking citations needs neither the index nor an embedding model.
+
+### Fixed
+- **The list of texts in a corpus updates after a sync with Zotero.** Items newly added in Zotero now appear under
+  Open by themselves, also when the sync ran in the background. Before, they only appeared after "Reload" or a restart.
+- **Citations without a page find their page again after indexing.** For a text that was not read yet (e.g. after a
+  project import), Zotivity no longer remembers "no page" for good; it searches again once the text is indexed.
+
 ## 1.2.5 – 2026-11-15
 
 ### Changed

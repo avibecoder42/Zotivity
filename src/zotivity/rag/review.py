@@ -1026,9 +1026,86 @@ class ReviewService:
             for i, page in zip(rest, self._best_pages([items[i] for i in rest]) if rest else []):
                 found[i] = page
             new = dict(zip(todo, found))
-            self.store.put_review_pages(review_id, new)
+            # Keine Seite, weil der Text hier noch nicht gelesen ist (z. B. nach einem Projekt-Import): nicht merken,
+            # sonst bliebe es auch nach dem Indexieren dabei
+            unread = {(lib, key) for ref, (lib, key, _) in todo.items()
+                      if new[ref] is None and not self.store.document_chunks(lib, key)}
+            self.store.put_review_pages(review_id, {ref: p for ref, p in new.items()
+                                                    if p is not None or todo[ref][:2] not in unread})
             known.update(new)
         return known
+
+    # -- Seiten der Belege im Projekt-Export ---------------------------------------------------------
+    @staticmethod
+    def _imported_pages(state: dict, key: str, pdf: dict | None) -> dict | None:
+        """Seiten aus einem Projekt-Import (state["_pdf_pages"], s. page_map) – nur für dieselbe Datei: gleicher
+        Anhang und gleiche MD5-Prüfsumme wie hier."""
+        entry = (state.get("_pdf_pages") or {}).get(key)
+        if not isinstance(entry, dict) or not pdf or entry.get("att") != pdf.get("key"):
+            return None
+        if not entry.get("md5") or entry.get("md5") != pdf.get("md5"):
+            return None
+        return entry
+
+    def _cite_page(self, state: dict, lib: str, key: str, pdf: dict, page: str, ref: str | None,
+                   located: dict[str, int | None]) -> int | None:
+        """PDF-Seite (0-basiert) eines Belegs: mit Seitenangabe über die Seitenzahlen des Texts, ohne über die
+        Fundstelle der belegten Aussage (ref). Seiten aus einem Projekt-Import gelten zuerst – sie stammen vom Rechner,
+        auf dem der Text indexiert war, und gelten auch, solange er hier noch nicht gelesen ist."""
+        imported = self._imported_pages(state, key, pdf) or {}
+        if page and page != NO_PAGE:
+            idx = (imported.get("cited") or {}).get(page)
+            return idx if idx is not None else self._page_index(lib, key, page)
+        if not ref:
+            return None
+        idx = located.get(ref)
+        return idx if idx is not None else (imported.get("located") or {}).get(ref)
+
+    def page_map(self, review_id: int) -> dict[str, dict]:
+        """PDF-Seiten der Belege für den Projekt-Export: je zitiertem Text der PDF-Anhang (Schlüssel, MD5) und die
+        Seite je Seitenangabe („cited“) bzw. je Belegstelle ohne Seitenangabe („located“). Am Ziel öffnen die Belege
+        so die richtige Seite, auch bevor die Texte dort indexiert sind – aber nur bei derselben Datei."""
+        try:  # wie beim Anzeigen: Seitenangaben aus der Zeit vor der Seitenzahl-Erkennung zuerst umstellen
+            self.ensure_review_pages(review_id)
+        except Exception as e:  # noqa: BLE001
+            log.warning("Seitenangaben nicht umgestellt: %s", e)
+        review = self.store.get_review(review_id)
+        if not review:
+            return {}
+        state = review["state"]
+        text = latex_to_text("\n\n".join(s["text"] for s in state.get("sections", [])))
+        docs = {d["item_key"]: d for d in self.store.review_docs(review_id)}
+        try:
+            located = self.locate_pages(review_id, text)
+        except Exception as e:  # noqa: BLE001 – dann nur die bereits gemerkten Fundstellen
+            log.warning("Seiten der Belege nicht gefunden: %s", e)
+            located = self.store.review_pages(review_id)
+        out: dict[str, dict] = {}
+        pdfs: dict[str, dict | None] = {}
+        for m in self._CITE.finditer(text):
+            ctx = None
+            for key, page in parse_citation(m.group(1)):
+                d = docs.get(key)
+                if not d:
+                    continue
+                if key not in pdfs:
+                    pdfs[key] = self._pdf_attachment(d["lib"], key)
+                pdf = pdfs[key]
+                if not pdf or not pdf.get("md5"):  # ohne Prüfsumme lässt sich am Ziel nicht prüfen, ob es dieselbe Datei ist
+                    continue
+                ref = None
+                if not page or page == NO_PAGE:
+                    ctx = ctx if ctx is not None else self._cite_context(text, m.start())
+                    ref = self._page_ref(key, ctx)
+                idx = self._cite_page(state, d["lib"], key, pdf, page, ref, located)
+                if idx is None:
+                    continue
+                entry = out.setdefault(key, {"att": pdf["key"], "md5": pdf["md5"], "cited": {}, "located": {}})
+                if ref:
+                    entry["located"][ref] = int(idx)
+                else:
+                    entry["cited"][page] = int(idx)
+        return out
 
     _WORD = re.compile(r"\w{4,}", re.UNICODE)
 
@@ -1564,11 +1641,11 @@ class ReviewService:
                 pdf = self._pdf_attachment(d["lib"], key)
                 idx = None
                 if pdf and target in ("pdf", "dialog"):
-                    if page and not no_page:
-                        idx = self._page_index(d["lib"], key, page)
-                    else:  # ohne (gedruckte) Seitenangabe: Fundstelle des Zitats bzw. der belegten Aussage
+                    ref = None
+                    if not page or no_page:  # ohne (gedruckte) Seitenangabe: Fundstelle des Zitats bzw. der Aussage
                         ctx = ctx if ctx is not None else self._cite_context(text, m.start())
-                        idx = located.get(self._page_ref(key, ctx))
+                        ref = self._page_ref(key, ctx)
+                    idx = self._cite_page(state, d["lib"], key, pdf, page, ref, located)
                 select = zotero_select_url(d["lib"], key)
                 pdf_url = zotero_open_pdf_url(d["lib"], pdf["key"], idx) if pdf else None
                 if target == "dialog":

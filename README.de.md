@@ -140,10 +140,11 @@ fragt Zotivity, ob im Hintergrund weitergearbeitet werden soll. Startet das Zote
 Fenster im Hintergrund und endet einige Minuten nach Zotero; «Zotivity öffnen» in Zotero zeigt das Fenster.
 Beenden jederzeit unter *Einstellungen → Programm & Daten*.
 
-**Updates:** Unter *Einstellungen → Programm & Daten* eine Update-Quelle eintragen – HTTPS-Adresse oder Netzwerkpfad
-zur Datei `zotivity-update.json`, die beim Build neben dem Installer entsteht. Zotivity prüft beim Start, lädt den
-Installer, kontrolliert die SHA-256-Prüfsumme, installiert unbeaufsichtigt und startet neu. Einstellungen, Index,
-Korpora und Schlüssel bleiben erhalten (auch bei der Deinstallation).
+**Updates:** Zotivity fragt beim Start auf GitHub nach der neuesten Version (Datei `zotivity-update.json` im neuesten
+Release; abschaltbar unter *Einstellungen → Programm & Daten*). GitHub sieht dabei die IP-Adresse, sonst nichts. Auf
+Bestätigung lädt Zotivity den Installer, kontrolliert die SHA-256-Prüfsumme, installiert unbeaufsichtigt und startet
+neu. Einstellungen, Index, Korpora und Schlüssel bleiben erhalten (auch bei der Deinstallation). Die Update-Quelle ist
+fest; nur für Tests nennt die Umgebungsvariable `ZOTIVITY_UPDATE_URL` eine andere.
 
 **Installer bauen:** `.\packaging\build.ps1` (Tests → Symbole → PyInstaller → Selbsttest der EXE inkl. Fenster →
 Inno Setup 6 → Update-Manifest). Mit `-UpdateBaseUrl https://…` steht die Download-Adresse im Manifest.

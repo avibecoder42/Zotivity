@@ -138,6 +138,7 @@ Die Ansicht **Projekt** zeigt links alle Projekte untereinander; oben stehen **N
 - **Neues Projekt** legt ein leeres Projekt an (Name, Beschreibung, Farbe).
 - Das Menü **⋯** auf einer Projektkachel bietet Bearbeiten, Nach oben/unten, Als Datei exportieren, Duplizieren, Archivieren und Löschen.
 - **Als Datei exportieren** speichert das Projekt als `.zoty`-Datei (`.zllm`-Dateien früherer Versionen lassen sich weiter importieren) – mit Korpus-Definitionen, Chats, Forschungsständen und Auswertungsblättern, aber ohne Index. So lässt sich ein Projekt sichern oder auf einen anderen Rechner bringen. **Importieren** lädt eine solche Datei; fehlende Sammlungen werden gemeldet.
+- Forschungsstände nehmen die **PDF-Seiten ihrer Belege** mit: Am Ziel öffnet ein Beleg die richtige Seite in Zotero, auch bevor die Texte dort indexiert sind – sofern es dieselbe PDF-Datei ist. Zum Anklicken der Belege braucht es weder Index noch Embedding-Modell. Zotivity muss die Bibliotheken aber einmal mit Zotero abgleichen, und die Einträge müssen im eigenen Zotero vorhanden sein: Bei Gruppen genügt die Mitgliedschaft; Einträge aus «Meine Bibliothek» findet nur dieselbe Person auf einem anderen Rechner.
 - Ein Korpus kann zu mehreren Projekten gehören. Beim Löschen eines Projekts bleiben Korpora, die auch anderswo verwendet werden, erhalten.
 
 ### Archiv
@@ -196,6 +197,8 @@ Die Vektoren gehören zum jeweiligen Modell. Nach einem Modellwechsel ist deshal
 Beim Lesen bestimmt Zotivity die **gedruckten Seitenzahlen** aus Kopf- und Fusszeilen (Jahrgang, Jahr und Heftnummer werden dabei herausgefiltert, die Seitenspanne aus Zotero dient als Gegenprobe) und merkt sich, wo innerhalb eines Abschnitts eine neue Seite beginnt. Findet sich keine Zählung, gilt die Quelle als „ohne Seitenzahlen“ (o. S.).
 
 Ganz oben steht immer der **Zustand des Index** über alle Korpora: das aktive Embedding-Modell, Texte, indexiert (mit dem Zusatz „davon … zu aktualisieren“), einzubetten, offen, Probleme und durchsuchbare Abschnitte, dazu wann zuletzt geprüft wurde und wann die nächste automatische Prüfung ansteht. Texte = indexiert + einzubetten + offen + Probleme. Der Knopf sagt, was ein Lauf tut, z. B. **Indexieren: 9 lesen · 44 neu einlesen · 2 einbetten** – ein Lauf erledigt alles auf einmal. Fehlen nur Vektoren, bettet **Nur einbetten** (bzw. **… für … einbetten**) mit der geschätzten Dauer ein, ohne etwas neu zu lesen. Die Tabelle **Korpora** zeigt dieselben Zahlen je Korpus, „zu aktualisieren“ als kleines Symbol neben der Zahl der indexierten Texte; sie wird zusammen mit dem Zustand nachgeladen, auch nach einem Abgleich im Hintergrund. Bei mehr als zehn Korpora scrollt sie in sich, statt die Seite zu verlängern.
+
+Rechts listet **Texte im Korpus** die Texte des gewählten Korpus nach Stand: indexiert, einzubetten, zu aktualisieren, offen und Probleme. Die Liste lädt nach jedem Abgleich mit Zotero und nach jeder Indexierung neu, auch wenn der Abgleich im Hintergrund lief; neu in Zotero aufgenommene Einträge erscheinen so von selbst unter **Offen**. Der Pfeil **Neu laden** oben holt die Liste jederzeit von Hand.
 
 Während eines Laufs zeigt die Karte **Laufende Indexierung** oben einen Fortschrittsring mit Prozent, das Embedding-Modell und die **geschätzte Restzeit** („noch ca. …“). Sie beruht auf dem Tempo dieses Laufs und wird nach den ersten Texten genauer; solange ein Teil noch nicht abschätzbar ist, steht „noch mindestens …“. Darunter folgen „Text … von …“ (wie viele zu lesen und wie viele nur einzubetten sind), der aktuelle Text mit Seiten- und Abschnittsfortschritt, die nächsten Texte dieses Laufs und die zuletzt fertigen Texte. Derselbe Ring mit Prozent und Restzeit steht in der Statusleiste. Drei Zählungen sind zu unterscheiden:
 
@@ -510,7 +513,9 @@ Das Programmfenster passt sich beim ersten Start dem Bildschirm an und merkt sic
 
 ### Updates
 
-Ist eine Update-Quelle eingetragen, sucht Zotivity beim Start nach neuen Versionen. **Jetzt aktualisieren** lädt den Installer, beendet Zotivity und startet es nach der Installation neu. Einstellungen, Index, Korpora und Schlüssel bleiben erhalten.
+Neue Versionen erscheinen auf GitHub. Beim Start fragt Zotivity dort nach der neuesten Version und meldet eine neue einige Sekunden später; **Nach Updates suchen** fragt jederzeit. **Jetzt aktualisieren** lädt den Installer, prüft seine Prüfsumme (SHA-256), beendet Zotivity und startet es nach der Installation neu. Einstellungen, Index, Korpora und Schlüssel bleiben erhalten. **Versionen auf GitHub** öffnet die Seite mit allen Versionen und ihren Änderungen.
+
+Die Abfrage geht an github.com; GitHub sieht dabei die IP-Adresse des Rechners, sonst nichts. Wer das nicht will, schaltet **Beim Start nach Updates suchen** aus. Die Update-Quelle ist fest und lässt sich nicht ändern – so kann niemand über die Einstellungen einen fremden Installer unterschieben.
 
 ## Datenschutz und Daten
 
@@ -518,6 +523,7 @@ Ist eine Update-Quelle eingetragen, sucht Zotivity beim Start nach neuen Version
 - Mit einem lokalen Embedding-Modell (eingebaut oder Ollama) verlassen die Texte den Rechner beim Indexieren nicht. Mit einem Cloud-Embedding gehen alle Textabschnitte an den Anbieter. Die eingebaute Laufzeit nimmt nur Anfragen von Zotivity an (zufälliger Schlüssel, nur 127.0.0.1) und greift nie aufs Netz zu; Hugging Face wird nur für Downloads per Knopf und für die Namenssuche angefragt.
 - Beim Fragen und beim Forschungsstand gehen die gefundenen Textstellen bzw. die Texte der Auswahl an den Anbieter des Sprachmodells. Mit Ollama als Sprachmodell bleibt alles lokal.
 - **Suchen** arbeitet ganz ohne Sprachmodell.
+- Beim Start fragt Zotivity auf GitHub nach einer neuen Version (abschaltbar unter Einstellungen → Programm & Daten). Dabei geht nur die Anfrage selbst an GitHub, keine Daten aus Zotivity.
 - API-Schlüssel liegen verschlüsselt im Anmeldeinformationsspeicher des Betriebssystems.
 - Zotivity verändert Zotero nur mit Schreibzugriff und nur auf Ihren Auftrag: Notizen für Auswertungsblätter, Sammlungen für den Forschungsstand.
 

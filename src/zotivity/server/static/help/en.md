@@ -137,6 +137,7 @@ The **Project** view lists all projects on the left, one below the other; **New 
 - **New project** creates an empty project (name, description, colour).
 - The **⋯** menu on a project tile offers Edit, Move up/down, Export as file, Duplicate, Archive and Delete.
 - **Export as file** saves the project as a `.zoty` file (`.zllm` files from earlier versions can still be imported) – with corpus definitions, chats, literature reviews and evaluation sheets, but without the index. Use it to back up a project or move it to another computer. **Import** loads such a file; missing collections are reported.
+- Literature reviews take the **PDF pages of their citations** along: on the target computer a citation opens the right page in Zotero even before the texts are indexed there – provided it is the same PDF file. Clicking citations needs neither the index nor an embedding model. Zotivity must however synchronise the libraries with Zotero once, and the items must exist in your own Zotero: for groups, membership is enough; items from "My Library" are only found by the same person on another computer.
 - A corpus can belong to several projects. When a project is deleted, corpora that are used elsewhere are kept.
 
 ### Archive
@@ -195,6 +196,8 @@ The vectors belong to their model. After a model switch only step 2 is needed ("
 While reading, Zotivity determines the **printed page numbers** from headers and footers (volume, year and issue numbers are filtered out, the page range from Zotero serves as a cross-check) and remembers where a new page begins inside a section. If no numbering can be found, the source counts as "without page numbers" (n.p., German "o. S.").
 
 At the top there is always the **Index status** across all corpora: the active embedding model, texts, indexed (with the addition "of which … to refresh"), to embed, open, problems and searchable passages, plus when the last check took place and when the next automatic check is due. Texts = indexed + to embed + open + problems. The button states what a run does, e.g. **Index: read 9 · re-read 44 · embed 2** – one run does everything at once. If only vectors are missing, **Embed only** (or **Embed … for …**) embeds them with the estimated duration, without reading anything again. The **Corpora** table shows the same figures per corpus, "to refresh" as a small symbol next to the number of indexed texts; it is reloaded together with the status, also after a synchronisation in the background. With more than ten corpora it scrolls within itself instead of making the page longer.
+
+On the right, **Texts in the corpus** lists the texts of the selected corpus by state: indexed, to embed, to refresh, open and problems. The list reloads after every synchronisation with Zotero and after every indexing run, also when the synchronisation ran in the background; items newly added in Zotero thus appear under **Open** by themselves. The **Reload** arrow at the top fetches the list by hand at any time.
 
 During a run, the **Running indexing** card shows a progress ring with percentage at the top, the embedding model and the **estimated remaining time** ("approx. … left"). It is based on the speed of this run and becomes more accurate after the first texts; while part of it cannot be estimated yet, it reads "at least … left". Below follow "Text … of …" (how many to read and how many only to embed), the current text with page and passage progress, the next texts in this run and the texts finished last. The same ring with percentage and remaining time appears in the status bar. Three counts must be distinguished:
 
@@ -509,7 +512,9 @@ On first start the program window adapts to the screen and afterwards remembers 
 
 ### Updates
 
-If an update source is entered, Zotivity checks for new versions at start-up. **Update now** downloads the installer, quits Zotivity and restarts it after installation. Settings, index, corpora and keys are kept.
+New versions are published on GitHub. At start-up Zotivity asks there for the latest version and reports a new one a few seconds later; **Check for updates** asks at any time. **Update now** downloads the installer, checks its checksum (SHA-256), quits Zotivity and restarts it after installation. Settings, index, corpora and keys are kept. **Versions on GitHub** opens the page with all versions and their changes.
+
+The request goes to github.com; GitHub sees the computer's IP address, nothing else. If you do not want this, switch off **Check for updates at start-up**. The update source is fixed and cannot be changed – so nobody can slip in a foreign installer through the settings.
 
 ## Privacy and data
 
@@ -517,6 +522,7 @@ If an update source is entered, Zotivity checks for new versions at start-up. **
 - With a local embedding model (built-in or Ollama), the texts do not leave the computer during indexing. With a cloud embedding, all passages are sent to the provider. The built-in runtime only accepts requests from Zotivity (random key, 127.0.0.1 only) and never accesses the network; Hugging Face is only contacted for downloads at the push of a button and for the name search.
 - When asking and for the literature review, the passages found or the texts of the selection are sent to the provider of the language model. With Ollama as language model everything stays local.
 - **Search** works entirely without a language model.
+- At start-up Zotivity asks GitHub for a new version (can be switched off under Settings → Program & data). Only the request itself goes to GitHub, no data from Zotivity.
 - API keys are stored encrypted in the operating system's credential store.
 - Zotivity changes Zotero only with write access and only on your instruction: notes for evaluation sheets, collections for the literature review.
 

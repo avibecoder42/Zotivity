@@ -275,8 +275,12 @@ function documentsPanel(running) {
   const c = state.corpora.find(x => x.id === s.corpus);
   if (!c) return h('aside', { class: 'index-panel', ...paneProps('index', INDEX_PANE) }, h('p', { class: 'muted pad' }, t('Noch kein Korpus.')), splitter('index', { def: INDEX_PANE, min: 260, max: 760, side: 'right' }));
   if (s.docsFor !== c.id) {
-    s.docsFor = c.id; s.docs = null;
+    s.docsFor = c.id; s.docs = null; s.docsGen = state.catalogGen;
     api.get(`/api/corpora/${c.id}/documents`).then(d => { if (st().docsFor === c.id) { st().docs = d; update(); } }).catch(() => {});
+  } else if (s.docsGen !== state.catalogGen) {
+    // Nach einem Abgleich mit Zotero oder einer Indexierung (auch im Hintergrund): neu laden, ohne die Liste zu leeren
+    s.docsGen = state.catalogGen;
+    refreshDocs();
   }
   const d = s.docs;
   // Der Text, an dem gerade gearbeitet wird, steht oben unter „In Arbeit“ – nicht schon unter „Indexiert“

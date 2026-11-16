@@ -1,20 +1,24 @@
 """Projekte als Datei (.zoty, früher .zllm) exportieren und importieren – für Sicherung, Weitergabe oder einen anderen Rechner.
 
 Die Datei ist ein ZIP mit project.json: Projekt, Korpus-Definitionen (Sammlungsschlüssel), Chats,
-Forschungsstände, die Auswertungsblätter der einbezogenen Texte und der Suchverlauf. Nicht enthalten: der Index
-(wird am Ziel neu erstellt) und API-Schlüssel.
+Forschungsstände samt PDF-Seiten ihrer Belege, die Auswertungsblätter der einbezogenen Texte und der Suchverlauf.
+Nicht enthalten: der Index (wird am Ziel neu erstellt) und API-Schlüssel. Die PDF-Seiten der Belege lassen die Belege
+am Ziel die richtige Seite öffnen, bevor die Texte dort indexiert sind (nur bei derselben Datei, s. ReviewService.page_map).
 """
 
 from __future__ import annotations
 
 import io
 import json
+import logging
 import time
 import zipfile
 
 from zotivity import __version__
 from zotivity.engine import Engine
 from zotivity.zotero.tree import describe_sources, fetch_tree
+
+log = logging.getLogger(__name__)
 
 FORMAT = "zotivity-project"
 LEGACY_FORMATS = ("zotllm-project", "zoterollm-project")  # .zllm-Dateien aus Versionen bis 1.0.1 (ZotLLM, ZoteroLLM)
@@ -33,12 +37,21 @@ def export_project(engine: Engine, project_id: int) -> tuple[str, bytes]:
         chats.append({"title": c["title"], "created_at": c["created_at"], "updated_at": c["updated_at"],
                       "messages": [{k: m[k] for k in ("role", "content", "sources", "meta", "created_at")}
                                    for m in store.chat_messages(c["id"])]})
+    from zotivity.rag.review import ReviewService
+
+    reviewer = ReviewService(engine)
     reviews, sheet_keys = [], set()
     for r in store.reviews(project_id=project_id):
-        full = store.get_review(r["id"])
+        try:  # PDF-Seiten der Belege; fehlen sie, öffnen die Belege am Ziel erst nach dem Indexieren die richtige Seite
+            pages = reviewer.page_map(r["id"])
+        except Exception as e:  # noqa: BLE001
+            log.warning("PDF-Seiten der Belege nicht exportiert: %s", e)
+            pages = {}
+        full = store.get_review(r["id"])  # nach page_map: das Umstellen alter Seitenangaben ist darin enthalten
         docs = store.review_docs(r["id"])
         sheet_keys.update((d["lib"], d["item_key"]) for d in docs if d["included"])
-        reviews.append({"title": full["title"], "question": full["question"], "state": full["state"],
+        state = {k: v for k, v in full["state"].items() if k != "_pdf_pages"}
+        reviews.append({"title": full["title"], "question": full["question"], "state": state, "pages": pages,
                         "created_at": full["created_at"], "updated_at": full["updated_at"],
                         "docs": [{k: d[k] for k in ("lib", "item_key", "score", "hits", "decision", "reason",
                                                     "included")} for d in docs]})
@@ -69,6 +82,27 @@ def _unique(name: str, taken: set[str]) -> str:
     while out.casefold() in taken:
         out, n = f"{name} ({n})", n + 1
     taken.add(out.casefold())
+    return out
+
+
+def _clean_pages(raw) -> dict[str, dict]:
+    """PDF-Seiten der Belege aus der Datei: nur die erwartete Form übernehmen (Schlüssel → Anhang, MD5, Seiten)."""
+    out: dict[str, dict] = {}
+    if not isinstance(raw, dict):
+        return out
+    for key, entry in raw.items():
+        if not isinstance(key, str) or not isinstance(entry, dict):
+            continue
+        att, md5 = entry.get("att"), entry.get("md5")
+        if not (isinstance(att, str) and att and isinstance(md5, str) and md5):
+            continue
+        maps = {}
+        for kind in ("cited", "located"):
+            src = entry.get(kind) if isinstance(entry.get(kind), dict) else {}
+            maps[kind] = {str(k): int(v) for k, v in src.items()
+                          if isinstance(v, int) and not isinstance(v, bool) and 0 <= v < 100000}
+        if maps["cited"] or maps["located"]:
+            out[key] = {"att": att, "md5": md5, **maps}
     return out
 
 
@@ -122,8 +156,13 @@ def import_project(engine: Engine, payload: bytes) -> dict:
             store.add_chat_message(chat_id, m.get("role", "user"), m.get("content", ""), sources=m.get("sources"),
                                    meta=m.get("meta"))
     for r in data.get("reviews") or []:
+        state = dict(r.get("state") or {})
+        state.pop("_pdf_pages", None)
+        pages = _clean_pages(r.get("pages"))
+        if pages:
+            state["_pdf_pages"] = pages
         rid = store.create_review(str(r.get("title") or r.get("question") or "Forschungsstand"),
-                                  str(r.get("question") or ""), r.get("state") or {}, project_id=pid)
+                                  str(r.get("question") or ""), state, project_id=pid)
         store.put_review_docs(rid, [d for d in r.get("docs") or [] if d.get("lib") and d.get("item_key")])
     for s in data.get("searches") or []:  # Dateien früherer Versionen: Der Suchverlauf gilt jetzt für alle Projekte
         if isinstance(s.get("query"), dict) and s["query"]:

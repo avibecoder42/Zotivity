@@ -85,6 +85,9 @@ export async function run(fn, { silent = false } = {}) {
 // Indexierläufe, die beim letzten Abruf liefen: endet einer, meldet die Oberfläche das Ergebnis – in jeder Ansicht
 const runningIndexJobs = new Set();
 const runningCatalogJobs = new Set();  // Abgleich des Suchkatalogs: danach Korpora neu laden
+// Zeitpunkt des letzten Katalog-Abgleichs: Der Abgleich im Hintergrund dauert oft nur Sekunden und fällt zwischen
+// zwei Abrufe – ein neuer Zeitpunkt zeigt ihn trotzdem an
+let catalogSyncedAt = null;
 // Von der Oberfläche gestartete Läufe gleich vormerken (ein kurzer Lauf kann zwischen zwei Abrufen enden)
 export function trackIndexJob(id) { runningIndexJobs.add(id); }
 
@@ -167,6 +170,9 @@ export async function loadStatus() {
       if (j.kind === 'index') runningIndexJobs.add(j.id);
       if (j.kind === 'catalog') runningCatalogJobs.add(j.id);
     }
+    const syncedAt = (state.status.catalog && state.status.catalog.synced_at) || null;
+    if (syncedAt && catalogSyncedAt && syncedAt !== catalogSyncedAt) ended = true;
+    if (syncedAt) catalogSyncedAt = syncedAt;
     if (ended) { state.catalogGen++; loadCorpora(); }
     // Aufträge, die inzwischen beendet sind, aber von niemandem beobachtet wurden: Endstand nachladen
     for (const j of Object.values(state.jobs)) {

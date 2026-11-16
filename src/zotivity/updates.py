@@ -1,18 +1,24 @@
 """Updates wie bei LLMplot: Ein Manifest (JSON) nennt Version, Installer und Prüfsumme. Installiert wird nur, was das
-Manifest der eingestellten Update-Quelle anbietet, und nur mit passender Prüfsumme.
+Manifest der Update-Quelle anbietet, und nur mit passender Prüfsumme.
 
-Quelle ist eine HTTPS-Adresse oder ein lokaler bzw. Netzwerkpfad, z. B.::
+Die Quelle ist fest: das Manifest des neuesten Releases auf GitHub (der Release-Workflow legt es als
+``zotivity-update.json`` neben Installer und Prüfsumme ab), z. B.::
 
-    {"version": "0.2.0", "url": "Zotivity-Setup-0.2.0.exe", "sha256": "…", "notes": "…"}
+    {"version": "1.2.6", "url": "https://github.com/…/releases/download/v1.2.6/Zotivity-Setup-1.2.6.exe",
+     "sha256": "…", "notes": "…"}
 
-Relative Installer-Angaben gelten relativ zum Manifest. Das Update startet den Installer
-unbeaufsichtigt (/SILENT) und beendet Zotivity; der Installer startet das Programm danach neu.
+Die Einstellungen können die Quelle nicht ändern – sonst könnte, wer die Einstellungen ändern kann, einen fremden
+Installer anbieten (Code-Prüfung 2026-11-11, A2/A3). Nur für Tests und Demo-Instanzen nennt die Umgebungsvariable
+``ZOTIVITY_UPDATE_URL`` eine andere Quelle (HTTPS oder ein lokaler bzw. Netzwerkpfad). Relative Installer-Angaben
+gelten relativ zum Manifest. Das Update startet den Installer unbeaufsichtigt (/SILENT) und beendet Zotivity; der
+Installer startet das Programm danach neu.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -23,9 +29,19 @@ from pathlib import Path
 
 from zotivity import __version__
 
+GITHUB_REPO = "avibecoder42/Zotivity"
+RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
+# „latest“ leitet GitHub auf das neueste Release um (ohne Entwürfe und Vorabversionen)
+UPDATE_URL = f"{RELEASES_URL}/latest/download/zotivity-update.json"
+
 
 class UpdateError(ValueError):
     pass
+
+
+def source() -> str:
+    """Die Update-Quelle: das Manifest des neuesten Releases auf GitHub (für Tests: ZOTIVITY_UPDATE_URL)."""
+    return os.environ.get("ZOTIVITY_UPDATE_URL", "").strip() or UPDATE_URL
 
 
 def version_tuple(text: str) -> tuple[int, ...]:

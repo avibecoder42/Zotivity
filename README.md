@@ -136,10 +136,11 @@ WebView2 runtime is required (included in Windows 10/11; the setup warns if it i
 close the window, Zotivity asks whether to continue in the background. If the Zotero plugin starts Zotivity, it runs
 without a window and ends a few minutes after Zotero; "Open Zotivity" in Zotero shows the window.
 
-**Updates:** under *Settings → Program & data*, enter an update source – an HTTPS address or network path to the file
-`zotivity-update.json` that the build creates next to the installer. Zotivity checks at start-up, downloads the
-installer, verifies its SHA-256 checksum, installs silently and restarts. Settings, index, corpora and keys are kept
-(also when uninstalling).
+**Updates:** at start-up Zotivity asks GitHub for the latest version (the file `zotivity-update.json` in the latest
+release; can be switched off under *Settings → Program & data*). GitHub sees the IP address, nothing else. After you
+confirm, Zotivity downloads the installer, verifies its SHA-256 checksum, installs silently and restarts. Settings,
+index, corpora and keys are kept (also when uninstalling). The update source is fixed; only for tests does the
+environment variable `ZOTIVITY_UPDATE_URL` name another one.
 
 **Building the installer:** `.\packaging\build.ps1` (tests → icons → PyInstaller → self-test of the EXE including the
 window → Inno Setup 6 → update manifest). With `-UpdateBaseUrl https://…` the download address goes into the manifest.

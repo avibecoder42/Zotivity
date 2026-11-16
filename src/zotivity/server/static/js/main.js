@@ -138,10 +138,10 @@ async function boot() {
   }
   update();
   poll();
-  if (state.settings.check_updates_on_start && state.settings.update_url) {
+  if (state.settings.check_updates_on_start) {
     setTimeout(async () => {
       const u = await checkUpdates(true);
-      if (u && u.available) toast(t('Zotivity {v} ist verfügbar.', { v: u.latest }), 'info', 0, { label: t('Aktualisieren'), onClick: () => installUpdate(u) });
+      if (u && u.available) toast(t('Zotivity {v} ist verfügbar.', { v: u.latest }), 'info', 0, { label: t('Jetzt aktualisieren'), onClick: () => installUpdate(u) });
     }, 5000);
   }
 }

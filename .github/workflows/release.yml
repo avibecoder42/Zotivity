@@ -57,5 +57,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $version = (python packaging/build_tools.py print-version).Trim()
+          # Update-Information für Zotivity (fest: releases/latest/download/zotivity-update.json) mit festem Link auf
+          # den Installer dieses Tags – auch wenn inzwischen ein neueres Release erscheint
+          python packaging/build_tools.py manifest "dist/Zotivity-Setup-$version.exe" `
+            "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}"
           gh release create "${{ github.ref_name }}" "dist/Zotivity-Setup-$version.exe" "dist/Zotivity-Setup-$version.exe.sha256" `
-            --title "Zotivity $version" --notes-file dist/release-notes.md --verify-tag
+            "dist/zotivity-update.json" --title "Zotivity $version" --notes-file dist/release-notes.md --verify-tag

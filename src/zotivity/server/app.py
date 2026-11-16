@@ -2101,11 +2101,11 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
 
     @app.get("/api/app/info")
     def app_info():
-        from zotivity import paths
+        from zotivity import paths, updates
 
         return {"version": __version__, "data_dir": str(paths.data_dir()), "config_dir": str(paths.config_dir()),
                 "log_dir": str(paths.log_dir()), "keystore": keys.backend_info(), "desktop": on_open_ui is not None,
-                "frozen": bool(getattr(sys, "frozen", False))}
+                "frozen": bool(getattr(sys, "frozen", False)), "releases_url": updates.RELEASES_URL}
 
     @app.post("/api/ui/open")
     def ui_open(body: dict = Body(default={})):
@@ -2117,25 +2117,26 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
 
     # -- Updates ------------------------------------------------------------------------------------
     @app.post("/api/update/check")
-    def update_check(body: dict = Body(default={})):
+    def update_check():
+        """Neueste Version auf GitHub. Die Quelle ist fest (updates.source) – weder Anfrage noch Einstellungen ändern sie."""
         from zotivity import updates
 
-        try:
-            return updates.check(body.get("url") or engine.settings.update_url)
+        try:  # GitHub nicht erreichbar oder kein Manifest im neuesten Release: UpdateError
+            return updates.check(updates.source())
         except updates.UpdateError as e:
             raise HTTPException(400, str(e)) from e
 
     @app.post("/api/update/install")
     def update_install(body: dict = Body(default={})):
         """Update installieren: {"version": bestätigte Version}. Installer und Prüfsumme stammen aus dem Manifest der
-        eingestellten Update-Quelle, nie aus der Anfrage – sonst könnte jedes Programm auf dem Rechner den Dienst eine
+        festen Update-Quelle, nie aus der Anfrage – sonst könnte jedes Programm auf dem Rechner den Dienst eine
         beliebige Datei herunterladen und starten lassen."""
         from zotivity import updates
 
         if engine.jobs.running("index"):
             raise HTTPException(409, "Bitte zuerst die laufende Indexierung abbrechen oder abwarten.")
         try:
-            offer = updates.offer(engine.settings.update_url, str((body or {}).get("version") or ""))
+            offer = updates.offer(updates.source(), str((body or {}).get("version") or ""))
             path = updates.download_installer(offer["installer"], offer["sha256"])
         except updates.UpdateError as e:
             raise HTTPException(400, str(e)) from e

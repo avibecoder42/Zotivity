@@ -780,13 +780,12 @@ function aboutTab() {
   return [
     card(t('Updates'), 'download', h('div', { class: 'stack' },
       h('div', { class: 'row' }, h('b', null, `Zotivity ${i.version || ''}`), h('span', { class: 'spacer' }),
-        btn(t('Nach Updates suchen'), { size: 'sm', icon: 'refresh', busy: s.checking, disabled: !state.settings.update_url, why: t('Zuerst eine Update-Quelle angeben.'), onClick: () => checkUpdates() })),
-      u && (!u.configured ? notice('info', t('Keine Update-Quelle eingetragen.'))
-        : u.available ? notice('success', h('span', null, h('b', null, t('Version {v} ist verfügbar.', { v: u.latest })), u.notes ? h('div', { class: 'small' }, u.notes) : null),
+        i.releases_url && btn(t('Versionen auf GitHub'), { size: 'sm', kind: 'ghost', icon: 'external', onClick: () => api.openExternal(i.releases_url) }),
+        btn(t('Nach Updates suchen'), { size: 'sm', icon: 'refresh', busy: s.checking, onClick: () => checkUpdates() })),
+      u && (u.available ? notice('success', h('span', null, h('b', null, t('Version {v} ist verfügbar.', { v: u.latest })), u.notes ? h('div', { class: 'small' }, u.notes) : null),
           h('div', { class: 'notice-actions' }, btn(t('Jetzt aktualisieren'), { size: 'sm', kind: 'primary', icon: 'download', onClick: () => installUpdate(u) })))
           : notice('info', t('Zotivity ist aktuell ({v}).', { v: u.current }))),
-      field(t('Update-Quelle'), textInput({ value: state.settings.update_url, placeholder: t('https://…/zotivity-update.json  oder  \\\\server\\freigabe\\zotivity-update.json'),
-        onChange: v => set('update_url', v.trim()) }), { help: t('Adresse der Datei zotivity-update.json, die beim Erstellen des Installers entsteht (HTTPS oder Datei-/Netzwerkpfad).') }),
+      h('p', { class: 'muted small' }, t('Neue Versionen erscheinen auf GitHub. Zotivity fragt dort nach der neuesten Version; dabei sieht GitHub die IP-Adresse dieses Rechners, sonst nichts. Installiert wird nur mit passender Prüfsumme und erst nach Bestätigung.')),
       toggle({ checked: state.settings.check_updates_on_start, label: t('Beim Start nach Updates suchen'), onChange: v => set('check_updates_on_start', v) }))),
     card(t('Index'), 'index', h('div', { class: 'stats-row' },
       stat(t('Einträge'), fmtInt(x.items)), stat(t('Dateien'), fmtInt(x.attachments)), stat(t('Abschnitte'), fmtInt(x.chunks)),

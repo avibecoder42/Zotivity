@@ -301,7 +301,7 @@ function corpusHeader() {
       btn(c.synced ? t('Indexieren') : t('Abgleichen und indexieren'), { kind: !c.synced || x.pending ? 'primary' : 'secondary', icon: 'play', onClick: () => indexCorpus(c) }),
       btn(t('Fragen stellen'), { icon: 'chat', disabled: !x.embedded, why: x.to_embed ? t('Erst für {m} einbetten', { m: modelLabel() }) : t('Noch keine Texte indexiert'), onClick: () => { ui('ask', {}).corpora = [c.id]; navigate('ask'); } }),
       btn(t('Forschungsstand'), { icon: 'review', disabled: !x.embedded, why: x.to_embed ? t('Erst für {m} einbetten', { m: modelLabel() }) : t('Noch keine Texte indexiert'), onClick: () => { ui('review', {}).presetCorpus = c.id; ui('review', {}).openId = 'new'; navigate('review'); } }),
-      btn(t('Texte ansehen'), { icon: 'file', kind: 'ghost', onClick: () => { Object.assign(ui('index', {}), { corpus: c.id, corpusFor: state.projectId }); navigate('index'); } })));
+      btn(t('Texte ansehen'), { icon: 'file', kind: 'ghost', onClick: () => { Object.assign(ui('index', {}), { corpus: c.id, corpusFor: state.projectId, docsFor: null }); navigate('index'); } })));
 }
 
 function describe(id) {

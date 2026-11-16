@@ -210,6 +210,59 @@ def test_citation_without_page_links_to_matching_page(zengine, fake_zotero, monk
     assert "Meier 2020, p. 1" in svc.render(rid, body_only=True, with_links=False)
 
 
+def test_exported_review_links_pages_before_indexing(zengine, fake_zotero):
+    """Projekt-Export mit den PDF-Seiten der Belege: Am Ziel öffnen die Belege die richtige Seite, auch bevor die
+    Texte dort indexiert sind – aber nur bei derselben Datei (Anhang und MD5)."""
+    from zotivity import projects_io
+
+    fake_zotero.add_item("ITEMC001", "Zwei Themen", "Meier", "2020")
+    fake_zotero.add_pdf("ATTC0001", "ITEMC001", [GARDEN * 40, HARBOUR * 40])
+    run_index(zengine)
+    store = zengine.store
+    pid = store.create_project("Quelle")
+    text = ("## Befunde\n\nGärten blühen [@ITEMC001, S. 1]. "
+            "Im Hafen entladen Kräne die Containerschiffe [@ITEMC001].")
+    rid = store.create_review("T", "Frage", {"sections": [{"heading": "Befunde", "text": text}]}, project_id=pid)
+    store.put_review_docs(rid, [{"lib": "users/0", "item_key": "ITEMC001", "included": True}])
+    svc = ReviewService(zengine)
+    pages = svc.page_map(rid)
+    md5 = store.attachments_for_item("users/0", "ITEMC001")[0]["md5"]
+    assert pages["ITEMC001"]["att"] == "ATTC0001" and pages["ITEMC001"]["md5"] == md5
+    assert pages["ITEMC001"]["cited"] == {"1": 0} and list(pages["ITEMC001"]["located"].values()) == [1]
+
+    import io
+    import zipfile
+    _, payload = projects_io.export_project(zengine, pid)
+    exported = json.loads(zipfile.ZipFile(io.BytesIO(payload)).read("project.json"))
+    assert exported["reviews"][0]["pages"] == pages
+
+    # Ziel ohne gelesenen Text: keine Abschnitte, nichts gemerkt
+    with store.write() as con:
+        con.execute("DELETE FROM chunks WHERE lib='users/0' AND item_key='ITEMC001'")
+        con.execute("DELETE FROM review_pages")
+    new = projects_io.import_project(zengine, payload)
+    rid2 = next(r["id"] for r in store.reviews(project_id=new["project_id"]))
+    md = svc.render(rid2, link_target="pdf")
+    assert "[Meier 2020, S. 1](zotero://open-pdf/library/items/ATTC0001?page=1)" in md
+    assert "[Meier 2020](zotero://open-pdf/library/items/ATTC0001?page=2)" in md  # Seite aus dem Export
+    assert store.review_pages(rid2) == {}  # ohne gelesenen Text nichts gemerkt – nach dem Indexieren neu gesucht
+    # Die Seiten aus dem Export gelten zuerst (sie stammen vom Rechner mit dem Index) …
+    state = store.get_review(rid2)["state"]
+    state["_pdf_pages"]["ITEMC001"]["cited"]["1"] = 1
+    store.update_review_state(rid2, state)
+    assert "[Meier 2020, S. 1](zotero://open-pdf/library/items/ATTC0001?page=2)" in svc.render(rid2, link_target="pdf")
+    # … aber nur für dieselbe Datei
+    with store.write() as con:
+        con.execute("UPDATE attachments SET md5='anders' WHERE key='ATTC0001'")
+    md = svc.render(rid2, link_target="pdf")
+    assert "[Meier 2020, S. 1](zotero://open-pdf/library/items/ATTC0001?page=1)" in md
+    assert "[Meier 2020](zotero://open-pdf/library/items/ATTC0001)" in md
+    # Unbrauchbare Angaben in der Datei werden nicht übernommen
+    assert projects_io._clean_pages({"K": {"att": "A", "md5": "m", "cited": {"1": "x", "2": True}, "located": {}},
+                                     "L": "kaputt", "M": {"att": "A", "md5": "m", "cited": {"3": 2}}}) == \
+        {"M": {"att": "A", "md5": "m", "cited": {"3": 2}, "located": {}}}
+
+
 def test_check_english_quotation_marks(zengine, fake_zotero):
     """“…” endet beim schliessenden ” – nicht erst beim nächsten öffnenden Zeichen."""
     fake_zotero.add_item("ITEMQ001", "Zitate", "Meier", "2020")

@@ -172,8 +172,7 @@ class Settings(BaseModel):
     citation_style: str = "http://www.zotero.org/styles/apa"
     # Kennzeichnung für Belege aus Quellen ohne Seitenzahlen (je nach Stil Seitenangabe oder Suffix im Zotero-Beleg)
     citation_no_page: str = Field("o. S.", max_length=40)
-    # Update-Manifest (HTTPS oder Datei-/Netzwerkpfad), leer = keine Update-Prüfung
-    update_url: str = ""
+    # Beim Start das neueste Release auf GitHub abfragen (die Quelle ist fest, s. updates.py; früher „update_url“)
     check_updates_on_start: bool = True
     # Zentraler Katalog der Embedding-Modelle (HTTPS oder Datei), leer = nur der mitgelieferte Katalog
     model_catalog_url: str = ""
