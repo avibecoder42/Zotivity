@@ -2650,4 +2650,12 @@ export default {
   'angepasst': 'adjusted',
   '{k} Textstellen, ohne Grenze je Text': '{k} passages, no limit per text',
   '„Automatisch“ passt die Werte an die Zahl der Texte an': '“Automatic” adjusts the values to the number of texts',
+  'Belege': 'Evidence',
+  'Detail': 'Detail',
+  'Frageart': 'Question type',
+  'Frageart: {q}': 'Question type: {q}',
+  'Grundlage: Karten von {c} von {n} Texten (Abstract, Angaben, Auswertungsblatt)': 'Basis: cards of {c} of {n} texts (abstract, details, evaluation sheet)',
+  'zuletzt: {q}': 'last: {q}',
+  'Überblick': 'Overview',
+  'Überblicks- und Vergleichsfragen erhalten von jedem Text eine kurze Karte statt einzelner Textstellen. Automatisch: das Hilfsmodell ordnet die Frage ein (mit der Mehrfachsuche).': 'Overview and comparison questions get a short card per text instead of single passages. Automatic: the helper model classifies the question (together with the multi-query search).',
 };

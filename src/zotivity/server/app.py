@@ -1813,6 +1813,7 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
             filters=body.get("filters") or {}, retrieval=body.get("retrieval") or {},
             provider=body.get("provider"), model=body.get("model"), search_only=bool(body.get("search_only")),
             project_id=body.get("project_id"), scope=body.get("scope_mode") or "passages",
+            qtype=body.get("qtype") or "auto",
         )
 
         def localized(ev: dict) -> dict:

@@ -235,6 +235,7 @@ MESSAGES: dict[str, str] = {
     "Recherche-Runde {n}: prüfe Lücken …": "Research round {n}: checking for gaps …",
     "Recherche-Runde abgebrochen: {e}": "Research round aborted: {e}",
     "Lese die ganzen Texte …": "Reading the whole texts …",
+    "Lege eine Karte je Text an …": "Preparing a card per text …",
     "Ganze Texte sind hier nicht möglich; die Antwort stützt sich auf Textstellen.": "Whole texts are not possible here; the answer is based on passages.",
     "Mehrfachsuche nicht möglich ({e}); suche nur mit der Frage.":
         "Multi-query not possible ({e}); searching with the question only.",

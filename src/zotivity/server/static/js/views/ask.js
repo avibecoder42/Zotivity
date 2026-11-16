@@ -22,7 +22,7 @@ function st() {
   // corpora: gewählte Korpora des Projekts (leer = alle); scope: Aufruf aus Zotero für Sammlung/Einträge
   return ui('ask', { chatId: null, messages: [], chats: null, chatsFor: null, busy: false, corpora: [], mode: 'answer', showOptions: false,
     overrides: {}, overridesBase: null, draft: '', stick: true, controller: null, openChat: null, scope: null,
-    scopeMode: 'auto', plan: null, planKey: '', planTimer: null });
+    scopeMode: 'auto', plan: null, planKey: '', planTimer: null, qtype: 'auto', lastQtype: '' });
 }
 
 // Sitzungswerte der Suchoptionen gelten, bis sich die Experten-Werte oder das Preset ändern (zuletzt Eingestelltes gilt)
@@ -122,12 +122,13 @@ async function send() {
   s.controller = new AbortController();
   try {
     await api.stream('/api/chat', { question, chat_id: s.chatId, filters, retrieval: s.overrides, search_only: s.mode === 'search',
-      scope_mode: s.scopeMode, project_id: state.projectId }, ev => {
+      scope_mode: s.scopeMode, qtype: s.qtype, project_id: state.projectId }, ev => {
       switch (ev.type) {
         case 'chat': if (s.chatId !== ev.chat_id) loadProjects(); s.chatId = ev.chat_id; break;  // neuer Chat: Projektübersicht nachführen
         case 'status': msg.status = t(ev.text); break;
         case 'queries': msg.queries = ev.queries; msg.missing = ev.missing; break;
         case 'plan': msg.plan = ev.plan; break;
+        case 'qtype': msg.qtype = ev.qtype; s.lastQtype = ev.detected || ''; break;
         case 'sources': msg.sources = ev.sources; break;
         case 'delta': msg.status = ''; msg.content += ev.text; break;
         case 'rewrite': msg.content = ev.text; break;  // ganze Texte: Belege [1, S. 64] → [n]
@@ -237,8 +238,25 @@ function basisLine(m) {
         b.texts.map((x, i) => [i ? '; ' : '', h('a', { key: x.item_key, href: x.zotero_select, title: x.title }, x.citation)]),
         ` · ${t('rund {n} Tokens', { n: fmtTokens(b.tokens) })}`));
   }
+  const kind = b.qtype && b.qtype !== 'detail' ? ` · ${t('Frageart: {q}', { q: QTYPE_LABELS()[b.qtype] || b.qtype })}` : '';
+  if (b.mode === 'cards') {
+    return h('div', { class: 'basis-line' }, icon('layers', 12),
+      h('span', null, t('Grundlage: Karten von {c} von {n} Texten (Abstract, Angaben, Auswertungsblatt)', { c: fmtInt(b.cards), n: fmtInt(b.scope_docs) }) + kind));
+  }
   return h('div', { class: 'basis-line' }, icon('quote', 12),
-    h('span', null, t('Grundlage: {p} Textstellen aus {d} von {n} Texten', { p: fmtInt(b.passages), d: fmtInt(b.docs), n: fmtInt(b.scope_docs) })));
+    h('span', null, t('Grundlage: {p} Textstellen aus {d} von {n} Texten', { p: fmtInt(b.passages), d: fmtInt(b.docs), n: fmtInt(b.scope_docs) }) + kind));
+}
+
+// Frageart: das Hilfsmodell ordnet die Frage ein (mit der Mehrfachsuche); hier lässt sie sich festlegen
+const QTYPE_LABELS = () => ({ auto: t('Automatisch'), detail: t('Detail'), overview: t('Überblick'), evidence: t('Belege') });
+
+function qtypeSelect(s) {
+  const labels = QTYPE_LABELS();
+  return h('label', { class: 'plan-qtype', title: t('Überblicks- und Vergleichsfragen erhalten von jedem Text eine kurze Karte statt einzelner Textstellen. Automatisch: das Hilfsmodell ordnet die Frage ein (mit der Mehrfachsuche).') },
+    t('Frageart'),
+    h('select', { class: 'select select-sm', value: s.qtype, onchange: e => { s.qtype = e.target.value; update(); } },
+      Object.entries(labels).map(([v, l]) => h('option', { key: v, value: v, selected: s.qtype === v },
+        v === 'auto' && s.lastQtype ? `${l} (${t('zuletzt: {q}', { q: labels[s.lastQtype] || s.lastQtype })})` : l))));
 }
 
 function chatList() {
@@ -317,6 +335,7 @@ function planLine() {
   const session = Object.entries(s.overrides);
   const label = val => typeof val === 'boolean' ? (val ? t('an') : t('aus')) : String(val);
   return h('div', { class: 'plan-line' }, h('div', { class: 'plan-line-inner' }, main, why, hint,
+    p.mode !== 'whole' && s.mode === 'answer' ? qtypeSelect(s) : null,
     session.length ? h('span', { class: 'plan-session' },
       session.map(([k, val]) => `${SESSION_LABELS()[k] || k} ${label(val)}`).join(' · '), ` ${t('(diese Sitzung)')} `,
       h('button', { type: 'button', class: 'link-btn', onclick: () => { s.overrides = {}; update(); } }, t('Zurücksetzen'))) : null));

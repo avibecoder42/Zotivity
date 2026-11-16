@@ -11,6 +11,7 @@ from zotivity.catalog import PROVIDERS
 from zotivity.keystore import get_store
 from zotivity.llm import ChatMessage, GenParams, LLMError, UsageMeter, helper_model, main_model, truncation
 from zotivity.rag import prompts, wholetext
+from zotivity.rag.cards import QUESTION_TYPES, build_cards
 from zotivity.rag.plan import WHOLE_TOLERANCE, Plan, make_plan, retrieval_cfg
 from zotivity.rag.sources import build_sources, format_sources
 from zotivity.retrieval import Searcher
@@ -20,6 +21,7 @@ from zotivity.settings import RetrievalSettings
 log = logging.getLogger(__name__)
 
 HISTORY_MESSAGES = 6
+CARDS_BUDGET = 30000  # Karten: rund 100 Texte à 300 Tokens
 WHOLE_NOT_POSSIBLE = "Ganze Texte sind hier nicht möglich; die Antwort stützt sich auf Textstellen."
 
 
@@ -34,6 +36,8 @@ class AskOptions:
     project_id: int | None = None
     # Umfang: "auto" (ganze Texte, wenn sie passen), "passages" (Textstellen), "whole" (ganze Texte)
     scope: str = "passages"
+    # Frageart: "auto" (das Hilfsmodell ordnet ein), "detail", "overview" (Karten je Text), "evidence"
+    qtype: str = "auto"
 
 
 def _retrieval_cfg(engine: Engine, overrides: dict) -> RetrievalSettings:
@@ -63,7 +67,8 @@ def missing_key_message(provider: str) -> str | None:
     return f"Für Antworten ist {info.label} eingestellt, aber dafür ist kein API-Schlüssel gespeichert.{hint}"
 
 
-def generate_queries(model, question: str, history: list[dict], n: int, effort: str) -> list[str]:
+def generate_queries(model, question: str, history: list[dict], n: int, effort: str) -> tuple[list[str], str]:
+    """Suchanfragen und Frageart (detail, overview, evidence; "" wenn nicht erkannt) vom Hilfsmodell."""
     hist = ""
     if history:
         lines = [f"{m['role']}: {m['content'][:500]}" for m in history[-4:]]
@@ -74,7 +79,8 @@ def generate_queries(model, question: str, history: list[dict], n: int, effort: 
         GenParams(max_tokens=3000, effort=effort),
     )
     queries = [q.strip() for q in (data or {}).get("queries", []) if isinstance(q, str) and q.strip()]
-    return queries[:n]
+    qtype = str((data or {}).get("type") or "").strip().lower()
+    return queries[:n], (qtype if qtype in QUESTION_TYPES else "")
 
 
 class ChatService:
@@ -122,8 +128,10 @@ class ChatService:
             if done:
                 return
 
-        # 1. Suchanfragen
+        # 1. Suchanfragen (das Hilfsmodell ordnet dabei die Frage ein)
         queries = [question]
+        qtype = options.qtype if options.qtype in QUESTION_TYPES else ""
+        detected = ""
         helper = None
         try:
             helper_ok = missing_key_message(llm_cfg.helper_provider or llm_cfg.provider) is None
@@ -131,50 +139,63 @@ class ChatService:
                 helper = helper_model(llm_cfg, meter)
             if helper is not None and (cfg.multi_query or history):
                 yield {"type": "status", "text": "Formuliere Suchanfragen …"}
-                generated = generate_queries(helper, question, history, cfg.n_queries if cfg.multi_query else 1,
-                                             llm_cfg.helper_effort)
+                generated, detected = generate_queries(helper, question, history,
+                                                       cfg.n_queries if cfg.multi_query else 1, llm_cfg.helper_effort)
                 queries = ([question] if not history else []) + generated or [question]
                 yield {"type": "queries", "queries": queries}
         except LLMError as e:
             yield {"type": "warning", "text": f"Mehrfachsuche nicht möglich ({e}); suche nur mit der Frage."}
 
-        # 2. Suche (+ Recherche-Runden)
-        yield {"type": "status", "text": "Durchsuche die Bibliothek …"}
-        reranker = self._reranker(cfg, meter) if not options.search_only else None
-        try:
-            hits = self.searcher.search(queries, f, cfg, reranker=reranker, rerank_query=question)
-        except Exception as e:  # noqa: BLE001
-            yield {"type": "error", "message": f"Suche fehlgeschlagen: {e}"}
-            return
+        if not qtype:
+            qtype = detected or "detail"
+        if not options.search_only:
+            yield {"type": "qtype", "qtype": qtype, "detected": detected, "chosen": options.qtype or "auto"}
+        cards_mode = qtype == "overview" and plan.n_docs > 3 and not options.search_only
 
-        for round_no in range(cfg.research_rounds if helper else 0):
-            yield {"type": "status", "text": f"Recherche-Runde {round_no + 1}: prüfe Lücken …"}
-            found = "\n".join(
-                f"- {h.item.get('creator_summary', '')} {h.item.get('year') or ''}: {h.chunk['text'][:220]}"
-                for h in hits[:20]
-            )
+        if cards_mode:  # Überblick: von jedem Text eine Karte statt Textstellen
+            yield {"type": "status", "text": "Lege eine Karte je Text an …"}
+            budget = min(max(cfg.context_token_budget, CARDS_BUDGET), max(plan.limit, 4000))
+            sources = build_cards(self.engine, plan.docs, budget)
+        else:
+            # 2. Suche (+ Recherche-Runden)
+            yield {"type": "status", "text": "Durchsuche die Bibliothek …"}
+            reranker = self._reranker(cfg, meter) if not options.search_only else None
             try:
-                data = helper.complete_json(
-                    prompts.QUERY_SYSTEM,
-                    prompts.RESEARCH_PROMPT.format(question=question, queries="; ".join(queries), found=found,
-                                                   n=max(2, cfg.n_queries // 2)),
-                    GenParams(max_tokens=3000, effort=llm_cfg.helper_effort),
-                )
-            except LLMError as e:
-                yield {"type": "warning", "text": f"Recherche-Runde abgebrochen: {e}"}
-                break
-            new = [q for q in (data or {}).get("queries", []) if isinstance(q, str) and q.strip()]
-            if (data or {}).get("sufficient") or not new:
-                break
-            queries += new
-            yield {"type": "queries", "queries": queries, "missing": (data or {}).get("missing", "")}
-            hits = self.searcher.search(queries, f, cfg, reranker=reranker, rerank_query=question)
+                hits = self.searcher.search(queries, f, cfg, reranker=reranker, rerank_query=question)
+            except Exception as e:  # noqa: BLE001
+                yield {"type": "error", "message": f"Suche fehlgeschlagen: {e}"}
+                return
 
-        sources = build_sources(store, hits, cfg.neighbor_chunks, cfg.context_token_budget)
+            for round_no in range(cfg.research_rounds if helper else 0):
+                yield {"type": "status", "text": f"Recherche-Runde {round_no + 1}: prüfe Lücken …"}
+                found = "\n".join(
+                    f"- {h.item.get('creator_summary', '')} {h.item.get('year') or ''}: {h.chunk['text'][:220]}"
+                    for h in hits[:20]
+                )
+                try:
+                    data = helper.complete_json(
+                        prompts.QUERY_SYSTEM,
+                        prompts.RESEARCH_PROMPT.format(question=question, queries="; ".join(queries), found=found,
+                                                       n=max(2, cfg.n_queries // 2)),
+                        GenParams(max_tokens=3000, effort=llm_cfg.helper_effort),
+                    )
+                except LLMError as e:
+                    yield {"type": "warning", "text": f"Recherche-Runde abgebrochen: {e}"}
+                    break
+                new = [q for q in (data or {}).get("queries", []) if isinstance(q, str) and q.strip()]
+                if (data or {}).get("sufficient") or not new:
+                    break
+                queries += new
+                yield {"type": "queries", "queries": queries, "missing": (data or {}).get("missing", "")}
+                hits = self.searcher.search(queries, f, cfg, reranker=reranker, rerank_query=question)
+
+            sources = build_sources(store, hits, cfg.neighbor_chunks, cfg.context_token_budget)
         source_dicts = [s.as_dict() for s in sources]
         yield {"type": "sources", "sources": source_dicts}
         basis = {"mode": "passages", "passages": len(sources), "docs": len({(s.lib, s.item_key) for s in sources}),
-                 "scope_docs": plan.n_docs}
+                 "scope_docs": plan.n_docs, "qtype": qtype}
+        if cards_mode:
+            basis = {"mode": "cards", "cards": len(sources), "scope_docs": plan.n_docs, "qtype": qtype}
 
         if options.search_only:
             msg_id = store.add_chat_message(chat_id, "assistant", "", sources=source_dicts,
@@ -197,12 +218,12 @@ class ChatService:
 
         # 3. Antwort
         yield {"type": "status", "text": f"Schreibe Antwort mit {llm_cfg.model} …"}
-        system = prompts.ANSWER_SYSTEM.format(language=prompts.language_rule(settings.output_language))
+        system = (prompts.CARDS_SYSTEM if cards_mode else prompts.ANSWER_SYSTEM).format(
+            language=prompts.language_rule(settings.output_language))
         messages = _history_messages(history)
-        messages.append(ChatMessage(
-            "user",
-            f"Textstellen aus der Bibliothek:\n\n{format_sources(sources)}\n\n---\n\nFrage: {question}",
-        ))
+        heading = (f"Karten der Texte im Suchbereich ({len(sources)} von {plan.n_docs})" if cards_mode
+                   else "Textstellen aus der Bibliothek")
+        messages.append(ChatMessage("user", f"{heading}:\n\n{format_sources(sources)}\n\n---\n\nFrage: {question}"))
         params = GenParams(max_tokens=llm_cfg.max_output_tokens, temperature=llm_cfg.temperature, effort=llm_cfg.effort)
         parts: list[str] = []
         served = [llm_cfg.model]
