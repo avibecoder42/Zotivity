@@ -329,13 +329,44 @@ In **Fragen** stellen Sie Fragen in eigenen Worten. Zotivity sucht die passenden
 
 Oben wählen Sie die **Wissenskorpora** – mehrere sind möglich. Ohne Auswahl werden alle Korpora des Projekts durchsucht. Aus dem Zotero-Plugin lässt sich auch direkt eine Sammlung oder eine Auswahl von Einträgen befragen; sie erscheint dann als Chip, das × kehrt zu den Korpora zurück.
 
-Daneben wählen Sie **Antwort** oder **Nur Textstellen** (zeigt die gefundenen Textstellen ohne Antwort des Sprachmodells – schnell und kostenlos). Das **Preset** setzt die Such- und Antwortwerte für einen Zweck auf einmal (schnell, ausgewogen, gründlich). Ein Punkt zeigt, dass Werte vom Preset abweichen. Das Regler-Symbol öffnet die **Suchoptionen**: Zahl der Textstellen, höchstens je Text, Recherche-Runden und Mehrfachsuche – nur für diese Sitzung.
+Daneben wählen Sie **Antwort** oder **Nur Textstellen** (zeigt die gefundenen Textstellen ohne Antwort des Sprachmodells – schnell und kostenlos). Das **Preset** setzt die Such- und Antwortwerte für einen Zweck auf einmal (schnell, ausgewogen, gründlich). Ein Punkt zeigt, dass Werte vom Preset abweichen. Das Regler-Symbol öffnet die **Suchoptionen**: Zahl der Textstellen, höchstens je Text (bis 50), Recherche-Runden und Mehrfachsuche – nur für diese Sitzung. Ändern Sie danach etwas unter Einstellungen → Experten oder wählen ein anderes Preset, gelten die Sitzungswerte nicht mehr: Es gilt, was zuletzt eingestellt wurde.
+
+### Umfang: ganze Texte oder Textstellen
+
+Der Schalter **Umfang** legt fest, wie viel Text das Sprachmodell erhält:
+
+- **Automatisch** (Standard): Bleiben die Texte im Suchbereich zusammen unter der Grenze des Sprachmodells, erhält es die **ganzen Texte** mit Seitenangaben, sonst die passendsten Textstellen. So beantwortet Zotivity eine Frage zu einem Buch oder zu wenigen Artikeln aus dem ganzen Text statt aus wenigen Ausschnitten.
+- **Textstellen**: immer Textstellen, mit den Werten aus Preset und Suchoptionen.
+- **Ganze Texte**: die ganzen Texte. Passen sie nicht, ist der Knopf ausgegraut; der Hinweis nennt den Grund, z. B. „Zu viel Text: rund 2,1 Mio. Tokens“.
+
+Die Grenze steht je Anbieter unter Einstellungen → Experten → „Ganze Texte unter Fragen“ (Vorgaben: Claude, OpenAI und Gemini 100 000 Tokens, Mistral 50 000, DeepSeek 40 000, Ollama 6 000, kompatible Server 8 000; 0 = nie). Lokale Modelle haben oft nur 8 000–32 000 Tokens Kontext. Die Texte stehen am Anfang der Anfrage; Folgefragen im selben Chat nutzen deshalb den Zwischenspeicher des Anbieters (Prompt-Caching) und kosten deutlich weniger. Ein Chat mit ganzen Texten bleibt dabei. Die Belege lauten im Text [1, S. 64] und werden nach der Antwort zu Nummern; jede führt zur zitierten Seite, und **PDF öffnen** springt dorthin.
+
+Eine Frage aus Zotero (Rechtsklick → Zotivity → Fragen) nutzt „Automatisch“. In **Index → Texte im Korpus** startet das Sprechblasen-Symbol neben einem Text eine Frage zu genau diesem Text (**Diesen Text befragen**).
+
+Bei „Automatisch“ richten sich die Werte für Textstellen nach der Zahl der Texte im Suchbereich:
+
+| Texte | Automatisch |
+|---|---|
+| 1–3 | ganze Texte, wenn sie passen; sonst keine Grenze je Text, keine Vielfalt-Strafe (MMR 1), Nachbarabschnitte, so viele Stellen, wie ins Kontext-Budget passen |
+| 4–30 | mehr Stellen (bis 25), 3–4 je Text |
+| 31–200 | 2 je Text, mehr Stellen (bis 40) und mehr Kandidaten, damit möglichst viele Texte vorkommen |
+| über 200 | wie oben, dazu der Hinweis, den Suchbereich einzugrenzen |
+
+Werte, die Sie unter Experten bewusst vom Preset abweichend eingestellt haben, und Sitzungswerte bleiben stehen. Wer immer feste Werte will, schaltet unter Experten „„Automatisch“ passt die Werte an die Zahl der Texte an“ aus.
+
+Über dem Eingabefeld zeigt die **Planzeile**, was beim Senden geschieht, z. B. „Ganze Texte · 1 Text · rund 70 000 Tokens“ oder „Automatisch · 25 Textstellen, höchstens 4 je Text · 12 Texte im Suchbereich · angepasst“ (der Tooltip nennt die angepassten Werte). Aktive Sitzungswerte erscheinen dort mit **Zurücksetzen**. Unter jeder Antwort steht die **Grundlage**, z. B. „Grundlage: 18 Textstellen aus 7 von 100 Texten“ oder „Grundlage: ganzer Text“.
+
+### Frageart: Überblick mit einer Karte je Text
+
+Mit der Mehrfachsuche ordnet das Hilfsmodell die Frage ein: **Detail** (inhaltliche Einzelfrage), **Überblick** (Überblick oder Vergleich über den Bestand, z. B. welche Methoden oder Stichproben die Studien haben) oder **Belege** (Suche nach Belegen für eine Aussage). Die Planzeile zeigt die zuletzt erkannte Art; mit **Frageart** lässt sie sich festlegen.
+
+Bei einer Überblicksfrage über mehr als drei Texte erhält das Sprachmodell statt Textstellen von jedem Text eine kurze **Karte**: Autor, Jahr, Titel, Art und Ort der Veröffentlichung, Abstract und – wo es eines gibt – das Auswertungsblatt aus einem Forschungsstand. Rund 300 Tokens je Text; 100 Texte sind etwa 30 000 Tokens, und jeder Text kommt vor (die neuesten zuerst, falls das Budget nicht reicht). Für Einzelheiten aus dem Inneren der Texte die Frageart „Detail“ wählen oder einzelne Texte befragen.
 
 ### Wie gesucht wird
 
 1. Das Hilfsmodell formuliert mehrere Suchanfragen auf Deutsch und Englisch (**Mehrfachsuche**). Sie stehen aufklappbar über der Antwort.
 2. Jede Anfrage sucht nach Bedeutung (Embeddings) und nach Stichworten (BM25); die Ranglisten werden zusammengeführt.
-3. Ähnliche Textstellen werden zugunsten von Vielfalt ausgedünnt, höchstens wenige je Text.
+3. Ähnliche Textstellen werden zugunsten von Vielfalt ausgedünnt, höchstens wenige je Text (bei „Automatisch“ abhängig von der Zahl der Texte, siehe oben).
 4. Optional prüfen **Recherche-Runden**, ob Aspekte fehlen, und suchen gezielt nach; die **Neusortierung** ordnet die Kandidaten mit dem Hilfsmodell oder einem lokalen Cross-Encoder neu.
 
 ### Antwort und Belege

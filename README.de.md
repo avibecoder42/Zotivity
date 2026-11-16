@@ -208,7 +208,10 @@ der Breite ziehen (Doppelklick: Standardbreite), und im Programmfenster lässt s
 4. **Index:** aktueller Text, Fortschritt, Restzeit, nächste und zuletzt verarbeitete Texte, Probleme (z. B. Scans ohne
    Text). Eine **Warteschlange** nimmt weitere Läufe auf, solange einer läuft. Wahlweise automatisch im Hintergrund.
 5. **Fragen:** Antwort mit anklickbaren Belegen `[3]` (Vorschau mit «PDF öffnen (S. x)» und «In Zotero zeigen»);
-   die Textstellen stehen darunter, jeweils mit **Relevanz**. «Nur Textstellen» sucht ohne LLM.
+   die Textstellen stehen darunter, jeweils mit **Relevanz**. «Nur Textstellen» sucht ohne LLM. Passen die Texte im
+   Suchbereich ins Sprachmodell, erhält es die **ganzen Texte** mit Seitenangaben (Umfang «Automatisch», «Textstellen»,
+   «Ganze Texte»; «Diesen Text befragen» im Korpus). Sonst passt «Automatisch» die Suche an die Zahl der Texte an;
+   Überblicksfragen erhalten eine Karte je Text. Eine Planzeile zeigt vor dem Senden, wie viel Text verwendet wird.
 
 Tastatur: Strg+1–5 Ansichten des Projekts, Strg+6 Suchen, Strg+7 CSL-Editor, Strg+8 Index, Strg+, Einstellungen, F1 Hilfe, Strg+P Projekt wechseln.
 Darstellung: System, Hell, Grau, Dunkel (die Titelleiste des Fensters passt sich an).

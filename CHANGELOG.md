@@ -2,6 +2,27 @@
 
 All notable changes, newest first.
 
+## 1.2.7 – 2026-11-16
+
+### Added
+- **Whole texts under Ask.** If the texts in scope fit the language model together (a limit per provider under
+  Settings → Expert, cautious defaults, small for Ollama), the model gets the whole texts with page marks instead of
+  selected passages. A question about a book or a few articles is answered from the whole text. Citations lead to the
+  PDF page. Follow-up questions in the same chat use prompt caching. Triggered automatically from Zotero, by the new
+  switch **Scope: Automatic · Passages · Whole texts**, or by **Ask this text** in the list of texts in a corpus.
+- **Plan line and basis.** Before sending, a line shows what will happen (whole texts or passages, amount of text,
+  active session values with a reset). Under each answer, "Basis: 18 passages from 7 of 100 texts" or "whole text".
+- **"Automatic" adapts to the number of texts.** Passages, the limit per text, diversity and neighbouring sections
+  follow the number of texts in scope (1–3, 4–30, 31–200, more). Values set deliberately under Expert stay; it can be
+  switched off for fixed values.
+- **Question type and overview cards.** The helper model classifies a question as detail, overview or evidence; the
+  plan line shows it and it can be set by hand. Overview and comparison questions get a short card per text (abstract,
+  details, evaluation sheet if there is one), so every text in scope appears.
+
+### Changed
+- **Search options under Ask no longer override later changes.** A change under Settings → Expert or a preset switch
+  drops the session values: what was set last wins. "Max. per text" goes up to 50.
+
 ## 1.2.6 – 2026-11-16
 
 ### Added
