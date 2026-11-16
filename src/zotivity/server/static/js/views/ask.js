@@ -21,7 +21,50 @@ const examples = () => [
 function st() {
   // corpora: gewählte Korpora des Projekts (leer = alle); scope: Aufruf aus Zotero für Sammlung/Einträge
   return ui('ask', { chatId: null, messages: [], chats: null, chatsFor: null, busy: false, corpora: [], mode: 'answer', showOptions: false,
-    overrides: {}, draft: '', stick: true, controller: null, openChat: null, scope: null });
+    overrides: {}, overridesBase: null, draft: '', stick: true, controller: null, openChat: null, scope: null,
+    scopeMode: 'auto', plan: null, planKey: '', planTimer: null });
+}
+
+// Sitzungswerte der Suchoptionen gelten, bis sich die Experten-Werte oder das Preset ändern (zuletzt Eingestelltes gilt)
+function syncOverrides(s) {
+  if (!state.settings) return;
+  const base = JSON.stringify(state.settings.retrieval);
+  if (s.overridesBase !== null && s.overridesBase !== base) s.overrides = {};
+  s.overridesBase = base;
+}
+
+// Suchplan vor dem Senden (ganze Texte oder Textstellen, Textmenge, Werte) – neu, sobald sich etwas ändert
+function planBody(s) {
+  return { filters: s.scope ? s.scope.filters : { corpus_ids: selectedCorpora() }, scope_mode: s.scopeMode,
+    retrieval: s.overrides, search_only: s.mode === 'search' };
+}
+
+function ensurePlan(s) {
+  if (!s.scope && !projectCorpora().length) { s.plan = null; s.planKey = ''; return; }
+  const body = planBody(s);
+  const llm = state.status && state.status.llm;
+  const key = JSON.stringify([body, state.settings && state.settings.retrieval, llm && llm.provider, state.catalogGen]);
+  if (key === s.planKey) return;
+  s.planKey = key;
+  clearTimeout(s.planTimer);
+  s.planTimer = setTimeout(async () => {
+    try {
+      const plan = await api.post('/api/chat/plan', body);
+      if (st().planKey === key) { st().plan = plan; update(); }
+    } catch { /* ohne Planzeile weiter */ }
+  }, 120);
+}
+
+// Tokens rund: 70 000, 2,1 Mio.
+export const fmtTokens = n => n >= 1e6 ? t('{n} Mio.', { n: fmtNum(n / 1e6, 1) })
+  : fmtInt(n >= 10000 ? Math.round(n / 1000) * 1000 : n >= 1000 ? Math.round(n / 100) * 100 : n);
+
+function reasonText(p) {
+  if (p.reason === 'too_large') return t('Zu viel Text: rund {n} Tokens, Grenze {l} (Einstellungen → Experten)', { n: fmtTokens(p.tokens), l: fmtTokens(p.limit) });
+  if (p.reason === 'empty') return t('Im Suchbereich ist noch kein Text gelesen.');
+  if (p.reason === 'off') return t('Ganze Texte sind für dieses Sprachmodell ausgeschaltet (Einstellungen → Experten).');
+  if (p.reason === 'search_only') return t('„Nur Textstellen“ arbeitet ohne Sprachmodell.');
+  return '';
 }
 
 async function loadChats() {
@@ -49,6 +92,7 @@ async function openChat(id) {
   const f = last && last.meta && last.meta.filters;
   if (f && f.corpus_ids) s.corpora = f.corpus_ids;
   else if (f && f.corpus_id) s.corpora = [f.corpus_id];
+  if (last && last.meta && last.meta.scope) s.scopeMode = last.meta.scope;  // ein Chat mit ganzen Texten bleibt dabei
   s.stick = true;
   update();
 }
@@ -78,16 +122,18 @@ async function send() {
   s.controller = new AbortController();
   try {
     await api.stream('/api/chat', { question, chat_id: s.chatId, filters, retrieval: s.overrides, search_only: s.mode === 'search',
-      project_id: state.projectId }, ev => {
+      scope_mode: s.scopeMode, project_id: state.projectId }, ev => {
       switch (ev.type) {
         case 'chat': if (s.chatId !== ev.chat_id) loadProjects(); s.chatId = ev.chat_id; break;  // neuer Chat: Projektübersicht nachführen
         case 'status': msg.status = t(ev.text); break;
         case 'queries': msg.queries = ev.queries; msg.missing = ev.missing; break;
+        case 'plan': msg.plan = ev.plan; break;
         case 'sources': msg.sources = ev.sources; break;
         case 'delta': msg.status = ''; msg.content += ev.text; break;
+        case 'rewrite': msg.content = ev.text; break;  // ganze Texte: Belege [1, S. 64] → [n]
         case 'warning': msg.warnings.push(ev.text); break;
         case 'error': msg.status = ''; msg.errors.push({ message: ev.message, kind: ev.kind }); break;
-        case 'done': msg.status = ''; msg.meta = { model: ev.model, usage: ev.usage }; msg.id = ev.message_id; break;
+        case 'done': msg.status = ''; msg.meta = { model: ev.model, usage: ev.usage, basis: ev.basis }; msg.id = ev.message_id; break;
         default: break;
       }
       update();
@@ -124,7 +170,7 @@ function sourcesBlock(m) {
       h('div', { class: 'source-head' }, h('span', { class: 'cite static' }, x.n),
         h('div', { class: 'source-title' }, h('b', null, x.citation), ' · ', x.title),
         h('span', { class: 'muted small' }, x.kind === 'abstract' ? 'Abstract' : x.page_label ? `${t('S.')} ${x.page_label}` : '')),
-      h('div', { class: 'source-text' }, x.text),
+      h('div', { class: ['source-text', !x.text && 'muted'] }, x.text || (x.whole ? t('Diese Seite liess sich im Text nicht finden.') : '')),
       h('div', { class: 'source-links' },
         x.zotero_pdf && h('a', { href: x.zotero_pdf }, icon('pdf', 13), ' ', x.page_label ? t('PDF öffnen (S. {p})', { p: x.page_label }) : t('PDF öffnen')),
         h('a', { href: x.zotero_select }, icon('zotero', 13), ' ', t('In Zotero zeigen')),
@@ -175,9 +221,24 @@ function assistantMessage(m, i) {
     m.warnings.map((w, j) => h('div', { key: 'w' + j }, notice('warning', w, null, { dismiss: `chatwarn:${m.id || 'neu'}:${w}`, session: true }))),
     m.errors.map((e, j) => h('div', { key: 'e' + j }, errorBlock(e))),
     sourcesBlock(m),
+    basisLine(m),
     m.done && (m.meta.model || (usage && usage.requests)) ? h('div', { class: 'msg-meta' },
       m.meta.model && h('span', null, icon('ai', 12), ' ', m.meta.model),
       usage && usage.requests ? h('span', null, t('{a} Input-Token · {b} Output-Token', { a: fmtInt(usage.input_tokens), b: fmtInt(usage.output_tokens) })) : null) : null);
+}
+
+// Grundlage einer Antwort: wie viel Text das Sprachmodell hatte
+function basisLine(m) {
+  const b = m.meta && m.meta.basis;
+  if (!b || !m.done) return null;
+  if (b.mode === 'whole') {
+    return h('div', { class: 'basis-line' }, icon('file', 12),
+      h('span', null, b.texts.length === 1 ? t('Grundlage: ganzer Text') : t('Grundlage: {n} ganze Texte', { n: b.texts.length }), ' – ',
+        b.texts.map((x, i) => [i ? '; ' : '', h('a', { key: x.item_key, href: x.zotero_select, title: x.title }, x.citation)]),
+        ` · ${t('rund {n} Tokens', { n: fmtTokens(b.tokens) })}`));
+  }
+  return h('div', { class: 'basis-line' }, icon('quote', 12),
+    h('span', null, t('Grundlage: {p} Textstellen aus {d} von {n} Texten', { p: fmtInt(b.passages), d: fmtInt(b.docs), n: fmtInt(b.scope_docs) })));
 }
 
 function chatList() {
@@ -214,6 +275,41 @@ function presetSwitch() {
     p.changed.length ? h('span', { class: 'preset-changed', title: t('Werte weichen vom Preset ab – Einstellungen › Experten') }, '•') : null);
 }
 
+// Umfang: ganze Texte (wenn sie für das Sprachmodell passen) oder Textstellen
+function scopeSwitch() {
+  const s = st();
+  const p = s.plan;
+  const blocked = p && !p.whole_ok && p.reason !== 'search_only';
+  return h('div', { class: 'ask-scope-mode' }, h('span', { class: 'muted small' }, t('Umfang')),
+    segmented({ size: 'sm', value: s.scopeMode, onChange: v => { s.scopeMode = v; update(); }, options: [
+      { value: 'auto', label: t('Automatisch'), title: t('Ganze Texte, wenn sie für das Sprachmodell passen, sonst die passendsten Textstellen') },
+      { value: 'passages', label: t('Textstellen'), title: t('Immer die passendsten Textstellen, mit den Werten aus Preset und Suchoptionen') },
+      { value: 'whole', label: t('Ganze Texte'), disabled: blocked, title: blocked ? reasonText(p) : t('Das Sprachmodell erhält die ganzen Texte mit Seitenangaben') }] }));
+}
+
+// Planzeile über dem Eingabefeld: was beim Senden geschieht, dazu die Sitzungswerte der Suchoptionen
+const SESSION_LABELS = () => ({ top_k: t('Textstellen'), max_chunks_per_doc: t('Max. pro Text'), research_rounds: t('Recherche-Runden'), multi_query: t('Mehrfachsuche') });
+
+function planLine() {
+  const s = st();
+  const p = s.plan;
+  if (!p) return null;
+  const v = p.values;
+  const texts = p.n_docs === 1 ? t('1 Text') : t('{n} Texte', { n: fmtInt(p.n_docs) });
+  const main = p.mode === 'whole'
+    ? [icon('file', 13), h('b', null, t('Ganze Texte')), h('span', null, `${texts} · ${t('rund {n} Tokens', { n: fmtTokens(p.tokens) })}`)]
+    : [icon('quote', 13), h('b', null, s.mode === 'search' ? t('Nur Textstellen') : p.requested === 'auto' ? t('Automatisch') : t('Textstellen')),
+      h('span', null, `${t('{k} Textstellen, höchstens {m} je Text', { k: v.top_k, m: v.max_chunks_per_doc })} · ${t('{n} im Suchbereich', { n: texts })}`)];
+  const why = p.mode !== 'whole' && p.requested !== 'passages' && p.reason && p.reason !== 'search_only' && p.reason !== 'empty'
+    ? h('span', { class: 'muted', title: reasonText(p) }, t('keine ganzen Texte: {r}', { r: reasonText(p) })) : null;
+  const session = Object.entries(s.overrides);
+  const label = val => typeof val === 'boolean' ? (val ? t('an') : t('aus')) : String(val);
+  return h('div', { class: 'plan-line' }, h('div', { class: 'plan-line-inner' }, main, why,
+    session.length ? h('span', { class: 'plan-session' },
+      session.map(([k, val]) => `${SESSION_LABELS()[k] || k} ${label(val)}`).join(' · '), ` ${t('(diese Sitzung)')} `,
+      h('button', { type: 'button', class: 'link-btn', onclick: () => { s.overrides = {}; update(); } }, t('Zurücksetzen'))) : null));
+}
+
 function toolbar() {
   const s = st();
   const corpora = projectCorpora();
@@ -231,6 +327,7 @@ function toolbar() {
           : h('span', { class: 'muted small' }, t('Projekt ohne Korpus'))),
     segmented({ size: 'sm', value: s.mode, onChange: v => { s.mode = v; update(); }, options: [
       { value: 'answer', label: t('Antwort'), icon: 'ai' }, { value: 'search', label: t('Nur Textstellen'), icon: 'quote' }] }),
+    s.mode === 'answer' ? scopeSwitch() : null,
     presetSwitch(),
     btn('', { icon: 'sliders', kind: s.showOptions ? 'secondary' : 'ghost', size: 'sm', title: t('Suchoptionen'), onClick: () => { s.showOptions = !s.showOptions; update(); } }),
     h('div', { class: 'spacer' }),
@@ -246,10 +343,10 @@ function optionsRow() {
   const set = (k, v) => { if (v === r[k]) delete s.overrides[k]; else s.overrides[k] = v; update(); };
   return h('div', { class: 'ask-options' },
     field(t('Textstellen'), numberInput({ value: val('top_k'), min: 1, max: 100, int: true, onChange: v => set('top_k', v) }), { help: t('Wie viele Textstellen an das Sprachmodell gehen.') }),
-    field(t('Max. pro Text'), numberInput({ value: val('max_chunks_per_doc'), min: 1, max: 20, int: true, onChange: v => set('max_chunks_per_doc', v) }), { help: t('Verhindert, dass ein einzelnes Werk alles dominiert.') }),
+    field(t('Max. pro Text'), numberInput({ value: val('max_chunks_per_doc'), min: 1, max: 50, int: true, onChange: v => set('max_chunks_per_doc', v) }), { help: t('Verhindert, dass ein einzelnes Werk alles dominiert.') }),
     field(t('Recherche-Runden'), numberInput({ value: val('research_rounds'), min: 0, max: 5, int: true, onChange: v => set('research_rounds', v) }), { help: t('Das Modell prüft die Treffer auf Lücken und sucht gezielt nach.') }),
     field(t('Mehrfachsuche'), toggle({ checked: val('multi_query'), label: val('multi_query') ? t('an') : t('aus'), onChange: v => set('multi_query', v) }), { help: t('Mehrere Suchanfragen auf Deutsch und Englisch mit Synonymen.') }),
-    h('p', { class: 'muted small' }, t('Gilt nur für diese Sitzung und geht dem Preset vor. Dauerhafte Werte und eigene Presets: Einstellungen → Experten.')));
+    h('p', { class: 'muted small' }, t('Gilt nur für diese Sitzung und geht dem Preset vor – bis du unter Einstellungen → Experten etwas änderst oder ein anderes Preset wählst. Dauerhafte Werte und eigene Presets: Einstellungen → Experten.')));
 }
 
 function composer() {
@@ -264,6 +361,7 @@ function composer() {
 
 function conversation() {
   const s = st();
+  ensurePlan(s);
   const corpora = projectCorpora();
   const indexed = corpora.reduce((a, c) => a + (c.stats.embedded || 0), 0);
   // Deckt das aktive Embedding-Modell die Korpora nur teilweise ab (z. B. nach einem Modellwechsel)?
@@ -285,11 +383,13 @@ function conversation() {
     coverage && h('div', { class: 'coverage-banner' }, coverage),
     h('div', { class: 'messages', onscroll: e => { const el = e.currentTarget; s.stick = el.scrollHeight - el.scrollTop - el.clientHeight < 60; },
       ref: el => { if (s.stick) el.scrollTop = el.scrollHeight; } }, h('div', { class: 'messages-inner' }, body)),
+    planLine(),
     composer());
 }
 
 export function askView() {
   const s = st();
+  syncOverrides(s);
   if (s.openChat) { const id = s.openChat; s.openChat = null; openChat(id); }
   const p = project();
   return h('div', { class: 'view-wrap' },

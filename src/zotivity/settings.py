@@ -5,13 +5,18 @@ from __future__ import annotations
 import json
 import os
 import threading
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
 from zotivity import paths
 
 Effort = Literal["", "low", "medium", "high", "xhigh", "max"]
+
+# Ganze Texte unter „Fragen“: höchstens so viele Tokens je Anbieter des Hauptmodells (vorsichtig – lokale Modelle haben
+# oft nur 8 000–32 000 Tokens Kontext; 0 = nie ganze Texte)
+FULLTEXT_LIMITS = {"anthropic": 100000, "openai": 100000, "gemini": 100000, "mistral": 50000, "deepseek": 40000,
+                   "ollama": 6000, "openai_compatible": 8000}
 
 # Word (.docx) und OpenDocument-Text (.odt) – lesbar ab Version 0.9.0 (Einstellungen der Version 2)
 OFFICE_TYPES = ["application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -134,6 +139,9 @@ class RetrievalSettings(BaseModel):
     rerank_model: str = "BAAI/bge-reranker-v2-m3"
     rerank_candidates: int = Field(40, ge=5, le=300)
     context_token_budget: int = Field(16000, ge=1000, le=900000)
+    # Ganze Texte statt Textstellen, wenn die Texte im Suchbereich zusammen unter der Grenze des Anbieters bleiben
+    fulltext_limits: dict[str, Annotated[int, Field(ge=0, le=2000000)]] = Field(
+        default_factory=lambda: dict(FULLTEXT_LIMITS))
 
 
 class ReviewSettings(BaseModel):

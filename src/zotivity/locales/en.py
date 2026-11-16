@@ -234,6 +234,8 @@ MESSAGES: dict[str, str] = {
     "Durchsuche die Bibliothek …": "Searching the library …",
     "Recherche-Runde {n}: prüfe Lücken …": "Research round {n}: checking for gaps …",
     "Recherche-Runde abgebrochen: {e}": "Research round aborted: {e}",
+    "Lese die ganzen Texte …": "Reading the whole texts …",
+    "Ganze Texte sind hier nicht möglich; die Antwort stützt sich auf Textstellen.": "Whole texts are not possible here; the answer is based on passages.",
     "Mehrfachsuche nicht möglich ({e}); suche nur mit der Frage.":
         "Multi-query not possible ({e}); searching with the question only.",
     "Schreibe Antwort mit {model} …": "Writing answer with {model} …",

@@ -232,6 +232,15 @@ function queueHint(title) {
 }
 
 // ------------------------------------------------------------------ Rechtes Panel: Texte des Korpus
+// Fragen zu einem Text: neuer Chat, Suchbereich nur dieser Text, Umfang automatisch (ganzer Text, wenn er passt)
+function askText(e) {
+  const ask = ui('ask', {});
+  if (ask.busy) { toast(t('Unter „Fragen“ läuft noch eine Antwort.'), 'warning'); return; }
+  Object.assign(ask, { scope: { label: e.title || e.citation, filters: { item_keys: [`${e.lib}:${e.item_key}`] } },
+    scopeMode: 'auto', chatId: null, messages: [], draft: '' });
+  navigate('ask');
+}
+
 function docList(title, entries, kind, open, extra = null) {
   const s = st();
   const f = s.docsFilter.trim().toLowerCase();
@@ -250,6 +259,7 @@ function docList(title, entries, kind, open, extra = null) {
           e.copy_from ? ` · ${t('Kopie aus {lib} (Dublette)', { lib: e.copy_from })}` : '',
           kind === 'current' && extra ? ` · ${extra.step}` : '')),
       kind === 'problems' && e.error ? h('div', { class: 'doc-item-error' }, `${statusText(e.status)}: ${e.error}`) : null,
+      kind === 'indexed' && e.item_key ? iconBtn('chat', t('Diesen Text befragen'), () => askText(e)) : null,
       e.pdf ? iconBtn('pdf', t('PDF in Zotero öffnen'), () => api.openExternal(e.pdf)) : null)),
     shown.length > 500 ? h('p', { class: 'muted small pad-x' }, t('… und {n} weitere – Filter verwenden.', { n: fmtInt(shown.length - 500) })) : null)
       : h('p', { class: 'muted small pad-x' }, f ? t('Keine Treffer für den Filter.') : t('Keine.')));

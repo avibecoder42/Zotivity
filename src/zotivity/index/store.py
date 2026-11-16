@@ -836,6 +836,22 @@ class Store:
             "SELECT * FROM chunks WHERE lib=? AND att_key=? AND ord BETWEEN ? AND ? ORDER BY ord",
             (lib, att_key, ord_ - n, ord_ + n))]
 
+    def text_lengths(self, items: set[tuple[str, str]] | None = None) -> dict[tuple[str, str], tuple[int, int]]:
+        """Gelesener Text je Eintrag als (Zeichen, Abschnitte): Text und Abstract, nur Einträge mit gelesenem Text.
+        items = None: alle Einträge. Für die Länge ganzer Texte unter „Fragen“."""
+        sql = ("SELECT lib, item_key, SUM(LENGTH(text)), SUM(kind='text') FROM chunks "
+               "WHERE kind IN ('text', 'abstract'){where} GROUP BY lib, item_key HAVING SUM(kind='text') > 0")
+        out: dict[tuple[str, str], tuple[int, int]] = {}
+        if items is not None and len(items) <= 400:  # wenige Einträge: über den Index je Eintrag
+            for lib, key in items:
+                for r in self.con.execute(sql.format(where=" AND lib=? AND item_key=?"), (lib, key)):
+                    out[(r[0], r[1])] = (int(r[2] or 0), int(r[3] or 0))
+            return out
+        for r in self.con.execute(sql.format(where="")):
+            if items is None or (r[0], r[1]) in items:
+                out[(r[0], r[1])] = (int(r[2] or 0), int(r[3] or 0))
+        return out
+
     def document_chunks(self, lib: str, item_key: str) -> list[dict]:
         return [dict(r) for r in self.con.execute(
             "SELECT * FROM chunks WHERE lib=? AND item_key=? ORDER BY att_key, ord", (lib, item_key))]

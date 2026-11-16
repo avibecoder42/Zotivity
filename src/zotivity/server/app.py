@@ -38,6 +38,7 @@ from zotivity.index.store import SearchFilter
 from zotivity.keystore import SecretStoreError, get_store
 from zotivity.llm import LLMError, make_chat_model
 from zotivity.rag import AskOptions, ChatService, ReviewService
+from zotivity.rag.plan import make_plan
 from zotivity.rag.sources import build_sources
 from zotivity.research.api import install as install_research
 from zotivity.research.service import ResearchService
@@ -1795,6 +1796,14 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
         hits = Searcher(engine).search(query, engine.make_filter(body.get("filters")), cfg, k=k)
         return {"sources": [s.as_dict() for s in build_sources(engine.store, hits, 0, 10**9)]}
 
+    @app.post("/api/chat/plan")
+    def chat_plan(body: dict = Body(...)):
+        """Suchplan vor dem Senden: ganze Texte oder Textstellen, Textmenge, Werte (Zeile über dem Eingabefeld)."""
+        provider = body.get("provider") or engine.settings.llm.provider
+        plan = make_plan(engine, engine.make_filter(body.get("filters")), body.get("scope_mode"), body.get("retrieval"),
+                         provider, bool(body.get("search_only")))
+        return plan.as_dict()
+
     @app.post("/api/chat")
     def chat_stream(body: dict = Body(...)):
         question = (body.get("question") or "").strip()
@@ -1803,7 +1812,7 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
         opts = AskOptions(
             filters=body.get("filters") or {}, retrieval=body.get("retrieval") or {},
             provider=body.get("provider"), model=body.get("model"), search_only=bool(body.get("search_only")),
-            project_id=body.get("project_id"),
+            project_id=body.get("project_id"), scope=body.get("scope_mode") or "passages",
         )
 
         def localized(ev: dict) -> dict:
