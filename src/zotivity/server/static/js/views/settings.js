@@ -577,6 +577,7 @@ const ADVANCED = () => [
     ['retrieval.rerank', t('Neu sortieren'), 'select', { options: [['none', t('aus')], ['llm', t('mit dem Hilfsmodell')], ['cross_encoder', t('Cross-Encoder (lokal)')]] }],
     ['retrieval.rerank_candidates', t('Kandidaten für die Neusortierung'), 'int', { min: 5, max: 300 }],
     ['retrieval.context_token_budget', t('Kontext-Budget (Tokens)'), 'int', { min: 1000, max: 900000, step: 1000 }],
+    ['retrieval.auto_adjust', t('„Automatisch“ passt die Werte an die Zahl der Texte an'), 'bool', { help: t('Bei Umfang „Automatisch“ unter Fragen: Textstellen, Grenze je Text, Vielfalt und Nachbarabschnitte richten sich nach der Zahl der Texte im Suchbereich. Werte, die hier vom Preset abweichen, bleiben fest. Aus = immer die Werte von Preset und Experten.') }],
   ] },
   { id: 'whole', title: t('Ganze Texte unter „Fragen“'), icon: 'file',
     note: t('Bleiben die Texte im Suchbereich zusammen unter dieser Grenze, erhält das Sprachmodell die ganzen Texte mit Seitenangaben statt einzelner Textstellen (Umfang „Automatisch“ oder „Ganze Texte“). Es gilt die Grenze des Anbieters, der die Antworten schreibt; 0 = nie. Lokale Modelle über Ollama haben oft nur 8 000–32 000 Tokens Kontext.'),

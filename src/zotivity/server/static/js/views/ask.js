@@ -289,6 +289,15 @@ function scopeSwitch() {
 
 // Planzeile über dem Eingabefeld: was beim Senden geschieht, dazu die Sitzungswerte der Suchoptionen
 const SESSION_LABELS = () => ({ top_k: t('Textstellen'), max_chunks_per_doc: t('Max. pro Text'), research_rounds: t('Recherche-Runden'), multi_query: t('Mehrfachsuche') });
+const AUTO_LABELS = () => ({ top_k: t('Textstellen'), max_chunks_per_doc: t('Max. pro Text'), mmr_lambda: t('Relevanz vs. Vielfalt'),
+  neighbor_chunks: t('Nachbarabschnitte'), candidate_k: t('Kandidaten je Suchverfahren') });
+
+// Was „Automatisch“ bei dieser Zahl von Texten angepasst hat (Tooltip der Planzeile)
+function autoTitle(p) {
+  const lines = Object.entries(p.auto || {}).map(([k, v]) => `${AUTO_LABELS()[k] || k}: ${v >= 50 && k === 'max_chunks_per_doc' ? t('unbegrenzt') : v}`);
+  if (p.fixed && p.fixed.length) lines.push(t('Fest unter Experten: {f}', { f: p.fixed.map(k => AUTO_LABELS()[k] || k).join(', ') }));
+  return [t('Automatisch angepasst an {n} Texte im Suchbereich', { n: fmtInt(p.n_docs) }), ...lines].join('\n');
+}
 
 function planLine() {
   const s = st();
@@ -299,12 +308,15 @@ function planLine() {
   const main = p.mode === 'whole'
     ? [icon('file', 13), h('b', null, t('Ganze Texte')), h('span', null, `${texts} · ${t('rund {n} Tokens', { n: fmtTokens(p.tokens) })}`)]
     : [icon('quote', 13), h('b', null, s.mode === 'search' ? t('Nur Textstellen') : p.requested === 'auto' ? t('Automatisch') : t('Textstellen')),
-      h('span', null, `${t('{k} Textstellen, höchstens {m} je Text', { k: v.top_k, m: v.max_chunks_per_doc })} · ${t('{n} im Suchbereich', { n: texts })}`)];
+      h('span', null, `${v.max_chunks_per_doc >= 50 ? t('{k} Textstellen, ohne Grenze je Text', { k: v.top_k }) : t('{k} Textstellen, höchstens {m} je Text', { k: v.top_k, m: v.max_chunks_per_doc })} · ${t('{n} im Suchbereich', { n: texts })}`),
+      p.auto && Object.keys(p.auto).length ? h('span', { class: 'plan-auto', title: autoTitle(p) }, t('angepasst')) : null];
+  const hint = p.mode !== 'whole' && p.band === 'very_many' && s.mode === 'answer'
+    ? h('span', { class: 'muted' }, t('Viele Texte: Für Detailfragen den Suchbereich eingrenzen (Korpus, Sammlung in Zotero).')) : null;
   const why = p.mode !== 'whole' && p.requested !== 'passages' && p.reason && p.reason !== 'search_only' && p.reason !== 'empty'
     ? h('span', { class: 'muted', title: reasonText(p) }, t('keine ganzen Texte: {r}', { r: reasonText(p) })) : null;
   const session = Object.entries(s.overrides);
   const label = val => typeof val === 'boolean' ? (val ? t('an') : t('aus')) : String(val);
-  return h('div', { class: 'plan-line' }, h('div', { class: 'plan-line-inner' }, main, why,
+  return h('div', { class: 'plan-line' }, h('div', { class: 'plan-line-inner' }, main, why, hint,
     session.length ? h('span', { class: 'plan-session' },
       session.map(([k, val]) => `${SESSION_LABELS()[k] || k} ${label(val)}`).join(' · '), ` ${t('(diese Sitzung)')} `,
       h('button', { type: 'button', class: 'link-btn', onclick: () => { s.overrides = {}; update(); } }, t('Zurücksetzen'))) : null));

@@ -2643,4 +2643,11 @@ export default {
   '{n} im Suchbereich': '{n} in scope',
   '{p}: ganze Texte bis (Tokens)': '{p}: whole texts up to (tokens)',
   '„Nur Textstellen“ arbeitet ohne Sprachmodell.': '“Passages only” works without a language model.',
+  'Automatisch angepasst an {n} Texte im Suchbereich': 'Automatically adjusted to {n} texts in scope',
+  'Bei Umfang „Automatisch“ unter Fragen: Textstellen, Grenze je Text, Vielfalt und Nachbarabschnitte richten sich nach der Zahl der Texte im Suchbereich. Werte, die hier vom Preset abweichen, bleiben fest. Aus = immer die Werte von Preset und Experten.': 'With scope “Automatic” under Ask: passages, limit per text, diversity and neighbouring sections follow the number of texts in scope. Values that differ from the preset here stay fixed. Off = always the values of the preset and Expert settings.',
+  'Fest unter Experten: {f}': 'Fixed under Expert: {f}',
+  'Viele Texte: Für Detailfragen den Suchbereich eingrenzen (Korpus, Sammlung in Zotero).': 'Many texts: for detail questions, narrow the scope (corpus, collection in Zotero).',
+  'angepasst': 'adjusted',
+  '{k} Textstellen, ohne Grenze je Text': '{k} passages, no limit per text',
+  '„Automatisch“ passt die Werte an die Zahl der Texte an': '“Automatic” adjusts the values to the number of texts',
 };

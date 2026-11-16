@@ -142,6 +142,9 @@ class RetrievalSettings(BaseModel):
     # Ganze Texte statt Textstellen, wenn die Texte im Suchbereich zusammen unter der Grenze des Anbieters bleiben
     fulltext_limits: dict[str, Annotated[int, Field(ge=0, le=2000000)]] = Field(
         default_factory=lambda: dict(FULLTEXT_LIMITS))
+    # Umfang „Automatisch“: Textstellen, Grenze je Text, Vielfalt und Nachbarabschnitte nach der Zahl der Texte im
+    # Suchbereich (Werte, die unter Experten vom Preset abweichen, bleiben fest)
+    auto_adjust: bool = True
 
 
 class ReviewSettings(BaseModel):
