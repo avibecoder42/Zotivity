@@ -32,6 +32,7 @@ from zotivity.engine import Engine
 from zotivity.extract import chunk_pages, extract_file, make_abstract_chunk, text_as_document
 from zotivity.extract.chunker import mark_references
 from zotivity.extract.pagenumbers import parse_page_range
+from zotivity.extract.pdf import substantive_chars
 from zotivity.extract.worker import DEFAULT_TARGET, ExtractionFailed, ExtractionWorker
 from zotivity.index import duplicates
 from zotivity.index.store import SearchFilter, strip_bidi
@@ -398,7 +399,8 @@ class Indexer:
                 text = self.engine.zotero().fulltext(lib, key)
             except ZoteroError:
                 text = None
-            if text and len(text) > 200:
+            # Nur echter Text: bei einem Scan kann der Volltext von Zotero bloss aus Lieferstempeln bestehen
+            if text and len(text) > 200 and substantive_chars(text) > 200:
                 doc = text_as_document(text, "zotero-fulltext")
                 warning = (warning + "; " if warning else "") + "Zotero-Volltext verwendet (ohne Seitenzahlen)"
 

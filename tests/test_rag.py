@@ -274,3 +274,21 @@ def test_check_english_quotation_marks(zengine, fake_zotero):
     zengine.store.put_review_docs(rid, [{"lib": "users/0", "item_key": "ITEMQ001", "included": True}])
     check = ReviewService(zengine).check(rid)
     assert check["verified_quotes"] == 2 and check["unverified_quotes"] == []
+
+
+def test_check_guillemets_pair_by_direction(zengine, fake_zotero):
+    """Kurze «Wörter» machen den Fliesstext dazwischen nicht zum Zitat; Teile der Frage sind keine Zitate."""
+    fake_zotero.add_item("ITEMQ002", "Zitate", "Meier", "2020")
+    fake_zotero.add_pdf("ATTQ0002", "ITEMQ002", [GARDEN * 20])
+    run_index(zengine)
+    q = "die Gärtnerin pflegt die Beete sorgfältig"
+    text = ("## A\n\nDer Begriff «Cyberbullying» wird oft verwendet, und die Studien zeigen viele verschiedene Formen "
+            "der Gewalt unter Jugendlichen im Netz, etwa «Flaming» oder «Outing». Das Projekt «Jugendliche und "
+            f"Onlineaggressionen» fragt danach. Meier schreibt: «{q}» [@ITEMQ002, S. 1]. Falsch: »Diese Aussage "
+            "steht so in keinem der Texte drin« [@ITEMQ002, S. 1].")
+    rid = zengine.store.create_review("T", "Stand der Forschung: Jugendliche und Onlineaggressionen",
+                                      {"language": "de", "sections": [{"heading": "A", "text": text}]})
+    zengine.store.put_review_docs(rid, [{"lib": "users/0", "item_key": "ITEMQ002", "included": True}])
+    check = ReviewService(zengine).check(rid)
+    assert check["verified_quotes"] == 1
+    assert [u["quote"] for u in check["unverified_quotes"]] == ["Diese Aussage steht so in keinem der Texte drin"]

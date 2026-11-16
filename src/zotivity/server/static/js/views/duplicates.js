@@ -31,6 +31,15 @@ const ruleSel = g => copyId(g.copies.find(c => c.rule) || g.copies[0]);
 const dialogSel = g => (g.mode === 'user' || g.mode === 'separate' ? currentSel(g) : copyId(g.copies.find(c => c.suggest) || g.copies[0]));
 const textLevel = c => (c.text > 0 ? 2 : c.file ? 1 : 0);
 
+// „Für alle: Kopie aus …“: unter den gleichwertigen Kopien dieser Bibliothek die aus dem Korpus, dann gelesenen Text,
+// dann Seitenzahlen – nie eine schlechtere als die beste Kopie des Werks (sonst verlöre es Text oder Datei)
+export function pickCopy(g, lib) {
+  const best = Math.max(...g.copies.map(textLevel));
+  const cands = g.copies.filter(x => x.lib === lib && textLevel(x) === best);
+  const score = x => (x.in_corpus ? 4 : 0) + (x.text === 2 ? 2 : 0) + (x.pages ? 1 : 0);
+  return cands.sort((a, b) => score(b) - score(a))[0] || null;
+}
+
 // Auswahl → Entscheidung: wie die Regel = „rule“ (folgt dem Zustand, z. B. wenn die Kopie keinen Text hat),
 // sonst „user“ (bleibt fest)
 function choiceOf(g, sel) {
@@ -73,8 +82,7 @@ function openDuplicatesDialog(r, again = null) {
     // „Für alle“ wählt keine Kopie, die schlechter ist als eine andere – sonst verlöre das Werk seinen Text oder seine Datei
     const pickAll = lib => {
       for (const g of r.groups) {
-        const best = Math.max(...g.copies.map(textLevel));
-        const c = g.copies.find(x => x.lib === lib && textLevel(x) === best);
+        const c = pickCopy(g, lib);
         if (c) sel[g.work] = copyId(c);
       }
       update();

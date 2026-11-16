@@ -1512,7 +1512,11 @@ class ReviewService:
     # ------------------------------------------------------------------------------
     _CITE = re.compile(r"\[(@[^\]]+)\]")
     # Deutsche („…“), englische (“…”) und gerade Anführungszeichen sowie Guillemets
-    _QUOTE = re.compile(r"[„“\"«»]([^„“”\"«»]{25,600})[“”\"«»]")
+    # Zitate je Anführungszeichen-Paar in seiner Richtung („…“, “…”, «…», »…«, "…"): ein kurzes «Wort» darf nicht
+    # dazu führen, dass » ein Zitat öffnet und das nächste « es schliesst (Fliesstext dazwischen wäre sonst ein „Zitat“).
+    # Die Mindestlänge prüft check() nach dem Finden.
+    _QUOTE = re.compile(r'„([^„“”"«»]{1,600})[“”]|“([^„“”"«»]{1,600})”|«([^«»„“”"]{1,600})»|»([^«»„“”"]{1,600})«'
+                        r'|"([^"„“”«»]{1,600})"')
 
     def check(self, review_id: int) -> dict:
         review = self.store.get_review(review_id)
@@ -1535,10 +1539,11 @@ class ReviewService:
                 by_att.setdefault(r["att_key"], []).append(r["text"])
             doc_texts[key] = _norm(" ".join(_merge_overlapping(t) for t in by_att.values() if t))
         verified, unverified = [], []
+        question = _norm(review.get("question") or "")
         for m in self._QUOTE.finditer(text):
-            quote = m.group(1).strip()
+            quote = next(g for g in m.groups() if g is not None).strip()
             nq = _norm(quote)
-            if len(nq) < 20:
+            if len(nq) < 20 or (question and nq in question):  # kurze Wendungen und Teile der Frage sind keine Zitate
                 continue
             after = text[m.end(): m.end() + 200]
             cm = self._CITE.search(after)

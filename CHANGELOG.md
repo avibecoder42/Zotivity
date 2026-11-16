@@ -28,6 +28,15 @@ All notable changes, newest first.
 - **Texts in a corpus (Index): open work first.** Open texts and problems are at the top of the list, indexed texts
   at the bottom.
 
+### Fixed
+- **Quote check in literature reviews.** Quotation marks are paired by direction («…», »…«, „…“, “…”, "…"). A short
+  «word» no longer turns the running text up to the next guillemet into an "unclear quote", and parts of the review's
+  own question are not checked as quotes.
+- **"For all: copy from …" for duplicates** picks the copy in the corpus among equally good copies of that library,
+  as the rule does, instead of the first one found.
+- **Scans with a stamp line on every page** (e.g. "Kopie von subito e.V. …") are recognised as scans, so text
+  recognition (OCR) can start. A Zotero full text that consists only of such stamps is not indexed as text.
+
 ## 1.2.6 – 2026-11-16
 
 ### Added

@@ -97,6 +97,14 @@ def _strip_running_heads(pages: list[list[str]]) -> list[list[str]]:
     return out
 
 
+def substantive_chars(text: str) -> int:
+    """Zeichen ohne Zeilen, die sich (bis auf Zahlen) mindestens dreimal wiederholen – Stempel, Kopf- und Fusszeilen.
+    So zählt ein Volltext, der nur aus Lieferstempeln besteht, nicht als Text."""
+    lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
+    counts = Counter(_norm_line(ln) for ln in lines)
+    return sum(len(ln) for ln in lines if counts[_norm_line(ln)] < 3)
+
+
 def _page_blocks(page: pymupdf.Page, textpage=None) -> tuple[list[str], bool, list[tuple[str, int]]]:
     """Textblöcke, ob die Seite Bilder hat, und Seitenzahl-Kandidaten aus Kopf-/Fusszeilen."""
     blocks = page.get_text("blocks", flags=_TEXT_FLAGS, textpage=textpage) if textpage else \
@@ -160,7 +168,9 @@ def extract_with_pymupdf(
                 pdf_labels.append(clean_pdf_label(page.get_label()))
             except Exception:  # noqa: BLE001
                 pdf_labels.append("")
-        total = sum(len(" ".join(b)) for b in raw)
+        # Ob die Seiten Text haben, ohne Kopf-/Fusszeilen gezählt: ein Scan mit einer Stempelzeile je Seite (z. B.
+        # „Kopie von subito e.V. …“) ist sonst kein Scan, und die Texterkennung startet nie
+        total = sum(len(" ".join(b)) for b in _strip_running_heads(raw))
         if n and total / n < min_chars_per_page:
             result.needs_ocr = True
             if ocr:
