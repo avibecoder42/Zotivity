@@ -203,7 +203,8 @@ whole interface can be zoomed.
    passages are listed below, each with a **relevance** indicator. "Passages only" searches without an LLM. If the texts
    in scope fit the language model, it gets the **whole texts** with page marks (scope "Automatic", "Passages", "Whole
    texts"; "Ask this text" in a corpus). Otherwise "Automatic" adapts the search to the number of texts; overview
-   questions get a card per text. A plan line shows before sending how much text is used.
+   questions get a card per text. Long texts can be read chapter by chapter ("In stages"). A plan line shows before
+   sending how much text is used.
 
 Keyboard: Ctrl+1–5 project views, Ctrl+6 search, Ctrl+7 CSL editor, Ctrl+8 index, Ctrl+, settings, F1 help, Ctrl+P switch project. Appearance: system,
 light, grey, dark (the window title bar follows).

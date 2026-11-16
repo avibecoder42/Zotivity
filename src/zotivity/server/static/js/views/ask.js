@@ -59,6 +59,14 @@ function ensurePlan(s) {
 export const fmtTokens = n => n >= 1e6 ? t('{n} Mio.', { n: fmtNum(n / 1e6, 1) })
   : fmtInt(n >= 10000 ? Math.round(n / 1000) * 1000 : n >= 1000 ? Math.round(n / 100) * 100 : n);
 
+function stagesReason(p) {
+  if (p.stages_reason === 'too_many_texts') return t('In Etappen lassen sich höchstens 5 Texte lesen.');
+  if (p.stages_reason === 'too_long') return t('Zu lang für Etappen: etwa {n} Etappen, höchstens 60.', { n: fmtInt(p.stages) });
+  return reasonText({ ...p, reason: p.stages_reason });
+}
+
+const modelOf = p => p.stage_model === 'main' ? t('Hauptmodell') : t('Hilfsmodell');
+
 function reasonText(p) {
   if (p.reason === 'too_large') return t('Zu viel Text: rund {n} Tokens, Grenze {l} (Einstellungen → Experten)', { n: fmtTokens(p.tokens), l: fmtTokens(p.limit) });
   if (p.reason === 'empty') return t('Im Suchbereich ist noch kein Text gelesen.');
@@ -134,7 +142,7 @@ async function send() {
         case 'rewrite': msg.content = ev.text; break;  // ganze Texte: Belege [1, S. 64] → [n]
         case 'warning': msg.warnings.push(ev.text); break;
         case 'error': msg.status = ''; msg.errors.push({ message: ev.message, kind: ev.kind }); break;
-        case 'done': msg.status = ''; msg.meta = { model: ev.model, usage: ev.usage, basis: ev.basis }; msg.id = ev.message_id; break;
+        case 'done': msg.status = ''; msg.meta = { model: ev.model, usage: ev.usage, basis: ev.basis, stages: ev.stages }; msg.id = ev.message_id; break;
         default: break;
       }
       update();
@@ -223,6 +231,7 @@ function assistantMessage(m, i) {
     m.errors.map((e, j) => h('div', { key: 'e' + j }, errorBlock(e))),
     sourcesBlock(m),
     basisLine(m),
+    notesBlock(m),
     m.done && (m.meta.model || (usage && usage.requests)) ? h('div', { class: 'msg-meta' },
       m.meta.model && h('span', null, icon('ai', 12), ' ', m.meta.model),
       usage && usage.requests ? h('span', null, t('{a} Input-Token · {b} Output-Token', { a: fmtInt(usage.input_tokens), b: fmtInt(usage.output_tokens) })) : null) : null);
@@ -238,6 +247,12 @@ function basisLine(m) {
         b.texts.map((x, i) => [i ? '; ' : '', h('a', { key: x.item_key, href: x.zotero_select, title: x.title }, x.citation)]),
         ` · ${t('rund {n} Tokens', { n: fmtTokens(b.tokens) })}`));
   }
+  if (b.mode === 'stages') {
+    return h('div', { class: 'basis-line' }, icon('layers', 12),
+      h('span', null, t('Grundlage: {n} in {s} Etappen gelesen, {k} mit Notizen', { n: b.texts.length === 1 ? t('ganzer Text') : t('{n} ganze Texte', { n: b.texts.length }), s: b.stages, k: b.with_notes }), ' – ',
+        b.texts.map((x, i) => [i ? '; ' : '', h('a', { key: x.item_key, href: x.zotero_select, title: x.title }, x.citation)]),
+        ` · ${t('rund {n} Tokens', { n: fmtTokens(b.tokens) })}`));
+  }
   const kind = b.qtype && b.qtype !== 'detail' ? ` · ${t('Frageart: {q}', { q: QTYPE_LABELS()[b.qtype] || b.qtype })}` : '';
   if (b.mode === 'cards') {
     return h('div', { class: 'basis-line' }, icon('layers', 12),
@@ -245,6 +260,18 @@ function basisLine(m) {
   }
   return h('div', { class: 'basis-line' }, icon('quote', 12),
     h('span', null, t('Grundlage: {p} Textstellen aus {d} von {n} Texten', { p: fmtInt(b.passages), d: fmtInt(b.docs), n: fmtInt(b.scope_docs) }) + kind));
+}
+
+// Notizen je Etappe (Lesen in Etappen), eingeklappt unter der Antwort
+function notesBlock(m) {
+  const list = (m.meta && m.meta.stages) || [];
+  if (!m.done || !list.length) return null;
+  const withNotes = list.filter(x => x.notes && !/^nichts zur frage/i.test(x.notes.trim()));
+  return h('details', { class: 'queries stage-notes', key: 'notes' },
+    h('summary', null, icon('layers', 13), t('Notizen der Etappen ({k} von {n})', { k: withNotes.length, n: list.length })),
+    h('div', { class: 'stage-list' }, list.map(x => h('div', { key: x.index, class: 'stage-item' },
+      h('div', { class: 'muted small' }, t('Etappe {i}', { i: x.index }), x.pages ? ` · ${x.pages}` : '', x.headings && x.headings.length ? ` · ${x.headings.join(' · ')}` : ''),
+      h('div', { class: 'stage-notes-text' }, x.notes || '–')))));
 }
 
 // Frageart: das Hilfsmodell ordnet die Frage ein (mit der Mehrfachsuche); hier lässt sie sich festlegen
@@ -302,7 +329,9 @@ function scopeSwitch() {
     segmented({ size: 'sm', value: s.scopeMode, onChange: v => { s.scopeMode = v; update(); }, options: [
       { value: 'auto', label: t('Automatisch'), title: t('Ganze Texte, wenn sie für das Sprachmodell passen, sonst die passendsten Textstellen') },
       { value: 'passages', label: t('Textstellen'), title: t('Immer die passendsten Textstellen, mit den Werten aus Preset und Suchoptionen') },
-      { value: 'whole', label: t('Ganze Texte'), disabled: blocked, title: blocked ? reasonText(p) : t('Das Sprachmodell erhält die ganzen Texte mit Seitenangaben') }] }));
+      { value: 'whole', label: t('Ganze Texte'), disabled: blocked, title: blocked ? reasonText(p) : t('Das Sprachmodell erhält die ganzen Texte mit Seitenangaben') },
+      { value: 'stages', label: t('In Etappen'), disabled: p && !p.stages_ok && p.stages_reason !== 'search_only',
+        title: p && !p.stages_ok ? stagesReason(p) : t('Für Texte über der Grenze: kapitelweise lesen, je Etappe Notizen, dann die Antwort aus den Notizen. Langsamer und mit mehr Aufrufen, aber vollständig.') }] }));
 }
 
 // Planzeile über dem Eingabefeld: was beim Senden geschieht, dazu die Sitzungswerte der Suchoptionen
@@ -323,19 +352,24 @@ function planLine() {
   if (!p) return null;
   const v = p.values;
   const texts = p.n_docs === 1 ? t('1 Text') : t('{n} Texte', { n: fmtInt(p.n_docs) });
-  const main = p.mode === 'whole'
+  const main = p.mode === 'stages'
+    ? [icon('layers', 13), h('b', null, t('In Etappen')), h('span', null, `${texts} · ${t('rund {n} Tokens', { n: fmtTokens(p.tokens) })} · ${t('etwa {n} Etappen, Notizen mit dem {m}', { n: fmtInt(p.stages), m: modelOf(p) })}`)]
+    : p.mode === 'whole'
     ? [icon('file', 13), h('b', null, t('Ganze Texte')), h('span', null, `${texts} · ${t('rund {n} Tokens', { n: fmtTokens(p.tokens) })}`)]
     : [icon('quote', 13), h('b', null, s.mode === 'search' ? t('Nur Textstellen') : p.requested === 'auto' ? t('Automatisch') : t('Textstellen')),
       h('span', null, `${v.max_chunks_per_doc >= 50 ? t('{k} Textstellen, ohne Grenze je Text', { k: v.top_k }) : t('{k} Textstellen, höchstens {m} je Text', { k: v.top_k, m: v.max_chunks_per_doc })} · ${t('{n} im Suchbereich', { n: texts })}`),
       p.auto && Object.keys(p.auto).length ? h('span', { class: 'plan-auto', title: autoTitle(p) }, t('angepasst')) : null];
-  const hint = p.mode !== 'whole' && p.band === 'very_many' && s.mode === 'answer'
-    ? h('span', { class: 'muted' }, t('Viele Texte: Für Detailfragen den Suchbereich eingrenzen (Korpus, Sammlung in Zotero).')) : null;
-  const why = p.mode !== 'whole' && p.requested !== 'passages' && p.reason && p.reason !== 'search_only' && p.reason !== 'empty'
+  const hint = p.mode === 'passages' && p.band === 'very_many' && s.mode === 'answer'
+    ? h('span', { class: 'muted' }, t('Viele Texte: Für Detailfragen den Suchbereich eingrenzen (Korpus, Sammlung in Zotero).'))
+    : p.mode === 'passages' && p.reason === 'too_large' && p.stages_ok && p.n_docs <= 3 && s.mode === 'answer'
+      ? h('button', { type: 'button', class: 'link-btn', title: t('Für Texte über der Grenze: kapitelweise lesen, je Etappe Notizen, dann die Antwort aus den Notizen. Langsamer und mit mehr Aufrufen, aber vollständig.'),
+        onclick: () => { s.scopeMode = 'stages'; update(); } }, t('Vollständiger: in Etappen lesen (etwa {n})', { n: fmtInt(p.stages) })) : null;
+  const why = p.mode === 'passages' && p.requested !== 'passages' && p.reason && p.reason !== 'search_only' && p.reason !== 'empty'
     ? h('span', { class: 'muted', title: reasonText(p) }, t('keine ganzen Texte: {r}', { r: reasonText(p) })) : null;
   const session = Object.entries(s.overrides);
   const label = val => typeof val === 'boolean' ? (val ? t('an') : t('aus')) : String(val);
   return h('div', { class: 'plan-line' }, h('div', { class: 'plan-line-inner' }, main, why, hint,
-    p.mode !== 'whole' && s.mode === 'answer' ? qtypeSelect(s) : null,
+    p.mode === 'passages' && s.mode === 'answer' ? qtypeSelect(s) : null,
     session.length ? h('span', { class: 'plan-session' },
       session.map(([k, val]) => `${SESSION_LABELS()[k] || k} ${label(val)}`).join(' · '), ` ${t('(diese Sitzung)')} `,
       h('button', { type: 'button', class: 'link-btn', onclick: () => { s.overrides = {}; update(); } }, t('Zurücksetzen'))) : null));

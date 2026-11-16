@@ -145,6 +145,8 @@ class RetrievalSettings(BaseModel):
     # Umfang „Automatisch“: Textstellen, Grenze je Text, Vielfalt und Nachbarabschnitte nach der Zahl der Texte im
     # Suchbereich (Werte, die unter Experten vom Preset abweichen, bleiben fest)
     auto_adjust: bool = True
+    # Lesen in Etappen (Texte über der Ganztext-Grenze): Notizen je Etappe mit dem Hilfs- oder dem Hauptmodell
+    stage_model: Literal["helper", "main"] = "helper"
 
 
 class ReviewSettings(BaseModel):

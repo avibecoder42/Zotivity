@@ -18,6 +18,9 @@ All notable changes, newest first.
 - **Question type and overview cards.** The helper model classifies a question as detail, overview or evidence; the
   plan line shows it and it can be set by hand. Overview and comparison questions get a short card per text (abstract,
   details, evaluation sheet if there is one), so every text in scope appears.
+- **Reading in stages.** Texts above the limit (up to 5) can be read chapter by chapter with the new scope **In
+  stages**: notes per stage with page numbers (helper or main model, Settings → Expert), then the answer from all
+  notes. Slower, but complete; the notes are shown below the answer.
 
 ### Changed
 - **Search options under Ask no longer override later changes.** A change under Settings → Expert or a preset switch

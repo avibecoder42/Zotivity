@@ -582,7 +582,9 @@ const ADVANCED = () => [
   { id: 'whole', title: t('Ganze Texte unter „Fragen“'), icon: 'file',
     note: t('Bleiben die Texte im Suchbereich zusammen unter dieser Grenze, erhält das Sprachmodell die ganzen Texte mit Seitenangaben statt einzelner Textstellen (Umfang „Automatisch“ oder „Ganze Texte“). Es gilt die Grenze des Anbieters, der die Antworten schreibt; 0 = nie. Lokale Modelle über Ollama haben oft nur 8 000–32 000 Tokens Kontext.'),
     fields: ['anthropic', 'openai', 'gemini', 'mistral', 'deepseek', 'ollama', 'openai_compatible'].map(id =>
-      [`retrieval.fulltext_limits.${id}`, t('{p}: ganze Texte bis (Tokens)', { p: providerLabel(id) }), 'int', { min: 0, max: 2000000, step: 5000 }]) },
+      [`retrieval.fulltext_limits.${id}`, t('{p}: ganze Texte bis (Tokens)', { p: providerLabel(id) }), 'int', { min: 0, max: 2000000, step: 5000 }]).concat([
+      ['retrieval.stage_model', t('Notizen beim Lesen in Etappen'), 'select', { options: [['helper', t('Hilfsmodell')], ['main', t('Hauptmodell')]],
+        help: t('Umfang „In Etappen“ liest Texte über der Grenze kapitelweise. Das Hilfsmodell ist günstiger, das Hauptmodell gründlicher. Die Etappen richten sich nach der Grenze dieses Modells (höchstens 40 000 Tokens je Etappe).') }]]) },
   { id: 'llm', title: t('Sprachmodell'), icon: 'ai', fields: [
     ['llm.temperature', t('Temperatur'), 'float', { min: 0, max: 2, step: 0.1, nullable: true, help: t('Leer = Standard des Modells. Neuere Claude-Modelle akzeptieren keine Temperatur.') }],
     ['llm.max_output_tokens', t('Max. Output-Token'), 'int', { min: 256, max: 128000, step: 1000 }],

@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
 from zotivity.engine import Engine
 from zotivity.catalog import PROVIDERS
 from zotivity.keystore import get_store
 from zotivity.llm import ChatMessage, GenParams, LLMError, UsageMeter, helper_model, main_model, truncation
-from zotivity.rag import prompts, wholetext
+from zotivity.rag import prompts, stages, wholetext
 from zotivity.rag.cards import QUESTION_TYPES, build_cards
 from zotivity.rag.plan import WHOLE_TOLERANCE, Plan, make_plan, retrieval_cfg
 from zotivity.rag.sources import build_sources, format_sources
@@ -22,6 +23,8 @@ log = logging.getLogger(__name__)
 
 HISTORY_MESSAGES = 6
 CARDS_BUDGET = 30000  # Karten: rund 100 Texte à 300 Tokens
+STAGES_NOT_POSSIBLE = "Lesen in Etappen ist hier nicht möglich; die Antwort stützt sich auf Textstellen."
+NO_NOTES = "In keiner Etappe stand etwas zur Frage. Versuche es mit anderen Worten oder mit Textstellen."
 WHOLE_NOT_POSSIBLE = "Ganze Texte sind hier nicht möglich; die Antwort stützt sich auf Textstellen."
 
 
@@ -123,8 +126,14 @@ class ChatService:
 
         if plan.requested == "whole" and plan.mode != "whole" and plan.reason in ("too_large", "off", "empty"):
             yield {"type": "warning", "text": WHOLE_NOT_POSSIBLE}
+        if plan.requested == "stages" and plan.mode == "passages" and plan.stages_reason not in ("", "search_only"):
+            yield {"type": "warning", "text": STAGES_NOT_POSSIBLE}
         if plan.mode == "whole":
             done = yield from self._ask_whole(question, chat_id, history, plan, llm_cfg, meter, setup_problem)
+            if done:
+                return
+        if plan.mode == "stages":
+            done = yield from self._ask_stages(question, chat_id, history, plan, llm_cfg, meter, setup_problem)
             if done:
                 return
 
@@ -276,9 +285,17 @@ class ChatService:
                                    meta={"mode": "whole", "basis": basis, "error": setup_problem})
             yield {"type": "error", "message": setup_problem, "kind": "setup"}
             return True
-        yield {"type": "status", "text": f"Schreibe Antwort mit {llm_cfg.model} …"}
         system = prompts.WHOLE_SYSTEM.format(language=prompts.language_rule(self.engine.settings.output_language),
                                              texts=wholetext.format_texts(texts))
+        yield from self._answer_from_texts(question, chat_id, history, system, texts, basis, {"mode": "whole"},
+                                           llm_cfg, meter)
+        return True
+
+    def _answer_from_texts(self, question: str, chat_id: int, history: list[dict], system: str, texts: list,
+                           basis: dict, meta: dict, llm_cfg, meter: UsageMeter) -> Iterator[dict]:
+        """Antwort mit Belegen [1, S. 64] auf ganze Texte (bzw. Notizen dazu) → Quellen je Text und Seite."""
+        store = self.engine.store
+        yield {"type": "status", "text": f"Schreibe Antwort mit {llm_cfg.model} …"}
         messages = _history_messages(history)
         messages.append(ChatMessage("user", question))
         params = GenParams(max_tokens=llm_cfg.max_output_tokens, temperature=llm_cfg.temperature, effort=llm_cfg.effort)
@@ -291,9 +308,9 @@ class ChatService:
                 raw = "".join(parts)
                 text, sources = wholetext.resolve_citations(raw, texts, store)
                 store.add_chat_message(chat_id, "assistant", text, sources=wholetext.source_dicts(sources),
-                                       meta={"mode": "whole", "raw": raw, "basis": basis, "error": str(e)})
+                                       meta={**meta, "raw": raw, "basis": basis, "error": str(e)})
             yield {"type": "error", "message": str(e), "kind": e.kind}
-            return True
+            return
         raw = "".join(parts)
         text, sources = wholetext.resolve_citations(raw, texts, store)
         dicts = wholetext.source_dicts(sources)
@@ -301,7 +318,81 @@ class ChatService:
         yield {"type": "rewrite", "text": text}
         msg_id = store.add_chat_message(
             chat_id, "assistant", text, sources=dicts,
-            meta={"mode": "whole", "raw": raw, "model": served[0], "usage": meter.usage.as_dict(), "basis": basis})
+            meta={**meta, "raw": raw, "model": served[0], "usage": meter.usage.as_dict(), "basis": basis})
         yield {"type": "done", "chat_id": chat_id, "message_id": msg_id, "model": served[0],
-               "usage": meter.usage.as_dict(), "basis": basis}
+               "usage": meter.usage.as_dict(), "basis": basis, "stages": meta.get("stages")}
+
+    def _ask_stages(self, question: str, chat_id: int, history: list[dict], plan: Plan, llm_cfg, meter: UsageMeter,
+                    setup_problem: str | None):
+        """Lesen in Etappen: Notizen je Etappe (parallel), dann die Antwort aus den Notizen. Rückgabe False: weiter
+        mit Textstellen."""
+        store = self.engine.store
+        settings = self.engine.settings
+        yield {"type": "status", "text": "Lese die ganzen Texte …"}
+        texts = wholetext.load_texts(self.engine, [(d.lib, d.item_key) for d in plan.docs])
+        parts = stages.split_stages(texts, plan.stage_tokens) if texts else []
+        if not parts or len(parts) > stages.MAX_STAGES:
+            yield {"type": "warning", "text": STAGES_NOT_POSSIBLE}
+            plan.mode = "passages"
+            return False
+        helper = plan.stage_model == "helper"
+        problem = setup_problem or (missing_key_message(llm_cfg.helper_provider or llm_cfg.provider) if helper else None)
+        basis = {"mode": "stages", "texts": [w.as_dict() for w in texts], "tokens": sum(w.tokens for w in texts),
+                 "stages": len(parts), "with_notes": 0, "scope_docs": plan.n_docs}
+        if problem:
+            store.add_chat_message(chat_id, "assistant", "", sources=[],
+                                   meta={"mode": "stages", "basis": basis, "error": problem})
+            yield {"type": "error", "message": problem, "kind": "setup"}
+            return True
+        reader = helper_model(llm_cfg, meter) if helper else main_model(llm_cfg, meter)
+        effort = llm_cfg.helper_effort if helper else llm_cfg.effort
+        language = prompts.language_rule(settings.output_language)
+        by_n = {w.n: w for w in texts}
+
+        def read(s: stages.Stage) -> str:
+            w = by_n[s.text_n]
+            system = prompts.STAGE_SYSTEM.format(i=s.index, n=s.total, t=w.n, citation=w.citation, title=w.title,
+                                                 pages=f" ({s.pages})" if s.pages else "", language=language,
+                                                 text=s.text)
+            return reader.complete(system, [ChatMessage("user", f"Frage: {question}")],
+                                   GenParams(max_tokens=4000, effort=effort)).text
+
+        notes: dict[int, str] = {}
+        failed: list[str] = []
+        yield {"type": "status", "text": f"Lese {len(parts)} Etappen …"}
+        ex = ThreadPoolExecutor(max_workers=settings.review.parallel_requests)
+        futures = {ex.submit(read, s): s for s in parts}
+        try:
+            for done_n, fut in enumerate(as_completed(futures), start=1):
+                s = futures[fut]
+                try:
+                    notes[s.index] = fut.result()
+                except LLMError as e:
+                    failed.append(str(e))
+                    yield {"type": "warning", "text": f"Etappe {s.index} nicht gelesen: {e}"}
+                yield {"type": "status", "text": f"Etappen gelesen: {done_n} von {len(parts)} …"}
+        finally:
+            for fut in futures:
+                fut.cancel()
+            ex.shutdown(wait=False)
+        stage_meta = [{"index": s.index, "text": s.text_n, "pages": s.pages, "headings": s.headings[:3],
+                       "notes": notes.get(s.index, "")} for s in parts]
+        basis["with_notes"] = sum(1 for s in parts if stages.has_notes(notes.get(s.index, "")))
+        if len(failed) == len(parts):
+            store.add_chat_message(chat_id, "assistant", "", sources=[],
+                                   meta={"mode": "stages", "basis": basis, "error": failed[0]})
+            yield {"type": "error", "message": failed[0]}
+            return True
+        notes_text = stages.format_notes(texts, parts, notes)
+        if not notes_text:
+            msg_id = store.add_chat_message(chat_id, "assistant", NO_NOTES, sources=[],
+                                            meta={"mode": "stages", "basis": basis, "stages": stage_meta})
+            yield {"type": "delta", "text": NO_NOTES}
+            yield {"type": "done", "chat_id": chat_id, "message_id": msg_id, "usage": meter.usage.as_dict(),
+                   "basis": basis, "stages": stage_meta}
+            return True
+        system = prompts.STAGES_ANSWER_SYSTEM.format(
+            texts="; ".join(f"[{w.n}] {w.citation}: {w.title}" for w in texts), language=language, notes=notes_text)
+        yield from self._answer_from_texts(question, chat_id, history, system, texts, basis,
+                                           {"mode": "stages", "stages": stage_meta}, llm_cfg, meter)
         return True

@@ -19,9 +19,10 @@ from dataclasses import dataclass, field
 from zotivity.engine import Engine
 from zotivity.extract.chunker import CHARS_PER_TOKEN
 from zotivity.index.store import SearchFilter
+from zotivity.rag.stages import MAX_STAGES, MAX_TEXTS, estimate_stages, stage_size
 from zotivity.settings import FULLTEXT_LIMITS, RetrievalSettings, Settings
 
-SCOPE_MODES = ("auto", "passages", "whole")
+SCOPE_MODES = ("auto", "passages", "whole", "stages")
 # Ganze Texte dürfen etwas über der Schätzung liegen, bevor auf Textstellen ausgewichen wird
 WHOLE_TOLERANCE = 1.15
 
@@ -124,6 +125,12 @@ class Plan:
     auto: dict = field(default_factory=dict)  # von „Automatisch“ angepasste Werte
     band: str = ""  # few | some | many | very_many
     fixed: list[str] = field(default_factory=list)  # unter Experten fest eingestellt
+    # Lesen in Etappen: geschätzte Etappen, Länge je Etappe, Modell der Notizen; Grund, falls nicht möglich
+    # ("" möglich, search_only, empty, too_many_texts, too_long)
+    stages: int = 0
+    stage_tokens: int = 0
+    stage_model: str = "helper"
+    stages_reason: str = ""
 
     @property
     def whole_ok(self) -> bool:
@@ -135,6 +142,8 @@ class Plan:
             "requested": self.requested, "mode": self.mode, "n_docs": self.n_docs, "tokens": self.tokens,
             "limit": self.limit, "provider": self.provider, "whole_ok": self.whole_ok, "reason": self.reason,
             "session": self.session, "auto": self.auto, "band": self.band, "fixed": self.fixed,
+            "stages": self.stages, "stage_tokens": self.stage_tokens, "stage_model": self.stage_model,
+            "stages_ok": not self.stages_reason, "stages_reason": self.stages_reason,
             "values": {"top_k": c.top_k, "max_chunks_per_doc": c.max_chunks_per_doc, "mmr_lambda": c.mmr_lambda,
                        "neighbor_chunks": c.neighbor_chunks, "context_token_budget": c.context_token_budget,
                        "multi_query": c.multi_query, "research_rounds": c.research_rounds, "rerank": c.rerank},
@@ -150,7 +159,16 @@ def make_plan(engine: Engine, f: SearchFilter, requested: str | None, overrides:
     limit = fulltext_limit(settings, provider)
     reason = ("search_only" if search_only else "empty" if not docs else "off" if limit <= 0
               else "too_large" if tokens > limit else "")
-    mode = "whole" if not reason and requested in ("auto", "whole") else "passages"
+    # „In Etappen“: passen die Texte ganz, werden sie ganz gelesen (schneller, gleich vollständig)
+    mode = "whole" if not reason and requested in ("auto", "whole", "stages") else "passages"
+    stage_model = settings.retrieval.stage_model
+    notes_provider = (settings.llm.helper_provider or provider) if stage_model == "helper" else provider
+    size = stage_size(fulltext_limit(settings, notes_provider))
+    n_stages = estimate_stages(tokens, len(docs), size) if docs else 0
+    stages_reason = ("search_only" if search_only else "empty" if not docs else "too_many_texts" if len(docs) > MAX_TEXTS
+                     else "too_long" if n_stages > MAX_STAGES else "")
+    if requested == "stages" and mode != "whole" and not stages_reason:
+        mode = "stages"
     session = {k: v for k, v in (overrides or {}).items() if k in RetrievalSettings.model_fields and v is not None}
     base = settings.retrieval
     band, auto, fixed = "", {}, []
@@ -160,4 +178,5 @@ def make_plan(engine: Engine, f: SearchFilter, requested: str | None, overrides:
         auto = {k: v for k, v in values.items() if k not in fixed and k not in session and getattr(base, k) != v}
     cfg = retrieval_cfg(settings, {**auto, **session})
     return Plan(requested=requested, mode=mode, n_docs=len(docs), tokens=tokens, limit=limit, provider=provider,
-                reason=reason, cfg=cfg, docs=docs, session=session, auto=auto, band=band, fixed=fixed)
+                reason=reason, cfg=cfg, docs=docs, session=session, auto=auto, band=band, fixed=fixed,
+                stages=n_stages, stage_tokens=size, stage_model=stage_model, stages_reason=stages_reason)

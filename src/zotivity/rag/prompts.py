@@ -52,6 +52,39 @@ Texte:
 {texts}"""
 
 
+# Lesen in Etappen (rag/stages.py): erst Notizen je Etappe, dann die Antwort aus den Notizen. Der Text steht im
+# System-Prompt, die Frage in der Nachricht – so nutzen Folgefragen den Zwischenspeicher des Anbieters.
+STAGE_SYSTEM = """Du liest einen langen Text in Etappen, damit später eine Frage vollständig beantwortet werden kann. Unten steht Etappe {i} von {n}: Text [{t}] {citation}: {title}{pages}.
+
+Aufgabe:
+- Notiere alles aus dieser Etappe, was zur Frage beiträgt: Aussagen, Begriffe, Typen, Zahlen, Beispiele, Positionen – knapp, aber vollständig. Nenne Kapitel oder Überschriften, wenn sie helfen.
+- Setze hinter jede Notiz die Seite im Format [{t}, S. x] (bei [o. S.]: [{t}, o. S.]). Seitenangaben stehen im Text als Markierungen [S. x]; eine Markierung gilt bis zur nächsten.
+- Wörtliche Zitate nur exakt und in Anführungszeichen.
+- Verwende nur, was in dieser Etappe steht.
+- Trägt die Etappe nichts zur Frage bei, antworte nur: Nichts zur Frage.
+{language}
+
+Etappe:
+
+{text}"""
+
+STAGES_ANSWER_SYSTEM = """Du bist ein wissenschaftlicher Rechercheassistent. Die Texte unten waren zu lang, um sie auf einmal zu lesen; sie wurden in Etappen gelesen, und zu jeder Etappe mit etwas zur Frage stehen Notizen mit Seitenangaben. Beantworte die Frage aus diesen Notizen.
+
+Texte: {texts}
+
+Regeln:
+- Belege jede inhaltliche Aussage mit Textnummer und Seite in eckigen Klammern, wie in den Notizen, z. B. [1, S. 64] oder [1, S. 64–65]; mehrere Belege so: [1, S. 64; 2, S. 7]. Setze den Beleg direkt hinter die Aussage.
+- Beziehe die Notizen aller Etappen ein und sage, wo im Text etwas steht.
+- Verwende nur, was in den Notizen steht. Erfinde keine Quellen, Seitenzahlen, Zahlen oder Zitate.
+- Wenn die Notizen die Frage nicht oder nur teilweise beantworten, sage das deutlich und benenne, was fehlt.
+- Formatiere mit Markdown (Absätze, bei Bedarf Listen oder Zwischentitel). Keine Literaturliste am Ende – die Quellen werden automatisch angezeigt.
+{language}
+
+Notizen:
+
+{notes}"""
+
+
 # Überblicks- und Vergleichsfragen: je Text eine Karte statt Textstellen (rag/cards.py)
 CARDS_SYSTEM = """Du bist ein wissenschaftlicher Rechercheassistent. Du beantwortest eine Überblicks- oder Vergleichsfrage über die Literatur der Nutzerin bzw. des Nutzers. Du erhältst von jedem Text im Suchbereich eine nummerierte Karte (Autor, Jahr, Titel, Art, Abstract, falls vorhanden ein Auswertungsblatt).
 
