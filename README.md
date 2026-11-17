@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/img/banner-en-dark.png">
-    <img src="docs/img/banner-en-light.png" alt="Zotivity – Comprehensive scholarly work with Zotero. Database search, cited answers and checked literature reviews. Formerly ZotLLM.">
+    <img src="docs/img/banner-en-light.png" alt="Zotivity – Comprehensive scholarly work with Zotero. Database search, cited answers and checked literature reviews.">
   </picture>
 </p>
 

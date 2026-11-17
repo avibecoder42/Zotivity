@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/img/banner-de-dark.png">
-    <img src="docs/img/banner-de-light.png" alt="Zotivity – Umfassendes wissenschaftliches Arbeiten mit Zotero. Recherche, belegte Antworten und geprüfte Forschungsstände. Vormals ZotLLM.">
+    <img src="docs/img/banner-de-light.png" alt="Zotivity – Umfassendes wissenschaftliches Arbeiten mit Zotero. Recherche, belegte Antworten und geprüfte Forschungsstände.">
   </picture>
 </p>
 
