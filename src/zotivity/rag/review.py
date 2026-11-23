@@ -489,7 +489,10 @@ class ReviewService:
             d["title"] = it.get("title", "")
             d["citation"] = author_year(it) if it else d["item_key"]
             d["removed"] = bool(it.get("removed"))
-            d["has_sheet"] = self.store.get_sheet(d["lib"], d["item_key"]) is not None
+            sheet_row = self.store.get_sheet(d["lib"], d["item_key"])
+            d["has_sheet"] = sheet_row is not None
+            d["sheet_outdated"] = self.sheet_outdated(d["lib"], d["item_key"], sheet_row) if sheet_row else False
+            d["cited_in"] = self.cited_in(review["state"], d["item_key"]) if sheet_row else []
             d["zotero_select"] = zotero_select_url(d["lib"], d["item_key"])
         review["docs"] = docs
         review["unsynced_libraries"] = unsynced
@@ -694,6 +697,7 @@ class ReviewService:
                    language: str | None = None) -> dict:
         rcfg = self.engine.settings.review
         item = self.store.item(lib, item_key) or {}
+        version = self.text_version(lib, item_key)  # vor dem Lesen: so passt sie sicher zum gelesenen Text
         text, basis = self.document_text(lib, item_key, focus, rcfg.fulltext_token_limit, rcfg.relevant_chunks_if_long)
         if not text:
             raise ValueError("Kein indexierter Text vorhanden")
@@ -707,6 +711,7 @@ class ReviewService:
             raise ValueError("Ungültiges Auswertungsblatt")
         data["_basis"] = basis
         data["_version"] = SHEET_VERSION
+        data["_fassung"] = version
         # Seiten der Kernzitate nicht dem Modell überlassen: im Text nachschlagen (gedruckte Seite oder o. S.)
         return self.verify_sheet_pages(lib, item_key, data)
 
@@ -770,7 +775,54 @@ class ReviewService:
         return {"lib": lib, "item_key": item_key, "quotes": quotes,
                 "sheet": {k: v for k, v in sheet.items() if not k.startswith("_") and k != "kernzitate"},
                 "basis": sheet.get("_basis", ""), "model": row.get("model") or "", "created_at": row.get("created_at"),
+                "outdated": self.sheet_outdated(lib, item_key, row),
                 "note_select": zotero_select_url(lib, row["note_key"]) if row.get("note_key") else None}
+
+    # -- Fassung des Texts: Ist ein Blatt älter als der Text, aus dem es stammt? -------------------------------------
+    def text_version(self, lib: str, item_key: str) -> dict:
+        """Fassung des Texts, aus dem ein Auswertungsblatt entsteht: je eingelesenem Anhang die Prüfsumme der gelesenen
+        Datei, die Zahl der Zeichen und der Zeitpunkt des Einlesens."""
+        out = {}
+        for a in self.store.attachments_for_item(lib, item_key):
+            if a.get("status") in ("skipped", "redundant") or not a.get("n_chunks"):
+                continue
+            out[a["key"]] = {"md5": a.get("indexed_md5") or "", "chars": int(a.get("n_chars") or 0),
+                             "at": float(a.get("indexed_at") or 0)}
+        return out
+
+    def sheet_outdated(self, lib: str, item_key: str, row: dict | None = None) -> bool:
+        """Wurde der Text nach dem Blatt neu eingelesen und hat sich dabei geändert (andere Datei, z. B. nach OCR, oder
+        deutlich anderer Text)? Dasselbe Einlesen derselben Datei zählt nicht – auch nicht auf einem anderen Computer
+        (Projekt-Import), wo die Zeitpunkte andere sind."""
+        row = row if row is not None else self.store.get_sheet(lib, item_key)
+        if not row:
+            return False
+        now = self.text_version(lib, item_key)
+        then = row["sheet"].get("_fassung")
+        if not isinstance(then, dict):  # Blatt aus einer Version vor 1.2.8: nur der Zeitpunkt ist bekannt
+            created = float(row.get("created_at") or 0)
+            return any(v["at"] > created + 1 for v in now.values())
+        if set(then) != set(now):
+            return True
+        for key, v in now.items():
+            old = then.get(key) or {}
+            if v["at"] == old.get("at"):
+                continue
+            if v["md5"] != (old.get("md5") or ""):
+                return True
+            a, b = v["chars"], int(old.get("chars") or 0)
+            if abs(a - b) > max(200, 0.02 * max(a, b)):
+                return True
+        return False
+
+    def cited_in(self, state: dict, item_key: str) -> list[str]:
+        """Überschriften der geschriebenen Abschnitte, die einen Text zitieren (nach einem neuen Blatt neu schreiben)."""
+        out = []
+        for i, sec in enumerate(state.get("sections") or []):
+            text = sec.get("text") or ""
+            if any(key == item_key for m in self._CITE.finditer(text) for key, _ in parse_citation(m.group(1))):
+                out.append(sec.get("heading") or f"{i + 1}")
+        return out
 
     def _page_index(self, lib: str, item_key: str, label: str) -> int | None:
         """Seitenangabe eines Belegs („12“, „12–14“, „1, 9“, „12f.“, „xii“) → Seite in der PDF (0-basiert).
@@ -1158,7 +1210,9 @@ class ReviewService:
                      model_choice: str | None = None, overwrite: bool = False, language: str | None = None) -> dict:
         rcfg = self.engine.settings.review
         model, effort = self._model(model_choice or rcfg.sheet_model, job)
-        todo = [(lib, k) for lib, k in docs if overwrite or not self.store.get_sheet(lib, k)]
+        # Fehlende Blätter, und solche aus einer früheren Fassung des Texts (z. B. vor OCR): ein Blatt gilt für alle
+        # Forschungsstände, ein neuer soll aber nicht auf einem Blatt aus dem alten Scan aufbauen
+        todo = [(lib, k) for lib, k in docs if overwrite or self._sheet_needed(lib, k)]
         job.update(phase="Auswertungsblätter", total=len(docs), done=len(docs) - len(todo),
                    message=f"{len(todo)} Blätter zu erstellen ({len(docs) - len(todo)} vorhanden)")
         write_notes = rcfg.write_notes_to_zotero
@@ -1208,6 +1262,10 @@ class ReviewService:
         job.check()
         return result
 
+    def _sheet_needed(self, lib: str, item_key: str) -> bool:
+        row = self.store.get_sheet(lib, item_key)
+        return row is None or self.sheet_outdated(lib, item_key, row)
+
     def estimate_extraction(self, review_id: int) -> dict:
         """Umfang von Schritt 2: Eingabe-Tokens (gezählt), Ausgabe- und Denk-Tokens (Spanne), Kosten (falls Preise
         für das Modell hinterlegt sind)."""
@@ -1216,7 +1274,7 @@ class ReviewService:
         docs = [d for d in self.store.review_docs(review_id) if d["included"]]
         total, missing = 0, 0
         for d in docs:
-            if self.store.get_sheet(d["lib"], d["item_key"]):
+            if not self._sheet_needed(d["lib"], d["item_key"]):
                 continue
             missing += 1
             toks = sum(estimate_tokens(r["text"]) for r in self.store.document_chunks(d["lib"], d["item_key"])
@@ -1263,7 +1321,11 @@ class ReviewService:
                                 overwrite=True, language=state.get("language"))
         if not res["created"]:
             raise ValueError(f"Auswertungsblatt nicht neu erstellt: {res.get('error') or '?'}")
-        job.update(phase="Fertig", message="Auswertungsblatt neu erstellt")
+        res["cited_in"] = self.cited_in(state, item_key)
+        msg = "Auswertungsblatt neu erstellt"
+        if res["cited_in"]:
+            msg += "; diese Abschnitte zitieren den Text und sollten neu geschrieben werden: " + ", ".join(res["cited_in"])
+        job.update(phase="Fertig", message=msg)
         return res
 
     # ------------------------------------------------------------------------------

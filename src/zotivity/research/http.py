@@ -6,7 +6,7 @@ Tests übergeben einen ``httpx.MockTransport`` und eine ``sleep``-Funktion, die 
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from urllib.parse import urlsplit
 
 import httpx
@@ -27,8 +27,11 @@ class Http:
     def close(self) -> None:
         self.client.close()
 
-    def request(self, method: str, url: str, *, retries: int = 5, check: bool = True, **kw) -> httpx.Response:
-        """check=False: Fehlerstatus (>= 400, ausser 429/5xx) zurückgeben statt SourceError auslösen."""
+    def request(self, method: str, url: str, *, retries: int = 5, check: bool = True,
+                throttle_waits: Sequence[float] = (), **kw) -> httpx.Response:
+        """check=False: Fehlerstatus (>= 400, ausser 429/5xx) zurückgeben statt SourceError auslösen.
+        throttle_waits: Wartezeiten in Sekunden nach einem 429 (je Versuch), statt 2, 4, 8 … – für Dienste, die nach
+        einer Drosselung länger brauchen (Semantic Scholar)."""
         host = urlsplit(url).netloc or url
         for attempt in range(retries):
             try:
@@ -39,7 +42,10 @@ class Http:
                     continue
                 raise SourceError(f"{host} ist nicht erreichbar: {e}") from None
             if r.status_code in RETRY_STATUS and attempt < retries - 1:
-                self.sleep(_retry_after(r) or 2 ** (attempt + 1))
+                if r.status_code == 429 and attempt < len(throttle_waits):
+                    self.sleep(max(_retry_after(r), throttle_waits[attempt]))
+                else:
+                    self.sleep(_retry_after(r) or 2 ** (attempt + 1))
                 continue
             if r.headers.get("Backoff"):  # Zotero bittet um eine Pause
                 self.sleep(_seconds(r.headers["Backoff"]))

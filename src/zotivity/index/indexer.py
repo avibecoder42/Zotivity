@@ -16,7 +16,6 @@ Für grosse Bibliotheken (Tausende PDFs, Läufe über Tage):
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import shutil
@@ -35,7 +34,7 @@ from zotivity.extract.pagenumbers import parse_page_range
 from zotivity.extract.pdf import substantive_chars
 from zotivity.extract.worker import DEFAULT_TARGET, ExtractionFailed, ExtractionWorker
 from zotivity.index import duplicates
-from zotivity.index.store import SearchFilter, strip_bidi
+from zotivity.index.store import SearchFilter, file_md5, strip_bidi
 from zotivity.index.vectors import normalize
 from zotivity.jobs import Job, JobCancelled
 from zotivity.power import keep_awake
@@ -67,17 +66,6 @@ def file_stat(path: Path | None) -> dict:
     except OSError:
         st = None
     return {"file_size": st.st_size, "file_mtime": st.st_mtime} if st else {}
-
-
-def file_md5(path: Path) -> str | None:
-    h = hashlib.md5()  # noqa: S324 - Vergleich mit der MD5-Summe, die Zotero führt
-    try:
-        with open(path, "rb") as fh:
-            for block in iter(lambda: fh.read(1 << 20), b""):
-                h.update(block)
-    except OSError:
-        return None
-    return h.hexdigest()
 
 
 def in_hour_window(now: datetime, start: int | None, end: int | None) -> bool:
@@ -367,6 +355,9 @@ class Indexer:
         warning = ""
         path = Path(att["path"]) if att.get("path") else None
         stat = file_stat(path)
+        # Prüfsumme der Datei, die tatsächlich gelesen wird – nicht die aus Zoteros Metadaten: Wird eine Datei ausserhalb
+        # von Zotero ersetzt (z. B. nach OCR), führt Zotero sie erst später nach, und der nächste Lauf läse sie nochmals
+        read_md5 = (file_md5(path) if path and path.exists() else None) or att.get("md5")
         if path and path.exists():
             kwargs = {"max_pages": icfg.max_pages_per_document, "min_chars_per_page": icfg.min_chars_per_page,
                       "ocr": icfg.ocr, "ocr_languages": icfg.ocr_languages}
@@ -406,14 +397,14 @@ class Indexer:
 
         if doc is None:
             self.store.set_attachment_status(lib, key, "error", error=warning or "Unbekannter Fehler",
-                                             indexed_md5=att.get("md5"), indexed_at=time.time(), **stat)
+                                             indexed_md5=read_md5, indexed_at=time.time(), **stat)
             return "error", warning
         if doc.needs_ocr or doc.char_count < 200:
             self.store.replace_chunks(lib, parent, key, [])
             msg = "Scan ohne Textebene – Texterkennung (OCR) nötig" if doc.needs_ocr else "Kein Text gefunden"
             self.store.set_attachment_status(lib, key, "no_text", error=msg, method=doc.method,
                                              n_pages=doc.n_pages, n_chars=doc.char_count, n_chunks=0,
-                                             indexed_md5=att.get("md5"), indexed_at=time.time(), **stat)
+                                             indexed_md5=read_md5, indexed_at=time.time(), **stat)
             return "no_text", msg
 
         chunks = mark_references(chunk_pages(doc.pages, chunk_tokens=ccfg.chunk_tokens,
@@ -424,7 +415,7 @@ class Indexer:
         labels = [p.label for p in doc.pages] if doc.method in ("pymupdf", "ocr") else []
         self.store.set_attachment_status(lib, key, "indexed", error=warning or None, method=doc.method,
                                          n_pages=doc.n_pages, n_chars=doc.char_count, n_chunks=len(chunks),
-                                         indexed_md5=att.get("md5"), indexed_at=time.time(),
+                                         indexed_md5=read_md5, indexed_at=time.time(),
                                          page_labels=json.dumps(labels, ensure_ascii=False),
                                          label_source=getattr(doc, "label_source", "") or "", **stat)
         return "indexed", warning
@@ -767,9 +758,11 @@ class Indexer:
                         if type(e).__name__ == "JobCancelled":
                             raise
                         status, msg = "error", str(e)
+                        failed = Path(att["path"]) if att.get("path") else None
                         self.store.set_attachment_status(
-                            att["lib"], att["key"], "error", error=str(e), indexed_md5=att.get("md5"),
-                            indexed_at=time.time(), **file_stat(Path(att["path"]) if att.get("path") else None))
+                            att["lib"], att["key"], "error", error=str(e),
+                            indexed_md5=(file_md5(failed) if failed else None) or att.get("md5"),
+                            indexed_at=time.time(), **file_stat(failed))
                     row = self.store.attachment(att["lib"], att["key"]) or {}
                     cur["pages"] = row.get("n_pages")
                     if status == "indexed":

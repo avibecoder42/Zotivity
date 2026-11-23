@@ -6,4 +6,5 @@ Then enable Zotero's local API (Zotero → Settings → Advanced) and follow the
 ### Please note
 - Zotivity is **vibe-coded**: it was written by Claude (Anthropic) in Claude Code and tested in daily use, not reviewed line by line by a human developer.
 - **Use it as a tool, not as a replacement for your own scholarly work** – read the sources, verify critically and do not submit generated text as your own. See the README section on the risk of deskilling.
+- **Privacy:** at start-up Zotivity checks GitHub for updates; everything else happens only when you use a feature. The installer shows the [privacy policy](https://github.com/avibecoder42/Zotivity/blob/main/PRIVACY.md) and lets you turn the update check off.
 - Zotivity is an independent project, not affiliated with or endorsed by Zotero or the Corporation for Digital Scholarship. Zotero is a registered trademark of the Corporation for Digital Scholarship.

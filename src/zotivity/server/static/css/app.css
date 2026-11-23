@@ -830,6 +830,7 @@ details.doc-group > summary:hover .doc-group-title { color: var(--accent); }
 .doc-reason { flex-basis: 100%; line-height: 1.4; }
 .sheet-mark { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); color: var(--ink-3); }
 .sheet-mark.ok { background: var(--ok-soft); color: var(--ok); }
+.sheet-mark.stale { background: var(--warn-soft); color: var(--warn); }
 /* Auswertungsblatt, aufgeklappt in „Auswerten“ */
 .sheet-toggle { display: flex; align-items: flex-start; gap: 6px; width: 100%; border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .sheet-toggle .icon { margin-top: 3px; color: var(--ink-3); flex: none; }

@@ -21,6 +21,10 @@ DEFAULT_MAX = 1000
 TYPES = {"JournalArticle": "journalArticle", "Review": "journalArticle", "Book": "book", "BookSection": "bookSection",
          "Conference": "conferencePaper", "Dissertation": "thesis"}
 NO_KEY = "Semantic Scholar: zu viele Anfragen. Mit einem kostenlosen Schlüssel ([semanticscholar] api_key) geht es zuverlässig."
+# Mit Schlüssel: Der Schlüssel ist in Ordnung, der Dienst drosselt (z. B. nach einer schweren Anfrage) – länger warten
+THROTTLED = "Semantic Scholar drosselt gerade (zu viele Anfragen). Bitte später nochmals versuchen."
+KEY_WAITS = (10, 20, 40)  # Sekunden zwischen den Versuchen nach HTTP 429, wenn ein Schlüssel gespeichert ist
+COUNT_FIELDS = "paperId"  # Zählen braucht keine Abstracts: sonst bis 1000 Treffer mit allen Feldern (rund 1,3 MB)
 
 
 class SemanticScholar:
@@ -33,23 +37,31 @@ class SemanticScholar:
     def _headers(self) -> dict:
         return {"x-api-key": self.api_key} if self.api_key else {}
 
-    def _get(self, q: str, limits: dict | None, token: str | None = None) -> dict:
+    def _request(self, method: str, url: str, **kw):
+        if self.api_key:
+            return self.http.request(method, url, headers=self._headers(), retries=len(KEY_WAITS) + 1,
+                                     throttle_waits=KEY_WAITS, check=False, **kw)
+        return self.http.request(method, url, retries=2, check=False, **kw)
+
+    def _throttled(self) -> SourceError:
+        return SourceError(THROTTLED if self.api_key else NO_KEY, 429)
+
+    def _get(self, q: str, limits: dict | None, token: str | None = None, fields: str = FIELDS) -> dict:
         limits = limits or {}
-        params = {"query": q, "fields": FIELDS}
+        params = {"query": q, "fields": fields}
         if limits.get("year_from") or limits.get("year_to"):
             params["year"] = f"{limits.get('year_from') or ''}-{limits.get('year_to') or ''}"
         if token:
             params["token"] = token
-        r = self.http.request("GET", BULK, params=params, headers=self._headers(), retries=3 if self.api_key else 2,
-                              check=False)
+        r = self._request("GET", BULK, params=params)
         if r.status_code == 429:
-            raise SourceError(NO_KEY, 429)
+            raise self._throttled()
         if r.status_code >= 400:
             raise SourceError(f"Semantic Scholar: HTTP {r.status_code}: {r.text[:200]}", r.status_code)
         return r.json()
 
     def count(self, q: str, limits: dict | None = None) -> SearchResult:
-        return SearchResult(int(self._get(q, limits).get("total") or 0))
+        return SearchResult(int(self._get(q, limits, fields=COUNT_FIELDS).get("total") or 0))
 
     def search(self, q: str, limits: dict | None = None, max_records: int | None = None,
                progress: Callable[[int, int], None] | None = None) -> SearchResult:
@@ -72,10 +84,10 @@ class SemanticScholar:
         """Abstracts für bis zu 500 DOIs auf einmal (für „Abstracts nachladen“)."""
         if not dois:
             return {}
-        r = self.http.request("POST", BATCH, params={"fields": "abstract,externalIds"}, headers=self._headers(),
-                              json={"ids": [f"DOI:{d}" for d in dois[:500]]}, retries=2, check=False)
+        r = self._request("POST", BATCH, params={"fields": "abstract,externalIds"},
+                          json={"ids": [f"DOI:{d}" for d in dois[:500]]})
         if r.status_code == 429:
-            raise SourceError(NO_KEY, 429)
+            raise self._throttled()
         if r.status_code >= 400:
             raise SourceError(f"Semantic Scholar: HTTP {r.status_code}", r.status_code)
         out = {}

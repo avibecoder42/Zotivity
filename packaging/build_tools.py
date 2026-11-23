@@ -1,13 +1,14 @@
-"""Hilfsfunktionen für den Build: Versionsinfo, Lizenzen, Prüfsummen, Update-Manifest.
+"""Hilfsfunktionen für den Build: Versionsinfo, Lizenzen, Prüfsummen, Update-Manifest, Datenschutz für das Setup.
 
 Aufruf: python packaging/build_tools.py version|licenses <Ordner>|manifest <Installer> [Basis-URL]|print-version
-                                        |release-notes <Datei>
+                                        |release-notes <Datei>|privacy
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import sys
 from importlib import metadata
@@ -35,6 +36,7 @@ def version_info() -> None:
       StringStruct('FileDescription', 'Zotivity – Fragen und Forschungsstand für die Zotero-Bibliothek'),
       StringStruct('FileVersion', '{__version__}'),
       StringStruct('InternalName', 'Zotivity'),
+      StringStruct('LegalCopyright', 'Copyright (c) 2026 avibecoder. MIT License.'),
       StringStruct('OriginalFilename', 'Zotivity.exe'),
       StringStruct('ProductName', 'Zotivity'),
       StringStruct('ProductVersion', '{__version__}')])]),
@@ -134,6 +136,36 @@ def release_notes(target: str) -> None:
     print(target)
 
 
+def privacy_text(markdown: str) -> str:
+    """Datenschutzerklärung (PRIVACY*.md) als schlichter Text für die Seite im Setup: ohne Markdown-Zeichen, ein
+    Absatz bzw. Listenpunkt je Zeile (das Setup bricht selbst um)."""
+    lines: list[str] = []
+    for raw in markdown.replace("\r\n", "\n").split("\n"):
+        line = re.sub(r"^#+\s*", "", raw.rstrip())
+        line = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", line)
+        line = line.replace("**", "").replace("`", "")
+        if re.fullmatch(r"(Stand|As of).*· (English|Deutsch)", line.strip()):
+            line = line.rsplit("·", 1)[0].rstrip()
+        continues = raw.startswith(" ") or (raw and not raw.startswith(("#", "- ")) and lines and lines[-1]
+                                             and not raw.startswith("**"))
+        if continues and line.strip():
+            lines[-1] = f"{lines[-1]} {line.strip()}"
+        else:
+            lines.append(line)
+    return "\n".join(lines).strip() + "\n"
+
+
+def privacy() -> None:
+    """build/privacy-de.txt und build/privacy-en.txt für installer.iss (UTF-8 mit BOM, Windows-Zeilenenden)."""
+    out = ROOT / "build"
+    out.mkdir(parents=True, exist_ok=True)
+    for lang, name in (("de", "PRIVACY.de.md"), ("en", "PRIVACY.md")):
+        text = privacy_text((ROOT / name).read_text(encoding="utf-8")).replace("\n", "\r\n")
+        target = out / f"privacy-{lang}.txt"
+        target.write_bytes(b"\xef\xbb\xbf" + text.encode("utf-8"))
+        print(target)
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1]
     if cmd == "version":
@@ -146,3 +178,5 @@ if __name__ == "__main__":
         print(__version__)
     elif cmd == "release-notes":
         release_notes(sys.argv[2])
+    elif cmd == "privacy":
+        privacy()

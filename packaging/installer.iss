@@ -22,6 +22,9 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher=Zotivity
+AppPublisherURL=https://github.com/avibecoder42/Zotivity
+AppSupportURL=https://github.com/avibecoder42/Zotivity/issues
+AppCopyright=Copyright (c) 2026 avibecoder. MIT License.
 AppComments=Umfassendes wissenschaftliches Arbeiten mit der eigenen Zotero-Bibliothek
 ; Bisheriger Ordner wird beibehalten – ausser dem Standardordner des früheren Namens (siehe [Code]: AppDir)
 DefaultDirName={code:AppDir}
@@ -51,13 +54,15 @@ RestartApplications=no
 VersionInfoVersion={#AppVersion}.0
 VersionInfoProductName={#AppName}
 VersionInfoDescription={#AppName} Setup
+VersionInfoCopyright=Copyright (c) 2026 avibecoder. MIT License.
 MinVersion=10.0
 
 [Languages]
-Name: "de"; MessagesFile: "compiler:Languages\German.isl"
-Name: "fr"; MessagesFile: "compiler:Languages\French.isl"
-Name: "it"; MessagesFile: "compiler:Languages\Italian.isl"
-Name: "en"; MessagesFile: "compiler:Default.isl"
+; Vor der Installation: die Datenschutzerklärung (build_tools.py privacy erzeugt die Texte aus PRIVACY*.md)
+Name: "de"; MessagesFile: "compiler:Languages\German.isl"; InfoBeforeFile: "..\build\privacy-de.txt"
+Name: "fr"; MessagesFile: "compiler:Languages\French.isl"; InfoBeforeFile: "..\build\privacy-en.txt"
+Name: "it"; MessagesFile: "compiler:Languages\Italian.isl"; InfoBeforeFile: "..\build\privacy-en.txt"
+Name: "en"; MessagesFile: "compiler:Default.isl"; InfoBeforeFile: "..\build\privacy-en.txt"
 
 [CustomMessages]
 de.UpdatePrompt=Zotivity %1 ist bereits installiert.%n%nAuf Version %2 aktualisieren? Einstellungen, Index, Wissenskorpora und gespeicherte API-Schlüssel bleiben erhalten.
@@ -81,8 +86,27 @@ fr.StillRunning=Zotivity est encore en cours d'exécution et n'a pas pu être fe
 it.StillRunning=Zotivity è ancora in esecuzione e non è stato possibile chiuderlo automaticamente.%n%nChiudere Zotivity (o terminarlo in Gestione attività) e poi scegliere «Riprova».
 en.StillRunning=Zotivity is still running and could not be closed automatically.%n%nPlease close Zotivity (or end it in Task Manager), then choose "Retry".
 
+de.PrivacyGroup=Datenschutz:
+fr.PrivacyGroup=Confidentialité :
+it.PrivacyGroup=Privacy:
+en.PrivacyGroup=Privacy:
+de.UpdateCheckTask=Beim Start nach Updates suchen (fragt GitHub nach einer neuen Version)
+fr.UpdateCheckTask=Rechercher des mises à jour au démarrage (interroge GitHub)
+it.UpdateCheckTask=Cerca aggiornamenti all'avvio (interroga GitHub)
+en.UpdateCheckTask=Check for updates at start-up (asks GitHub for a new version)
+
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+; Die einzige Verbindung, die Zotivity von sich aus aufbaut (siehe PRIVACY.md). Bei einem Update mit Assistent
+; vorbelegt wie die Einstellung im Programm (siehe [Code]: CurPageChanged)
+Name: "updatecheck"; Description: "{cm:UpdateCheckTask}"; GroupDescription: "{cm:PrivacyGroup}"
+
+[Registry]
+; Wahl an Zotivity übergeben: Das Programm übernimmt sie beim nächsten Start in die Einstellung
+; check_updates_on_start und löscht den Wert (install_options.py). Unbeaufsichtigte Updates aus dem Programm
+; schreiben nichts – dort gilt die Einstellung im Programm.
+Root: HKCU; Subkey: "Software\Zotivity"; ValueType: dword; ValueName: "CheckUpdatesOnStart"; ValueData: 1; Tasks: updatecheck; Check: not WizardSilent; Flags: uninsdeletevalue uninsdeletekeyifempty
+Root: HKCU; Subkey: "Software\Zotivity"; ValueType: dword; ValueName: "CheckUpdatesOnStart"; ValueData: 0; Tasks: not updatecheck; Check: not WizardSilent; Flags: uninsdeletevalue uninsdeletekeyifempty
 
 [InstallDelete]
 ; Programmdateien älterer Versionen entfernen, damit keine veralteten Bibliotheken zurückbleiben.
@@ -172,6 +196,28 @@ begin
     and (CompareText(Legacy, RemoveBackslashUnlessRoot(ExpandConstant('{app}'))) <> 0)
     and (FileExists(AddBackslash(Legacy) + '{#LegacyName}.exe') or FileExists(AddBackslash(Legacy) + '{#OlderName}.exe')) then
     DelTree(Legacy, True, True, True);
+end;
+
+// «Beim Start nach Updates suchen»: bei einem Update mit Assistent so vorbelegt wie in den Einstellungen
+var
+  UpdateTaskInitialized: Boolean;
+
+function UpdateCheckOffInSettings(): Boolean;
+var
+  S: AnsiString;
+begin
+  Result := LoadStringFromFile(ExpandConstant('{localappdata}\{#AppName}\settings.json'), S)
+    and (Pos('"check_updates_on_start": false', String(S)) > 0);
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if (CurPageID = wpSelectTasks) and not UpdateTaskInitialized then
+  begin
+    UpdateTaskInitialized := True;
+    if UpdateCheckOffInSettings() then
+      WizardSelectTasks('!updatecheck');
+  end;
 end;
 
 function WebView2Installed(): Boolean;

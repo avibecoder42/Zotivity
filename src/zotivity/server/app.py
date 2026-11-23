@@ -43,6 +43,7 @@ from zotivity.rag.sources import build_sources
 from zotivity.research.api import install as install_research
 from zotivity.research.service import ResearchService
 from zotivity.research.errors import ResearchError
+from zotivity.research.keycheck import check_key
 from zotivity.research.ports import KEY_ZOTERO_WEB
 from zotivity.research_adapters import RESEARCH_KEYS, build_research_service
 from zotivity.retrieval import Searcher
@@ -447,6 +448,11 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
         keys.set(_research_key(name), str(body.get("key", "")))
         _research_key_changed(name)
         return {"stored": True, "masked": keys.masked(name)}
+
+    @app.post("/api/research-keys/{name}/test")
+    def test_research_key(name: str):
+        """Kleine Anfrage an den Dienst mit dem gespeicherten Schlüssel (Knopf «Testen»); nur der Befund geht zurück."""
+        return check_key(research.http, name, keys.get(_research_key(name)))
 
     @app.delete("/api/research-keys/{name}")
     def delete_research_key(name: str):

@@ -385,7 +385,7 @@ Follow-up questions refer to the conversation so far. The project's previous que
 
 **Research question** holds the research question, a short description and the inclusion and exclusion criteria (one line per criterion). The exclusion criteria work in three ways: they are offered as reasons in screening and for full texts, they feed into the AI suggestions, and they go into the log. They filter nothing automatically; an exclusion block in the search strategy arises from them only if a criterion is clearly recognisable in the title. Also here is the **selection process** (up to three reviewers, procedure). Under **Databases** you choose disciplines; the app suggests matching databases from its catalog, with access, terms of use and the key needed. Directly searchable are PubMed, OpenAlex, Europe PMC, ERIC, EconBiz, Semantic Scholar, arXiv, OSF Preprints and swisscovery. Licensed databases (PsycInfo, CINAHL, SocINDEX …) use the **RIS route**: search and export there, import here. The app never logs in to licensed databases and does not automate a browser.
 
-You store keys under **Settings → Databases**: OpenAlex (required since February 2026), PubMed (10 instead of 3 requests per second) and Semantic Scholar. The Databases tab shows when a key is missing. The key for the Zotero web API is under **Settings → Zotero and export**; it is only needed if a database search writes through zotero.org instead of Zotero on this computer.
+You store keys under **Settings → Databases**: OpenAlex (required since February 2026), PubMed (10 instead of 3 requests per second) and Semantic Scholar. The Databases tab shows when a key is missing. **Test** next to a stored key sends one small request to the service and shows the result: works, key rejected (check the key), service is throttling (due to the service, try again later) or no connection. The key itself is never shown. If Semantic Scholar throttles despite a key, the app waits longer (10, 20, 40 seconds) and tries again; counting hits there fetches only IDs, no abstracts. The key for the Zotero web API is under **Settings → Zotero and export**; it is only needed if a database search writes through zotero.org instead of Zotero on this computer.
 
 ### Search strategy, search and import
 
@@ -436,6 +436,8 @@ The helper model proposes a selection (suggested, maybe, excluded, each with a r
 Each text is read individually – in full up to an adjustable length, otherwise the parts relevant to the question – and recorded in an **evaluation sheet**: research question, method, sample, findings, limitations and verbatim key quotations with page. Zotivity does not leave the page of a key quotation to the language model: it looks the quotation up in the text and sets the printed page number (or "o. S."). Beforehand, Zotivity shows the counted input tokens, the estimated output and reasoning tokens and – if prices are entered – the estimated costs. Sheets are reused; if you like, Zotivity also saves them as a note on the Zotero item.
 
 Clicking a ticked text shows its evaluation sheet: short description, fields, key findings, key quotations and keywords, plus model, date and basis (full text or excerpts). Clicking the page of a key quotation opens the PDF in Zotero at that point. **Recreate sheet** reads only this text again and replaces the sheet (and the note in Zotero); text that has already been written stays unchanged.
+
+A sheet serves all literature reviews. It remembers which version of the text it was made from (checksum of the file read, number of characters). If the text was read again later and changed – for instance a scanned PDF after text recognition – the sheet counts as **outdated**: a new literature review recreates it, and existing ones show "outdated" next to the text together with the sections that cite it. After **Recreate sheet**, rewrite those sections with the pencil. The same text read again unchanged does not make a sheet outdated.
 
 ### 4. Write
 
@@ -546,7 +548,7 @@ On first start the program window adapts to the screen and afterwards remembers 
 
 New versions are published on GitHub. At start-up Zotivity asks there for the latest version and reports a new one a few seconds later; **Check for updates** asks at any time. **Update now** downloads the installer, checks its checksum (SHA-256), quits Zotivity and restarts it after installation. Settings, index, corpora and keys are kept. **Versions on GitHub** opens the page with all versions and their changes.
 
-The request goes to github.com; GitHub sees the computer's IP address, nothing else. If you do not want this, switch off **Check for updates at start-up**. The update source is fixed and cannot be changed – so nobody can slip in a foreign installer through the settings.
+The request goes to github.com; GitHub sees the computer's IP address, nothing else. If you do not want this, clear the checkbox **Check for updates at start-up** during installation or switch it off here. A later update from within the program keeps this choice. The update source is fixed and cannot be changed – so nobody can slip in a foreign installer through the settings.
 
 ## Privacy and data
 
@@ -554,7 +556,7 @@ The request goes to github.com; GitHub sees the computer's IP address, nothing e
 - With a local embedding model (built-in or Ollama), the texts do not leave the computer during indexing. With a cloud embedding, all passages are sent to the provider. The built-in runtime only accepts requests from Zotivity (random key, 127.0.0.1 only) and never accesses the network; Hugging Face is only contacted for downloads at the push of a button and for the name search.
 - When asking and for the literature review, the passages found or the texts of the selection are sent to the provider of the language model. With Ollama as language model everything stays local.
 - **Search** works entirely without a language model.
-- At start-up Zotivity asks GitHub for a new version (can be switched off under Settings → Program & data). Only the request itself goes to GitHub, no data from Zotivity.
+- At start-up Zotivity asks GitHub for a new version (can be switched off during installation and under Settings → Program & data). Only the request itself goes to GitHub, no data from Zotivity. This is the only connection Zotivity makes on its own; the privacy policy (PRIVACY.md in the repository, also shown by the installer) lists them all.
 - API keys are stored encrypted in the operating system's credential store.
 - Zotivity changes Zotero only with write access and only on your instruction: notes for evaluation sheets, collections for the literature review.
 

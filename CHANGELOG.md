@@ -2,6 +2,29 @@
 
 All notable changes, newest first.
 
+## 1.2.8 – 2026-11-23
+
+### Added
+- **"Test" button for database keys.** Under Settings → Databases each stored key (OpenAlex, PubMed/NCBI, Semantic
+  Scholar, Zotero web API) can be tested with one small request. The result says whether the key works, is rejected,
+  the service is throttling (HTTP 429, not the key's fault) or cannot be reached. The key itself is never shown.
+- **Privacy policy** ([English](https://github.com/avibecoder42/Zotivity/blob/main/PRIVACY.md), [Deutsch](https://github.com/avibecoder42/Zotivity/blob/main/PRIVACY.de.md)), also shown by the installer before
+  installation. It lists every connection; the update check is the only one Zotivity makes on its own.
+- **Installer checkbox "Check for updates at start-up".** Clearing it turns the update check off from the first
+  start (setting `check_updates_on_start`). Updates started from within Zotivity keep the setting.
+- The program file and the installer name the copyright holder and the licence in their file properties.
+
+### Fixed
+- **Semantic Scholar: "too many requests" although a key is stored.** Counting hits now fetches only the paper IDs
+  instead of all fields with abstracts (up to about 1.3 MB per count), which made the service throttle. With a key,
+  Zotivity waits longer before trying again (10, 20, 40 seconds), and the message no longer asks for a key that is
+  already there.
+- **Outdated evaluation sheets.** A sheet made before its text was read again (e.g. a scan after text recognition) was
+  reused by new literature reviews. A sheet now remembers the version of the text it was made from. A new literature
+  review recreates an outdated sheet; existing ones mark it as "outdated" and name the sections that cite the text.
+- **A file replaced outside Zotero (e.g. after OCR) is no longer read twice.** Zotivity stores the checksum of the file
+  it actually read instead of the one Zotero reports, which Zotero updates only later.
+
 ## 1.2.7 – 2026-11-16
 
 ### Added

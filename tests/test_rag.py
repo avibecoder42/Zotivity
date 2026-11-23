@@ -292,3 +292,92 @@ def test_check_guillemets_pair_by_direction(zengine, fake_zotero):
     check = ReviewService(zengine).check(rid)
     assert check["verified_quotes"] == 1
     assert [u["quote"] for u in check["unverified_quotes"]] == ["Diese Aussage steht so in keinem der Texte drin"]
+
+
+def test_outdated_sheet_is_marked_and_rebuilt_for_a_new_review(indexed, monkeypatch, fake_zotero):
+    """Ein Blatt aus einer früheren Fassung des Texts (z. B. vor OCR) wird für einen neuen Forschungsstand neu erstellt
+    und in bestehenden als veraltet gezeigt – derselbe Text, nochmals eingelesen, zählt nicht."""
+    import os
+    import time
+
+    from fakes import make_pdf
+    from test_indexing_search import TEEN
+
+    made = []
+
+    def sheet(prompt):
+        made.append(prompt)
+        return json.dumps({"kurzbeschreibung": "Nur ein Lieferschein." if len(made) == 1 else "Die Studie selbst.",
+                           "zentrale_befunde": [], "kernzitate": []})
+    main = ScriptedModel([("Auswertungsblatt in diesem JSON-Format", sheet)])
+    install_models(monkeypatch, main, main)
+    indexed.settings_store.update({"review": {"parallel_requests": 1, "write_notes_to_zotero": False}})
+    svc = ReviewService(indexed)
+    doc = [("users/0", "ITEMA001")]
+    assert svc.build_sheets(Job("review", "t"), doc)["created"] == 1
+    row = indexed.store.get_sheet("users/0", "ITEMA001")
+    assert set(row["sheet"]["_fassung"]) == {"ATTA0001"} and not svc.sheet_outdated("users/0", "ITEMA001")
+
+    # Derselbe Text nochmals eingelesen (gleiche Datei): nicht veraltet, kein neues Blatt
+    indexed.store.mark_pending("users/0", ["ATTA0001"])
+    run_index(indexed)
+    assert not svc.sheet_outdated("users/0", "ITEMA001")
+    assert svc.build_sheets(Job("review", "t"), doc)["created"] == 0
+
+    # Ein bestehender Forschungsstand zitiert den Text
+    rid = svc.create("Alt", "Wie nutzen Jugendliche Chatbots?")
+    indexed.store.put_review_docs(rid, [{"lib": "users/0", "item_key": "ITEMA001", "decision": "include", "included": True}])
+    state = indexed.store.get_review(rid)["state"]
+    state["sections"] = [{"heading": "Einleitung", "text": "## Einleitung\n\nNur ein Lieferschein [@ITEMA001]."},
+                         {"heading": "Ausblick", "text": "## Ausblick\n\nOhne Beleg."}]
+    indexed.store.update_review_state(rid, state)
+
+    # Die Datei wird ausserhalb von Zotero ersetzt (OCR-Fassung) und neu eingelesen
+    pdf = fake_zotero.storage / "ATTA0001" / "ATTA0001.pdf"
+    make_pdf(pdf, [TEEN * 6, TEEN * 5, "Erkannter Text der Studie mit Befunden zu Chatbots. " * 60])
+    os.utime(pdf, (time.time() + 10, time.time() + 10))
+    run_index(indexed)
+    assert svc.sheet_outdated("users/0", "ITEMA001")
+    assert svc.sheet_view("users/0", "ITEMA001")["outdated"] is True
+    assert svc.cited_in(state, "ITEMA001") == ["Einleitung"]
+    d = svc.get(rid)["docs"][0]
+    assert d["item_key"] == "ITEMA001" and d["sheet_outdated"] and d["cited_in"] == ["Einleitung"]
+    svc.confirm(rid)
+    assert svc.estimate_extraction(rid)["missing_sheets"] == 1  # das veraltete Blatt zählt als neu zu erstellen
+
+    # Ein neuer Forschungsstand erstellt das veraltete Blatt neu
+    assert svc.build_sheets(Job("review", "t"), doc)["created"] == 1
+    row = indexed.store.get_sheet("users/0", "ITEMA001")
+    assert row["sheet"]["kurzbeschreibung"] == "Die Studie selbst." and not svc.sheet_outdated("users/0", "ITEMA001")
+    assert len(made) == 2
+
+
+def test_outdated_sheet_from_an_older_version(indexed):
+    """Blätter vor 1.2.8 kennen ihre Fassung nicht: veraltet, wenn der Text nach dem Blatt eingelesen wurde."""
+    svc = ReviewService(indexed)
+    indexed.store.put_sheet("users/0", "ITEMA001", {"kurzbeschreibung": "alt"}, "m")
+    assert not svc.sheet_outdated("users/0", "ITEMA001")
+    indexed.store.con.execute("UPDATE sheets SET created_at=created_at-3600 WHERE item_key='ITEMA001'")
+    indexed.store.con.commit()
+    assert svc.sheet_outdated("users/0", "ITEMA001")
+    assert svc._sheet_needed("users/0", "ITEMA001") and not svc.sheet_outdated("users/0", "ITEMB001")
+
+
+def test_outdated_sheet_ignores_small_changes_and_new_machines(indexed):
+    """Ein Projekt-Import auf einem anderen Computer (andere Zeitpunkte, gleiche Datei) oder ein leicht anderes Lesen
+    derselben Datei macht ein Blatt nicht veraltet; eine andere Datei schon."""
+    svc = ReviewService(indexed)
+    now = svc.text_version("users/0", "ITEMA001")
+    att = now["ATTA0001"]
+    other_machine = {"ATTA0001": {**att, "at": att["at"] - 99999}}
+    indexed.store.put_sheet("users/0", "ITEMA001", {"_fassung": other_machine}, "m")
+    assert not svc.sheet_outdated("users/0", "ITEMA001")
+    slightly = {"ATTA0001": {**att, "at": 1.0, "chars": att["chars"] + 30}}
+    indexed.store.put_sheet("users/0", "ITEMA001", {"_fassung": slightly}, "m")
+    assert not svc.sheet_outdated("users/0", "ITEMA001")
+    other_file = {"ATTA0001": {**att, "at": 1.0, "md5": "0" * 32}}
+    indexed.store.put_sheet("users/0", "ITEMA001", {"_fassung": other_file}, "m")
+    assert svc.sheet_outdated("users/0", "ITEMA001")
+    no_text_then = {}
+    indexed.store.put_sheet("users/0", "ITEMA001", {"_fassung": no_text_then}, "m")
+    assert svc.sheet_outdated("users/0", "ITEMA001")

@@ -94,3 +94,33 @@ def test_full_sync_refetches(group):
     before = fz.json_item_requests
     run(engine, full_sync=True)
     assert fz.json_item_requests > before
+
+
+def test_file_replaced_outside_zotero_is_read_once(group):
+    """Eine Datei, die ausserhalb von Zotero ersetzt wird (z. B. OCR-Fassung), meldet Zotero eine Weile noch mit der
+    alten Prüfsumme. Gespeichert wird die Prüfsumme der gelesenen Datei: kein zweites Einlesen, weder vorher noch
+    nachdem Zotero die Prüfsumme nachgeführt hat."""
+    import hashlib
+
+    from fakes import make_pdf
+
+    engine, fz = group
+    whole_group(engine)
+    run(engine)
+    pdf = fz.storage / "ZAPZSESP" / "ZAPZSESP.pdf"
+    stale = fz.items["ZAPZSESP"]["data"]["md5"]
+    make_pdf(pdf, [SOCIAL * 3 + " Die OCR-Fassung mit erkanntem Text. " * 30])
+    os.utime(pdf, (time.time() + 10, time.time() + 10))
+    fresh = hashlib.md5(pdf.read_bytes()).hexdigest()
+    assert fresh != stale
+
+    result = run(engine)
+    assert result["synced"]["changed_files"] == 1 and result["extracted"] == 1
+    assert engine.store.attachment(GROUP, "ZAPZSESP")["indexed_md5"] == fresh  # nicht Zoteros alte Prüfsumme
+
+    # Zotero meldet noch die alte Prüfsumme: die Datei ist aber die gelesene
+    assert run(engine, full_sync=True)["extracted"] == 0
+    # Zotero hat nachgeführt
+    fz.items["ZAPZSESP"]["data"]["md5"] = fresh
+    assert run(engine, full_sync=True)["extracted"] == 0
+    assert engine.store.attachment(GROUP, "ZAPZSESP")["status"] == "indexed"

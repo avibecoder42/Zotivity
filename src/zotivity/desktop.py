@@ -303,6 +303,9 @@ class DesktopHost:
         from zotivity.service import write_state
 
         self.engine = Engine()
+        from zotivity.install_options import take_installer_choice
+
+        take_installer_choice(self.engine.settings_store)  # «Beim Start nach Updates suchen» aus dem Setup
         cfg = self.engine.settings.server
         app = create_app(self.engine, on_exit=self.quit, exit_after_minutes=self.exit_with_zotero,
                          on_open_ui=self.show, on_idle_exit=self.quit_if_hidden)

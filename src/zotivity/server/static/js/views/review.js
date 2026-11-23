@@ -358,6 +358,7 @@ function step3(r, job) {
   const s = st();
   const docs = (r.docs || []).filter(d => d.included);
   const withSheet = docs.filter(d => d.has_sheet).length;
+  const outdated = docs.filter(d => d.sheet_outdated).length;
   if (s.estimate === null) {
     s.estimate = false;
     api.get(`/api/reviews/${r.id}/estimate`).then(e => { s.estimate = e; update(); }).catch(() => {});
@@ -368,12 +369,16 @@ function step3(r, job) {
   const money = v => fmtNum(v, 2);
   const extract = label => btn(label, { kind: 'ai', icon: 'play', disabled: !docs.length || !!job,
     onClick: () => startJob(`/api/reviews/${r.id}/extract`, t('Auswertungsblätter erstellt')) });
+  // Veraltet: der Text wurde nach dem Blatt neu eingelesen (z. B. nach OCR) – „Erstellen“ erneuert auch diese Blätter
+  const missingLabel = withSheet < docs.length && outdated ? t('Fehlende und veraltete Blätter erstellen')
+    : withSheet < docs.length ? t('Fehlende Blätter erstellen') : outdated ? t('Veraltete Blätter neu erstellen') : null;
   const actions = !extracted ? [extract(t('Auswertungsblätter erstellen'))]
-    : [withSheet < docs.length ? extract(t('Fehlende Blätter erstellen')) : null, nextBtn(4, t('Weiter: Schreiben'))];
+    : [missingLabel ? extract(missingLabel) : null, nextBtn(4, t('Weiter: Schreiben'))];
   const body = h('div', { class: 'stack' },
     h('p', { class: 'muted' }, t('Jeder Text wird einzeln gelesen (bis zu einer bestimmten Länge ganz, sonst die zur Frage passenden Teile) und in einem Auswertungsblatt festgehalten: Fragestellung, Methode, Stichprobe, Befunde, Grenzen und wörtliche Kernzitate mit Seite.')),
     job ? null : h('div', { class: 'stats-row' },
       stat(t('Texte'), fmtInt(docs.length)), stat(t('mit Blatt'), fmtInt(withSheet)),
+      outdated ? stat(t('veraltet'), fmtInt(outdated), t('Text nach dem Blatt neu eingelesen')) : null,
       e ? stat(t('neu zu erstellen'), fmtInt(e.missing_sheets)) : null,
       e && e.missing_sheets ? stat(t('Input-Token (gezählt)'), tokenRange([e.input_tokens, e.input_tokens])) : null,
       e && e.missing_sheets ? stat(t('Output-Token (geschätzt)'), tokenRange(e.output_tokens)) : null,
@@ -392,13 +397,17 @@ function step3(r, job) {
 function sheetRow(r, d, job) {
   const s = st();
   const k = `${d.lib}:${d.item_key}`;
-  const mark = h('span', { class: ['sheet-mark', d.has_sheet && 'ok'], title: d.has_sheet ? t('Auswertungsblatt vorhanden') : t('noch kein Blatt') }, icon(d.has_sheet ? 'check' : 'dot', 14));
+  const stale = d.has_sheet && d.sheet_outdated;
+  const mark = h('span', { class: ['sheet-mark', d.has_sheet && (stale ? 'stale' : 'ok')],
+    title: stale ? t('Blatt veraltet – Text neu eingelesen') : d.has_sheet ? t('Auswertungsblatt vorhanden') : t('noch kein Blatt') },
+  icon(stale ? 'alert' : d.has_sheet ? 'check' : 'dot', 14));
   if (!d.has_sheet) return h('div', { key: k, class: 'doc-row' }, mark, docTitle(d));
   const open = !!s.sheetOpen[k];
   return h('div', { key: k, class: ['doc-row', 'sheet-row', open && 'open'] }, mark,
     h('div', { class: 'doc-text' },
       h('button', { type: 'button', class: 'sheet-toggle', 'aria-expanded': open ? 'true' : 'false', onclick: () => { s.sheetOpen[k] = !open; update(); } },
-        icon(open ? 'chevronDown' : 'chevronRight', 14), h('span', { class: 'doc-title' }, d.title || d.item_key)),
+        icon(open ? 'chevronDown' : 'chevronRight', 14), h('span', { class: 'doc-title' }, d.title || d.item_key),
+        stale ? badge(t('veraltet'), 'warning', t('Der Text wurde nach diesem Blatt neu eingelesen.')) : null),
       h('div', { class: 'muted small sheet-cite' }, d.citation),
       open && sheetView(r, d, job)));
 }
@@ -428,13 +437,18 @@ function sheetView(r, d, job) {
   const x = v.sheet;
   const list = val => (Array.isArray(val) ? val : val ? [val] : []).map(String);
   const page = p => p === 'o. S.' ? t('o. S.') : t('S. {p}', { p });
+  const cited = (d.cited_in || []).map(x => `„${x}“`).join(', ');
+  const rewriteHint = cited ? t('Danach die Abschnitte neu schreiben, die diesen Text zitieren: {list} (Schritt „Schreiben“, Stift beim Abschnitt).', { list: cited }) : '';
   const rebuild = async () => {
-    if (!await confirmDialog(t('Blatt neu erstellen?'), t('„{title}“ wird erneut gelesen und ausgewertet; das bisherige Blatt wird ersetzt. Ein bereits geschriebener Text bleibt unverändert.', { title: d.title || d.item_key }), { ok: t('Neu erstellen'), ai: true })) return;
-    startJob(`/api/reviews/${r.id}/sheets/rebuild`, t('Auswertungsblatt neu erstellt'), { body: { lib: d.lib, item_key: d.item_key } });
+    if (!await confirmDialog(t('Blatt neu erstellen?'), [t('„{title}“ wird erneut gelesen und ausgewertet; das bisherige Blatt wird ersetzt. Ein bereits geschriebener Text bleibt unverändert.', { title: d.title || d.item_key }), rewriteHint].filter(Boolean).join(' '), { ok: t('Neu erstellen'), ai: true })) return;
+    startJob(`/api/reviews/${r.id}/sheets/rebuild`, cited ? t('Auswertungsblatt neu erstellt. Abschnitte mit diesem Beleg neu schreiben: {list}', { list: cited }) : t('Auswertungsblatt neu erstellt'),
+      { body: { lib: d.lib, item_key: d.item_key } });
   };
   const findings = list(x.zentrale_befunde);
   const keywords = list(x.stichworte);
   return h('div', { class: 'sheet' },
+    v.outdated ? notice('warning', t('Veraltet: Der Text wurde nach diesem Blatt neu eingelesen (z. B. nach einer Texterkennung). Das Blatt beruht noch auf der alten Fassung. „Blatt neu erstellen“ wertet den neuen Text aus.'),
+      rewriteHint ? h('div', { class: 'small' }, rewriteHint) : null) : null,
     x.kurzbeschreibung ? h('p', { class: 'sheet-lead' }, String(x.kurzbeschreibung)) : null,
     h('dl', { class: 'sheet-fields' }, SHEET_FIELDS().filter(([f]) => list(x[f]).length).flatMap(([f, label]) => [
       h('dt', { key: `${f}-t` }, label), h('dd', { key: f }, list(x[f]).join('; '))])),

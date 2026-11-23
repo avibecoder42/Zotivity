@@ -343,6 +343,9 @@ work (see [the risk of deskilling](#use-it-as-a-tool--the-risk-of-deskilling)).
   everything stays local. Hugging Face is contacted only for downloads you start and for the model name search.
   Database search sends search strings to the databases you choose and, for AI suggestions, titles and abstracts of
   the records plus the project text to the language model.
+- **The update check** is the only connection Zotivity makes on its own: at start-up it fetches the small file
+  `zotivity-update.json` of the latest release from GitHub. Turn it off during installation (checkbox "Check for
+  updates at start-up") or under Settings → Program & data. Details: [privacy policy](PRIVACY.md).
 - **Model downloads** are pinned to a commit and SHA-256; the built-in runtime only accepts requests carrying
   Zotivity's random key.
 

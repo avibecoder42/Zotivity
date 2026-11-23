@@ -491,6 +491,7 @@ function researchKeyRows(which) {
     if (!key) return;
     await run(() => api.put(`/api/research-keys/${k.id}`, { key }));
     s.rdraft[k.id] = '';
+    if (s.rtest) delete s.rtest[k.id];
     if (el) el.value = '';
     toast(t('Schlüssel gespeichert.'), 'success', 2000);
     await researchKeysChanged();
@@ -498,14 +499,29 @@ function researchKeyRows(which) {
   const remove = async k => {
     if (!await confirmDialog(t('Schlüssel löschen?'), t('Der gespeicherte Schlüssel für {p} wird entfernt.', { p: k.label }), { ok: t('Löschen'), danger: true })) return;
     await run(() => api.del(`/api/research-keys/${k.id}`));
+    if (s.rtest) delete s.rtest[k.id];
     await researchKeysChanged();
+  };
+  s.rtest = s.rtest || {};
+  const test = async k => {
+    s.rtest[k.id] = { busy: true };
+    update();
+    try {
+      s.rtest[k.id] = await api.post(`/api/research-keys/${k.id}/test`, {});
+    } catch (err) {
+      s.rtest[k.id] = { status: 'error', message: err.message };
+    }
+    update();
   };
   return h('div', { class: 'stack' }, data.keys.filter(which).map(k => h('div', { key: k.id, class: 'stack-sm' },
     h('div', { class: 'row wrap' }, h('b', null, k.label),
       k.stored ? [icon('lock', 14), h('span', { class: 'muted small' }, k.source === 'env' ? t('aus Umgebungsvariable') : t('Gespeichert {mask}', { mask: k.masked || '' }))]
         : h('span', { class: 'muted small' }, t('kein Schlüssel')),
       h('span', { class: 'spacer' }),
+      k.stored ? btn(t('Testen'), { size: 'sm', kind: 'ghost', icon: 'check', busy: !!(s.rtest[k.id] && s.rtest[k.id].busy),
+        title: t('Eine kleine Anfrage mit diesem Schlüssel an {p} senden', { p: k.label }), onClick: () => test(k) }) : null,
       k.stored && k.source !== 'env' ? iconBtn('trash', t('Schlüssel löschen'), () => remove(k)) : null),
+    keyTestResult(k, s.rtest[k.id]),
     h('div', { class: 'muted small' }, k.hint),
     h('div', { class: 'row' },
       h('div', { class: 'grow' }, textInput({ type: 'password', id: inputId(k.id), value: s.rdraft[k.id] || '', label: t('Schlüssel für {p}', { p: k.label }),
@@ -513,6 +529,22 @@ function researchKeyRows(which) {
         onInput: v => { s.rdraft[k.id] = v; }, onKeyDown: e => { if (e.key === 'Enter') save(k); } })),
       btn(t('Speichern'), { kind: 'primary', icon: 'lock', onClick: () => save(k) })),
     h('a', { href: k.url, class: 'small' }, icon('external', 13), ' ', t('Schlüssel bei {p} erstellen', { p: k.label })))));
+}
+
+// Befund des Knopfs «Testen»: am Schlüssel (abgelehnt) oder am Dienst (drosselt, Fehler, keine Verbindung)
+function keyTestResult(k, r) {
+  if (!r || r.busy) return null;
+  const code = r.http ? ` (HTTP ${r.http})` : '';
+  const out = {
+    ok: ['success', t('funktioniert'), r.account ? t('Der Schlüssel gehört zum Konto «{a}».', { a: r.account }) : t('{p} hat die Anfrage mit diesem Schlüssel beantwortet.', { p: k.label })],
+    rejected: ['danger', t('Schlüssel abgelehnt'), t('{p} lehnt den Schlüssel ab{code}. Bitte prüfen oder einen neuen erstellen.', { p: k.label, code })],
+    throttled: ['warning', t('Dienst drosselt gerade'), t('{p} meldet zu viele Anfragen (HTTP 429). Das liegt am Dienst, nicht am Schlüssel; bitte später nochmals testen.', { p: k.label })],
+    service: ['warning', t('Fehler beim Dienst'), t('{p} antwortet mit einem Fehler{code}. Bitte später nochmals testen.', { p: k.label, code })],
+    offline: ['warning', t('keine Verbindung'), t('{p} ist nicht erreichbar. Besteht eine Internetverbindung?', { p: k.label })],
+    missing: ['neutral', t('kein Schlüssel'), t('Es ist kein Schlüssel gespeichert.')],
+    unknown: ['warning', t('unklar'), t('{p} antwortet unerwartet{code}.', { p: k.label, code })],
+  }[r.status] || ['danger', t('Test fehlgeschlagen'), r.message || ''];
+  return h('div', { class: 'row wrap small' }, badge(out[1], out[0]), h('span', { class: 'muted' }, out[2]));
 }
 
 function databasesTab() {

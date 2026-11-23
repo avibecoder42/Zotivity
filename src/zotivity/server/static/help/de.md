@@ -386,7 +386,7 @@ Die **Recherche** (Strg+2) führt eine Literatursuche in Fachdatenbanken von der
 
 Unter **Fragestellung** stehen Fragestellung, Kurzbeschreibung sowie Ein- und Ausschlusskriterien (eine Zeile je Kriterium). Die Ausschlusskriterien wirken dreifach: Sie stehen im Screening und bei den Volltexten als Gründe zur Wahl, sie gehen in die KI-Vorschläge ein und ins Protokoll. Sie filtern nichts automatisch; ein Ausschlussblock in der Suchstrategie entsteht aus ihnen nur, wenn ein Kriterium am Titel eindeutig erkennbar ist. Dazu kommt der **Auswahlprozess** (bis zu drei Reviewende, Vorgehen). Unter **Datenbanken** wählen Sie Disziplinen; die App schlägt passende Datenbanken aus ihrem Katalog vor, mit Zugang, Bedingungen und nötigem Schlüssel. Direkt durchsuchbar sind PubMed, OpenAlex, Europe PMC, ERIC, EconBiz, Semantic Scholar, arXiv, OSF-Preprints und swisscovery. Lizenzierte Datenbanken (PsycInfo, CINAHL, SocINDEX …) laufen über den **RIS-Weg**: dort suchen und exportieren, hier importieren. Die App meldet sich nie bei lizenzierten Datenbanken an und automatisiert keinen Browser.
 
-Schlüssel hinterlegen Sie unter **Einstellungen → Datenbanken**: OpenAlex (seit Februar 2026 nötig), PubMed (10 statt 3 Anfragen pro Sekunde) und Semantic Scholar. Fehlt ein Schlüssel, zeigt der Reiter Datenbanken das an. Den Schlüssel der Zotero-Web-API finden Sie unter **Einstellungen → Zotero und Export**; er ist nur nötig, wenn eine Recherche über zotero.org statt über Zotero auf diesem Computer schreibt.
+Schlüssel hinterlegen Sie unter **Einstellungen → Datenbanken**: OpenAlex (seit Februar 2026 nötig), PubMed (10 statt 3 Anfragen pro Sekunde) und Semantic Scholar. Fehlt ein Schlüssel, zeigt der Reiter Datenbanken das an. **Testen** neben einem gespeicherten Schlüssel schickt eine kleine Anfrage an den Dienst und zeigt das Ergebnis: funktioniert, Schlüssel abgelehnt (dann den Schlüssel prüfen), Dienst drosselt gerade (liegt am Dienst, später nochmals) oder keine Verbindung. Der Schlüssel selbst wird nie angezeigt. Drosselt Semantic Scholar trotz Schlüssel, wartet die App länger (10, 20, 40 Sekunden) und versucht es erneut; das Zählen der Treffer holt dort nur die IDs, keine Abstracts. Den Schlüssel der Zotero-Web-API finden Sie unter **Einstellungen → Zotero und Export**; er ist nur nötig, wenn eine Recherche über zotero.org statt über Zotero auf diesem Computer schreibt.
 
 ### Suchstrategie, Suche und Import
 
@@ -437,6 +437,8 @@ Das Hilfsmodell schlägt eine Auswahl vor (vorgeschlagen, vielleicht, ausgeschlo
 Jeder Text wird einzeln gelesen – bis zu einer einstellbaren Länge ganz, sonst die zur Frage passenden Teile – und in einem **Auswertungsblatt** festgehalten: Fragestellung, Methode, Stichprobe, Befunde, Grenzen und wörtliche Kernzitate mit Seite. Die Seite eines Kernzitats überlässt Zotivity nicht dem Sprachmodell: Es sucht das Zitat im Text und setzt die gedruckte Seitenzahl (oder „o. S.“). Vorher zeigt Zotivity die gezählten Input-Token, die geschätzten Output- und Denk-Token und – wenn Preise eingetragen sind – die geschätzten Kosten. Blätter werden wiederverwendet; auf Wunsch speichert Zotivity sie auch als Notiz am Zotero-Eintrag.
 
 Ein Klick auf einen Text mit Häkchen zeigt sein Auswertungsblatt: Kurzbeschreibung, Felder, zentrale Befunde, Kernzitate und Stichworte, dazu Modell, Datum und Grundlage (ganzer Text oder Auszüge). Ein Klick auf die Seite eines Kernzitats öffnet die PDF in Zotero an dieser Stelle. **Blatt neu erstellen** liest nur diesen Text noch einmal und ersetzt das Blatt (und die Notiz in Zotero); ein bereits geschriebener Text bleibt unverändert.
+
+Ein Blatt gilt für alle Forschungsstände. Es merkt sich, aus welcher Fassung des Texts es stammt (Prüfsumme der gelesenen Datei, Zahl der Zeichen). Wurde der Text danach neu eingelesen und hat sich dabei geändert – etwa eine Scan-PDF nach einer Texterkennung –, gilt das Blatt als **veraltet**: Ein neuer Forschungsstand erstellt es neu, in bestehenden steht beim Text „veraltet“ mit dem Hinweis, welche Abschnitte ihn zitieren. Nach **Blatt neu erstellen** diese Abschnitte mit dem Stift neu schreiben. Derselbe Text, nochmals unverändert eingelesen, macht ein Blatt nicht veraltet.
 
 ### 4. Schreiben
 
@@ -547,7 +549,7 @@ Das Programmfenster passt sich beim ersten Start dem Bildschirm an und merkt sic
 
 Neue Versionen erscheinen auf GitHub. Beim Start fragt Zotivity dort nach der neuesten Version und meldet eine neue einige Sekunden später; **Nach Updates suchen** fragt jederzeit. **Jetzt aktualisieren** lädt den Installer, prüft seine Prüfsumme (SHA-256), beendet Zotivity und startet es nach der Installation neu. Einstellungen, Index, Korpora und Schlüssel bleiben erhalten. **Versionen auf GitHub** öffnet die Seite mit allen Versionen und ihren Änderungen.
 
-Die Abfrage geht an github.com; GitHub sieht dabei die IP-Adresse des Rechners, sonst nichts. Wer das nicht will, schaltet **Beim Start nach Updates suchen** aus. Die Update-Quelle ist fest und lässt sich nicht ändern – so kann niemand über die Einstellungen einen fremden Installer unterschieben.
+Die Abfrage geht an github.com; GitHub sieht dabei die IP-Adresse des Rechners, sonst nichts. Wer das nicht will, wählt das Kontrollkästchen **Beim Start nach Updates suchen** schon bei der Installation ab oder schaltet es hier aus. Ein späteres Update aus dem Programm behält diese Wahl. Die Update-Quelle ist fest und lässt sich nicht ändern – so kann niemand über die Einstellungen einen fremden Installer unterschieben.
 
 ## Datenschutz und Daten
 
@@ -555,7 +557,7 @@ Die Abfrage geht an github.com; GitHub sieht dabei die IP-Adresse des Rechners, 
 - Mit einem lokalen Embedding-Modell (eingebaut oder Ollama) verlassen die Texte den Rechner beim Indexieren nicht. Mit einem Cloud-Embedding gehen alle Textabschnitte an den Anbieter. Die eingebaute Laufzeit nimmt nur Anfragen von Zotivity an (zufälliger Schlüssel, nur 127.0.0.1) und greift nie aufs Netz zu; Hugging Face wird nur für Downloads per Knopf und für die Namenssuche angefragt.
 - Beim Fragen und beim Forschungsstand gehen die gefundenen Textstellen bzw. die Texte der Auswahl an den Anbieter des Sprachmodells. Mit Ollama als Sprachmodell bleibt alles lokal.
 - **Suchen** arbeitet ganz ohne Sprachmodell.
-- Beim Start fragt Zotivity auf GitHub nach einer neuen Version (abschaltbar unter Einstellungen → Programm & Daten). Dabei geht nur die Anfrage selbst an GitHub, keine Daten aus Zotivity.
+- Beim Start fragt Zotivity auf GitHub nach einer neuen Version (abschaltbar bei der Installation und unter Einstellungen → Programm & Daten). Dabei geht nur die Anfrage selbst an GitHub, keine Daten aus Zotivity. Das ist die einzige Verbindung, die Zotivity von sich aus aufbaut; die Datenschutzerklärung (PRIVACY.de.md im Repository, auch im Installer) nennt alle.
 - API-Schlüssel liegen verschlüsselt im Anmeldeinformationsspeicher des Betriebssystems.
 - Zotivity verändert Zotero nur mit Schreibzugriff und nur auf Ihren Auftrag: Notizen für Auswertungsblätter, Sammlungen für den Forschungsstand.
 

@@ -354,6 +354,10 @@ endgültige Text bleiben deine Arbeit (siehe [die Gefahr des Deskilling](#werkze
   Ollama als LLM bleibt alles lokal. Hugging Face wird nur für Downloads per Knopf und die Namenssuche angefragt.
   Die Recherche sendet Suchstrings an die gewählten Datenbanken und für KI-Vorschläge Titel und Abstracts der Treffer
   sowie den Projekttext an das Sprachmodell.
+- **Die Update-Prüfung** ist die einzige Verbindung, die Zotivity von sich aus aufbaut: Beim Start holt es die kleine
+  Datei `zotivity-update.json` des neuesten Releases von GitHub. Abschalten bei der Installation (Kontrollkästchen
+  «Beim Start nach Updates suchen») oder unter Einstellungen → Programm & Daten. Einzelheiten:
+  [Datenschutzerklärung](PRIVACY.de.md).
 - **Downloads** von Modellen sind mit Commit und SHA-256 festgelegt; die eingebaute Laufzeit nimmt nur Anfragen mit dem
   zufälligen Schlüssel von Zotivity an.
 

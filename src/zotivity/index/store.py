@@ -7,6 +7,7 @@ Modellwechsel verwirft nichts, sondern legt einen neuen Raum an.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sqlite3
@@ -173,6 +174,18 @@ class SearchFilter:
 
 
 _BIDI = re.compile(r"[‎‏‪-‮⁦-⁩]")
+
+
+def file_md5(path: Path) -> str | None:
+    """MD5 einer Datei (wie Zotero sie für Anhänge führt); None, wenn sie nicht lesbar ist."""
+    h = hashlib.md5()  # noqa: S324 - Vergleich mit der MD5-Summe, die Zotero führt
+    try:
+        with open(path, "rb") as fh:
+            for block in iter(lambda: fh.read(1 << 20), b""):
+                h.update(block)
+    except OSError:
+        return None
+    return h.hexdigest()
 
 
 def strip_bidi(text: str | None) -> str:
@@ -625,7 +638,9 @@ class Store:
                 status = "skipped"
             elif old is None or old["status"] in ("pending", "skipped"):
                 status = "pending"
-            elif d.get("md5") and old["indexed_md5"] and d["md5"] != old["indexed_md5"]:
+            elif d.get("md5") and old["indexed_md5"] and d["md5"] != old["indexed_md5"]                     and not (path and file_md5(Path(path)) == old["indexed_md5"]):
+                # Zotero meldet eine andere Prüfsumme – geändert ist die Datei aber nur, wenn sie nicht mehr die
+                # gelesene ist (Zotero führt die Prüfsumme einer ausserhalb ersetzten Datei erst später nach)
                 status = "pending"
             else:
                 status = old["status"]

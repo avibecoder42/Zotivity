@@ -65,6 +65,8 @@ $iscc = @(
     "C:\Program Files\Inno Setup 6\ISCC.exe"
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $iscc) { throw "Inno Setup 6 (ISCC.exe) nicht gefunden. Installation: winget install JRSoftware.InnoSetup" }
+# Datenschutzerklärung für die Seite im Setup (aus PRIVACY.de.md und PRIVACY.md)
+& $py (Join-Path $PSScriptRoot "build_tools.py") privacy | Out-Null
 & $iscc /Q "/DAppVersion=$version" (Join-Path $PSScriptRoot "installer.iss")
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup fehlgeschlagen" }
 $installer = Join-Path $root "dist\Zotivity-Setup-$version.exe"
