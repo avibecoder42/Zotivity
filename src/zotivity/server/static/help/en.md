@@ -244,7 +244,8 @@ These settings are under **Settings → Index**; the gear at the top of the Inde
 - **Read texts in a separate process**: a broken PDF that crashes or hangs the reader is marked as an error after the time limit – the run continues.
 - **Keep the computer awake** prevents sleep mode during indexing.
 - If the embedding service is briefly unavailable (e.g. Ollama restarted), Zotivity waits for a configurable time instead of aborting.
-- **Index backup**: after indexing runs, at most every 12 hours; the two newest are kept.
+- **Index backup**: after indexing runs, at most every 12 hours; the two newest are kept. It is stored in the data folder, i.e. on the same drive.
+- **Backup to a folder of your choice** (Settings → Index): copies index, projects, chats, literature reviews, database searches (`research.db`), settings and your own citation styles to a folder you choose, e.g. in switchdrive, OneDrive or on a USB stick. Automatically daily or weekly (after indexing runs and shortly after start-up) or manually with **Back up now**; the newest three are kept (adjustable). Each backup is a subfolder "Zotivity-Sicherung-date-time"; Zotivity does not touch other files in the folder. API keys are not included, they stay in the credential store. To restore: quit Zotivity and copy the files of a backup into the data folder (instructions in `WIEDERHERSTELLEN.txt` in each backup).
 
 ### Texts without text
 
@@ -358,9 +359,9 @@ Above the input field, the **plan line** shows what happens when you send, e.g. 
 
 ### Question type: overview with one card per text
 
-Together with the multi-query search, the helper model classifies the question: **Detail** (a question about content), **Overview** (overview or comparison across the texts, e.g. which methods or samples the studies use) or **Evidence** (looking for evidence for a statement). The plan line shows the type detected last; **Question type** lets you set it.
+Together with the multi-query search, the helper model classifies the question: **Detail** (a question about content, including a comparison of concepts, definitions, theories or positions), **Overview** (a question about the texts as a whole, e.g. which texts, methods, samples or results there are) or **Evidence** (looking for evidence for a statement). The plan line shows the type detected last; **Question type** lets you set it.
 
-For an overview question about more than three texts, the language model gets a short **card** per text instead of passages: author, year, title, type and venue, abstract and – where one exists – the evaluation sheet from a literature review. About 300 tokens per text; 100 texts are about 30,000 tokens, and every text appears (newest first if the budget runs out). For details from inside the texts, choose the question type "Detail" or ask single texts.
+For an overview question about more than three texts, the language model gets a short **card** per text plus the best matching **passages** from the full texts (about a third of the volume). The card contains author, year, title, type and venue, abstract and – where one exists – the evaluation sheet from a literature review. About 300 tokens per text; 100 texts are about 30,000 tokens, and every text appears (newest first if the budget runs out). The cards give the overview, the passages details and verbatim evidence with page; the basis below the answer names both. If a question mainly needs details from a few texts, choose the question type "Detail" or ask single texts.
 
 ### How the search works
 

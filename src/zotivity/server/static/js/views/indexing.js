@@ -6,7 +6,7 @@ import { state, update, ui, toast, run, saveSettings, loadCorpora, loadSetup, lo
 import * as api from '../core/api.js';
 import { t } from '../core/i18n.js';
 import { icon } from '../ui/icons.js';
-import { btn, iconBtn, card, notice, spinner, progress, progressRing, toggle, numberInput, field, badge, emptyState, select, paneProps, splitter } from '../ui/components.js';
+import { btn, iconBtn, card, notice, spinner, progress, progressRing, toggle, numberInput, field, badge, emptyState, select, textInput, paneProps, splitter } from '../ui/components.js';
 import { fmtInt, fmtNum, fmtDuration, fmtBytes, fmtDate, fmtAgo, plural, nTexts, nIndexed, embedHint, refreshHint, openHint } from '../core/util.js';
 import { navigate, viewHeader } from './shell.js';
 import { indexCorpus } from './corpora.js';
@@ -399,6 +399,61 @@ export function backupCard() {
       btn(t('Jetzt sichern'), { size: 'sm', icon: 'download', disabled: !!runningJob('index'), why: t('Während einer Indexierung wird am Ende automatisch gesichert.'),
         onClick: async () => { s.backups = await run(() => api.post('/api/index/backup')); toast(t('Index gesichert.'), 'success'); update(); } }),
       b && api.isDesktop() && btn(t('Ordner öffnen'), { size: 'sm', kind: 'ghost', icon: 'folder', onClick: () => api.revealPath(b.folder) }))));
+}
+
+// Sicherung in einen selbst gewählten Ordner (z. B. switchdrive): Index, Recherchen, Einstellungen, eigene Zitierstile
+export function folderBackupCard() {
+  const s = st();
+  const cfg = state.settings && state.settings.backup;
+  if (!cfg) return null;
+  if (s.fbackup === undefined) {
+    s.fbackup = null;
+    api.get('/api/backup').then(r => { s.fbackup = r; update(); }).catch(err => { s.fbackup = { error: err.message, backups: [] }; update(); });
+  }
+  const b = s.fbackup;
+  const reload = () => { s.fbackup = undefined; update(); };
+  const setFolder = async folder => {
+    const v = (folder || '').trim();
+    if (!v) { await saveSettings({ backup: { folder: '' } }); s.folderDraft = undefined; reload(); return; }
+    let r;
+    try { r = await run(() => api.post('/api/backup/check', { folder: v })); } catch { return; }
+    await saveSettings({ backup: { folder: r.folder } });
+    s.folderDraft = undefined;
+    reload();
+  };
+  const choose = async () => { const p = await api.chooseFolder(cfg.folder); if (p) await setFolder(p); };
+  const backupNow = async () => {
+    s.fbusy = true; update();
+    try {
+      const r = await api.post('/api/backup', {});
+      s.fbackup = r;
+      toast(t('Gesichert in {p}', { p: r.result.path }), 'success');
+    } catch (err) {
+      toast(err.message, 'error', 0);
+      reload();
+    } finally { s.fbusy = false; update(); }
+  };
+  const draft = s.folderDraft !== undefined ? s.folderDraft : cfg.folder;
+  return card(t('Sicherung in einen eigenen Ordner'), 'folder', h('div', { class: 'stack' },
+    h('p', { class: 'muted small' }, t('Kopiert Index, Projekte, Chats, Forschungsstände, Recherchen, Einstellungen und eigene Zitierstile in einen frei wählbaren Ordner, z. B. in switchdrive, OneDrive oder auf einen USB-Stick. API-Schlüssel gehören nicht dazu; sie bleiben im Schlüsselspeicher des Betriebssystems.')),
+    field(t('Ordner'), h('div', { class: 'row' },
+      h('div', { class: 'grow' }, textInput({ value: draft, label: t('Ordner für die Sicherung'), placeholder: t('kein Ordner – Sicherung aus'),
+        onInput: v => { s.folderDraft = v; }, onChange: v => setFolder(v), onKeyDown: e => { if (e.key === 'Enter') setFolder(e.target.value); } })),
+      api.isDesktop() ? btn(t('Wählen …'), { size: 'sm', icon: 'folder', onClick: choose }) : null,
+      cfg.folder ? iconBtn('x', t('Keine Sicherung in einen Ordner'), () => setFolder('')) : null)),
+    cfg.folder ? h('div', { class: 'row wrap' },
+      field(t('Automatisch'), select({ value: String(cfg.every_hours), label: t('Automatisch sichern'), onChange: v => saveSettings({ backup: { every_hours: Number(v) } }),
+        options: [{ value: '24', label: t('täglich (nach Indexierläufen und beim Start)') }, { value: '168', label: t('wöchentlich') },
+          { value: '0', label: t('nur von Hand') }].concat(['24', '168', '0'].includes(String(cfg.every_hours)) ? [] : [{ value: String(cfg.every_hours), label: t('alle {n} Stunden', { n: cfg.every_hours }) }]) })),
+      field(t('Sicherungen behalten'), numberInput({ value: cfg.keep, min: 1, max: 30, int: true, label: t('Sicherungen behalten'), onChange: v => saveSettings({ backup: { keep: v } }) }))) : null,
+    b && b.error ? notice('warning', t('Letzte Sicherung fehlgeschlagen: {e}', { e: b.error })) : null,
+    cfg.folder && b ? (b.backups && b.backups.length ? h('div', { class: 'stack-sm' }, b.backups.map(x => h('div', { key: x.name, class: 'row small' }, icon('folder', 13),
+      h('span', { class: 'grow' }, fmtDate(x.created_at)), h('span', { class: 'muted' }, fmtBytes(x.bytes)))))
+      : h('p', { class: 'muted small' }, t('In diesem Ordner liegt noch keine Sicherung.'))) : null,
+    cfg.folder ? h('div', { class: 'row' },
+      btn(t('Jetzt sichern'), { size: 'sm', kind: 'primary', icon: 'download', busy: !!s.fbusy, onClick: backupNow }),
+      api.isDesktop() ? btn(t('Ordner öffnen'), { size: 'sm', kind: 'ghost', icon: 'folder', onClick: () => api.revealPath(cfg.folder) }) : null) : null,
+    cfg.folder ? h('p', { class: 'muted small' }, t('Wiederherstellen: Zotivity beenden und die Dateien einer Sicherung in den Datenordner kopieren. Die Anleitung liegt als WIEDERHERSTELLEN.txt in jeder Sicherung.')) : null));
 }
 
 // ------------------------------------------------------------------ Warteschlange

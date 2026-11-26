@@ -98,6 +98,13 @@ function downloadBlob(filename, blob) {
   return true;
 }
 
+// Ordner wählen (nur im Programmfenster; im Browser wird der Pfad eingetippt)
+export async function chooseFolder(start) {
+  const d = desktop();
+  if (d && d.choose_folder) return d.choose_folder(start || null);
+  return null;
+}
+
 export async function revealPath(path) {
   const d = desktop();
   if (d) return d.reveal(path);

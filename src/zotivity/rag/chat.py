@@ -23,6 +23,7 @@ log = logging.getLogger(__name__)
 
 HISTORY_MESSAGES = 6
 CARDS_BUDGET = 30000  # Karten: rund 100 Texte à 300 Tokens
+PASSAGES_MIN = 1500  # Überblick: so viele Tokens Textstellen mindestens neben den Karten (sonst ein Drittel)
 STAGES_NOT_POSSIBLE = "Lesen in Etappen ist hier nicht möglich; die Antwort stützt sich auf Textstellen."
 NO_NOTES = "In keiner Etappe stand etwas zur Frage. Versuche es mit anderen Worten oder mit Textstellen."
 WHOLE_NOT_POSSIBLE = "Ganze Texte sind hier nicht möglich; die Antwort stützt sich auf Textstellen."
@@ -161,10 +162,27 @@ class ChatService:
             yield {"type": "qtype", "qtype": qtype, "detected": detected, "chosen": options.qtype or "auto"}
         cards_mode = qtype == "overview" and plan.n_docs > 3 and not options.search_only
 
-        if cards_mode:  # Überblick: von jedem Text eine Karte statt Textstellen
+        n_cards = 0
+        if cards_mode:  # Überblick: von jedem Text eine Karte, dazu die passendsten Textstellen aus den Volltexten
             yield {"type": "status", "text": "Lege eine Karte je Text an …"}
-            budget = min(max(cfg.context_token_budget, CARDS_BUDGET), max(plan.limit, 4000))
-            sources = build_cards(self.engine, plan.docs, budget)
+            cap = max(plan.limit, 4000)
+            passage_budget = min(cfg.context_token_budget, max(PASSAGES_MIN, min(CARDS_BUDGET, cap) // 3))
+            card_budget = min(max(cfg.context_token_budget, CARDS_BUDGET), cap - passage_budget)
+            sources = build_cards(self.engine, plan.docs, card_budget)
+            n_cards = len(sources)
+            yield {"type": "status", "text": "Durchsuche die Volltexte …"}
+            try:
+                hits = self.searcher.search(queries, f, cfg, reranker=self._reranker(cfg, meter), rerank_query=question)
+                passages = [p for p in build_sources(store, hits, cfg.neighbor_chunks, passage_budget)
+                            if p.kind != "abstract"]  # Abstracts stehen schon auf den Karten
+            except Exception as e:  # noqa: BLE001 - dann wenigstens die Karten
+                yield {"type": "warning", "text": f"Keine Textstellen gefunden ({e}); die Antwort stützt sich auf die Karten."}
+                passages = []
+            for i, p in enumerate(passages):
+                p.n = n_cards + i + 1
+                if p.relevance:
+                    p.relevance["of"] = len(passages)
+            sources = sources + passages
         else:
             # 2. Suche (+ Recherche-Runden)
             yield {"type": "status", "text": "Durchsuche die Bibliothek …"}
@@ -204,7 +222,10 @@ class ChatService:
         basis = {"mode": "passages", "passages": len(sources), "docs": len({(s.lib, s.item_key) for s in sources}),
                  "scope_docs": plan.n_docs, "qtype": qtype}
         if cards_mode:
-            basis = {"mode": "cards", "cards": len(sources), "scope_docs": plan.n_docs, "qtype": qtype}
+            passages_only = sources[n_cards:]
+            basis = {"mode": "cards", "cards": n_cards, "passages": len(passages_only),
+                     "passage_docs": len({(s.lib, s.item_key) for s in passages_only}), "scope_docs": plan.n_docs,
+                     "qtype": qtype}
 
         if options.search_only:
             msg_id = store.add_chat_message(chat_id, "assistant", "", sources=source_dicts,
@@ -230,9 +251,13 @@ class ChatService:
         system = (prompts.CARDS_SYSTEM if cards_mode else prompts.ANSWER_SYSTEM).format(
             language=prompts.language_rule(settings.output_language))
         messages = _history_messages(history)
-        heading = (f"Karten der Texte im Suchbereich ({len(sources)} von {plan.n_docs})" if cards_mode
-                   else "Textstellen aus der Bibliothek")
-        messages.append(ChatMessage("user", f"{heading}:\n\n{format_sources(sources)}\n\n---\n\nFrage: {question}"))
+        if cards_mode:
+            context = f"Karten der Texte im Suchbereich ({n_cards} von {plan.n_docs}):\n\n{format_sources(sources[:n_cards])}"
+            if len(sources) > n_cards:
+                context += f"\n\n---\n\nPassende Textstellen aus den Volltexten:\n\n{format_sources(sources[n_cards:])}"
+        else:
+            context = f"Textstellen aus der Bibliothek:\n\n{format_sources(sources)}"
+        messages.append(ChatMessage("user", f"{context}\n\n---\n\nFrage: {question}"))
         params = GenParams(max_tokens=llm_cfg.max_output_tokens, temperature=llm_cfg.temperature, effort=llm_cfg.effort)
         parts: list[str] = []
         served = [llm_cfg.model]

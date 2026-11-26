@@ -236,6 +236,19 @@ MESSAGES: dict[str, str] = {
     "Recherche-Runde abgebrochen: {e}": "Research round aborted: {e}",
     "Lese die ganzen Texte …": "Reading the whole texts …",
     "Lege eine Karte je Text an …": "Preparing a card per text …",
+    "Durchsuche die Volltexte …": "Searching the full texts …",
+    # -- Sicherung in einen eigenen Ordner ------------------------------------------------------
+    "Kein Ordner für die Sicherung gewählt.": "No backup folder chosen.",
+    "Der Ordner für die Sicherung ist nicht erreichbar: {path}": "The backup folder cannot be reached: {path}",
+    "Der Ordner für die Sicherung darf nicht im Datenordner von Zotivity liegen.":
+        "The backup folder must not be inside Zotivity's data folder.",
+    "In dieser Sekunde gibt es schon eine Sicherung – bitte nochmals.": "A backup was made this very second – please try again.",
+    "Sicherung fehlgeschlagen: {e}": "Backup failed: {e}",
+    "Sicherung in den gewählten Ordner …": "Backing up to the chosen folder …",
+    "Gesichert in {p}": "Backed up to {p}",
+    "Sicherung in den gewählten Ordner fehlgeschlagen: {e}": "Backup to the chosen folder failed: {e}",
+    "Keine Textstellen gefunden ({e}); die Antwort stützt sich auf die Karten.":
+        "No passages found ({e}); the answer is based on the cards.",
     "Lese {n} Etappen …": "Reading {n} stages …",
     "Etappen gelesen: {a} von {b} …": "Stages read: {a} of {b} …",
     "Etappe {n} nicht gelesen: {e}": "Stage {n} not read: {e}",

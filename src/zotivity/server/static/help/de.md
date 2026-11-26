@@ -245,7 +245,8 @@ Diese Einstellungen stehen unter **Einstellungen → Index**; das Zahnrad oben i
 - **Texte in einem eigenen Prozess lesen**: Eine defekte PDF, die das Lesen abstürzen lässt oder hängt, wird nach dem Zeitlimit als Fehler markiert – der Lauf geht weiter.
 - **Rechner wach halten** verhindert den Ruhezustand während der Indexierung.
 - Fällt der Embedding-Dienst kurz aus (z. B. Ollama neu gestartet), wartet Zotivity eine einstellbare Zeit, statt abzubrechen.
-- **Sicherung des Index**: nach Indexierläufen höchstens alle 12 Stunden; die zwei neuesten bleiben.
+- **Sicherung des Index**: nach Indexierläufen höchstens alle 12 Stunden; die zwei neuesten bleiben. Sie liegt im Datenordner, also auf demselben Laufwerk.
+- **Sicherung in einen eigenen Ordner** (Einstellungen → Index): kopiert Index, Projekte, Chats, Forschungsstände, Recherchen (`research.db`), Einstellungen und eigene Zitierstile in einen Ordner Ihrer Wahl, z. B. in switchdrive, OneDrive oder auf einen USB-Stick. Automatisch täglich oder wöchentlich (nach Indexierläufen und kurz nach dem Start) oder nur von Hand mit **Jetzt sichern**; die neuesten drei bleiben (einstellbar). Jede Sicherung ist ein eigener Unterordner „Zotivity-Sicherung-Datum-Zeit“; andere Dateien im Ordner fasst Zotivity nicht an. API-Schlüssel gehören nicht dazu, sie bleiben im Schlüsselspeicher. Wiederherstellen: Zotivity beenden und die Dateien einer Sicherung in den Datenordner kopieren (Anleitung in `WIEDERHERSTELLEN.txt` jeder Sicherung).
 
 ### Texte ohne Text
 
@@ -359,9 +360,9 @@ Werte, die Sie unter Experten bewusst vom Preset abweichend eingestellt haben, u
 
 ### Frageart: Überblick mit einer Karte je Text
 
-Mit der Mehrfachsuche ordnet das Hilfsmodell die Frage ein: **Detail** (inhaltliche Einzelfrage), **Überblick** (Überblick oder Vergleich über den Bestand, z. B. welche Methoden oder Stichproben die Studien haben) oder **Belege** (Suche nach Belegen für eine Aussage). Die Planzeile zeigt die zuletzt erkannte Art; mit **Frageart** lässt sie sich festlegen.
+Mit der Mehrfachsuche ordnet das Hilfsmodell die Frage ein: **Detail** (inhaltliche Frage, auch ein Vergleich von Begriffen, Definitionen, Theorien oder Positionen), **Überblick** (Frage nach dem Bestand, z. B. welche Texte, Methoden, Stichproben oder Ergebnisse es gibt) oder **Belege** (Suche nach Belegen für eine Aussage). Die Planzeile zeigt die zuletzt erkannte Art; mit **Frageart** lässt sie sich festlegen.
 
-Bei einer Überblicksfrage über mehr als drei Texte erhält das Sprachmodell statt Textstellen von jedem Text eine kurze **Karte**: Autor, Jahr, Titel, Art und Ort der Veröffentlichung, Abstract und – wo es eines gibt – das Auswertungsblatt aus einem Forschungsstand. Rund 300 Tokens je Text; 100 Texte sind etwa 30 000 Tokens, und jeder Text kommt vor (die neuesten zuerst, falls das Budget nicht reicht). Für Einzelheiten aus dem Inneren der Texte die Frageart „Detail“ wählen oder einzelne Texte befragen.
+Bei einer Überblicksfrage über mehr als drei Texte erhält das Sprachmodell von jedem Text eine kurze **Karte** und dazu die passendsten **Textstellen** aus den Volltexten (etwa ein Drittel des Umfangs). Die Karte enthält Autor, Jahr, Titel, Art und Ort der Veröffentlichung, Abstract und – wo es eines gibt – das Auswertungsblatt aus einem Forschungsstand. Rund 300 Tokens je Text; 100 Texte sind etwa 30 000 Tokens, und jeder Text kommt vor (die neuesten zuerst, falls das Budget nicht reicht). Die Karten geben den Überblick, die Textstellen Einzelheiten und wörtliche Belege mit Seite; die Grundlage unter der Antwort nennt beides. Braucht eine Frage vor allem Einzelheiten aus wenigen Texten, die Frageart „Detail“ wählen oder einzelne Texte befragen.
 
 ### Wie gesucht wird
 

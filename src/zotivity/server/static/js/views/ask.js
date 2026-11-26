@@ -255,8 +255,10 @@ function basisLine(m) {
   }
   const kind = b.qtype && b.qtype !== 'detail' ? ` · ${t('Frageart: {q}', { q: QTYPE_LABELS()[b.qtype] || b.qtype })}` : '';
   if (b.mode === 'cards') {
-    return h('div', { class: 'basis-line' }, icon('layers', 12),
-      h('span', null, t('Grundlage: Karten von {c} von {n} Texten (Abstract, Angaben, Auswertungsblatt)', { c: fmtInt(b.cards), n: fmtInt(b.scope_docs) }) + kind));
+    const text = b.passages
+      ? t('Grundlage: Karten von {c} von {n} Texten und {p} Textstellen aus {d} Texten', { c: fmtInt(b.cards), n: fmtInt(b.scope_docs), p: fmtInt(b.passages), d: fmtInt(b.passage_docs) })
+      : t('Grundlage: Karten von {c} von {n} Texten (Abstract, Angaben, Auswertungsblatt)', { c: fmtInt(b.cards), n: fmtInt(b.scope_docs) });
+    return h('div', { class: 'basis-line' }, icon('layers', 12), h('span', null, text + kind));
   }
   return h('div', { class: 'basis-line' }, icon('quote', 12),
     h('span', null, t('Grundlage: {p} Textstellen aus {d} von {n} Texten', { p: fmtInt(b.passages), d: fmtInt(b.docs), n: fmtInt(b.scope_docs) }) + kind));
@@ -279,7 +281,7 @@ const QTYPE_LABELS = () => ({ auto: t('Automatisch'), detail: t('Detail'), overv
 
 function qtypeSelect(s) {
   const labels = QTYPE_LABELS();
-  return h('label', { class: 'plan-qtype', title: t('Überblicks- und Vergleichsfragen erhalten von jedem Text eine kurze Karte statt einzelner Textstellen. Automatisch: das Hilfsmodell ordnet die Frage ein (mit der Mehrfachsuche).') },
+  return h('label', { class: 'plan-qtype', title: t('Überblicksfragen erhalten von jedem Text eine kurze Karte und dazu die passendsten Textstellen. Vergleiche von Begriffen oder Positionen gelten als Detailfragen. Automatisch: das Hilfsmodell ordnet die Frage ein (mit der Mehrfachsuche).') },
     t('Frageart'),
     h('select', { class: 'select select-sm', value: s.qtype, onchange: e => { s.qtype = e.target.value; update(); } },
       Object.entries(labels).map(([v, l]) => h('option', { key: v, value: v, selected: s.qtype === v },

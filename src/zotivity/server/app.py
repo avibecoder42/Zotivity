@@ -43,6 +43,7 @@ from zotivity.rag.sources import build_sources
 from zotivity.research.api import install as install_research
 from zotivity.research.service import ResearchService
 from zotivity.research.errors import ResearchError
+from zotivity import backup as backup_mod
 from zotivity.research.keycheck import check_key
 from zotivity.research.ports import KEY_ZOTERO_WEB
 from zotivity.research_adapters import RESEARCH_KEYS, build_research_service
@@ -1751,6 +1752,36 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
         if path is None:
             raise HTTPException(500, "Sicherung fehlgeschlagen – Details im Protokoll.")
         return index_backups()
+
+    # Sicherung in einen selbst gewählten Ordner (Einstellungen → Index): Index, Recherchen, Einstellungen, Zitierstile
+    def _backup_status() -> dict:
+        s = backup_mod.status(engine)
+        return {**s, "error": tr(s["error"])}
+
+    @app.get("/api/backup")
+    def backup_status():
+        return _backup_status()
+
+    @app.post("/api/backup")
+    def backup_now(body: dict = Body(default={})):
+        """Jetzt sichern; mit {"folder": …} zuerst den Ordner prüfen und als Einstellung übernehmen."""
+        folder = body.get("folder")
+        try:
+            if folder is not None:
+                checked = backup_mod.check_folder(folder)
+                engine.settings_store.update({"backup": {"folder": str(checked)}})
+            result = backup_mod.run_backup(engine)
+        except backup_mod.BackupError as e:
+            engine.store.set_meta(backup_mod.META_ERROR, str(e))
+            raise HTTPException(400, tr(str(e))) from None
+        return {**_backup_status(), "result": result}
+
+    @app.post("/api/backup/check")
+    def backup_check(body: dict = Body(...)):
+        try:
+            return {"folder": str(backup_mod.check_folder(body.get("folder") or ""))}
+        except backup_mod.BackupError as e:
+            raise HTTPException(400, tr(str(e))) from None
 
     @app.post("/api/index/run")
     def index_run(body: dict = Body(default={})):

@@ -506,6 +506,9 @@ class Indexer:
                                    worker=worker, processed=processed, embed_only=embed_only)
             if result.get("extracted") or result.get("errors") or result.get("no_text"):
                 self.maybe_backup(job)
+            from zotivity import backup  # Sicherung in den gewählten Ordner (wenn eingerichtet und fällig)
+
+            backup.maybe_backup(self.engine, job)
             if result.get("stopped"):
                 status = "switched" if result.get("switched") else "stage"
             return result

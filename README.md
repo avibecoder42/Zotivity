@@ -346,6 +346,8 @@ work (see [the risk of deskilling](#use-it-as-a-tool--the-risk-of-deskilling)).
 - **The update check** is the only connection Zotivity makes on its own: at start-up it fetches the small file
   `zotivity-update.json` of the latest release from GitHub. Turn it off during installation (checkbox "Check for
   updates at start-up") or under Settings → Program & data. Details: [privacy policy](PRIVACY.md).
+- **Backups** stay on your computer unless you choose a folder under Settings → Index (e.g. switchdrive): then
+  index, database searches, settings and own citation styles are copied there; API keys never are.
 - **Model downloads** are pinned to a commit and SHA-256; the built-in runtime only accepts requests carrying
   Zotivity's random key.
 

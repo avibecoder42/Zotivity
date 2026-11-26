@@ -175,6 +175,16 @@ class ServerSettings(BaseModel):
     exit_after_zotero_closed_minutes: int = Field(0, ge=0)
 
 
+class BackupSettings(BaseModel):
+    # Sicherung in einen selbst gewählten Ordner (z. B. switchdrive): Index, Recherchen, Einstellungen, eigene
+    # Zitierstile (backup.py); "" = aus
+    folder: str = ""
+    # so viele Sicherungen bleiben im Ordner
+    keep: int = Field(3, ge=1, le=30)
+    # automatisch höchstens einmal in so vielen Stunden (nach Indexierläufen und kurz nach dem Start); 0 = nur von Hand
+    every_hours: int = Field(24, ge=0, le=720)
+
+
 class Settings(BaseModel):
     version: int = 2
     # Sprache der Oberfläche (Wörterbücher in static/js/i18n) und der KI-Ausgaben („auto“ = Sprache der Frage)
@@ -200,6 +210,7 @@ class Settings(BaseModel):
     retrieval: RetrievalSettings = Field(default_factory=RetrievalSettings)
     review: ReviewSettings = Field(default_factory=ReviewSettings)
     server: ServerSettings = Field(default_factory=ServerSettings)
+    backup: BackupSettings = Field(default_factory=BackupSettings)
 
 
 def _deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:

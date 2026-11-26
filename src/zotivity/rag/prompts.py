@@ -85,14 +85,15 @@ Notizen:
 {notes}"""
 
 
-# Überblicks- und Vergleichsfragen: je Text eine Karte statt Textstellen (rag/cards.py)
-CARDS_SYSTEM = """Du bist ein wissenschaftlicher Rechercheassistent. Du beantwortest eine Überblicks- oder Vergleichsfrage über die Literatur der Nutzerin bzw. des Nutzers. Du erhältst von jedem Text im Suchbereich eine nummerierte Karte (Autor, Jahr, Titel, Art, Abstract, falls vorhanden ein Auswertungsblatt).
+# Überblicksfragen: je Text eine Karte (rag/cards.py), dazu die passendsten Textstellen aus den Volltexten
+CARDS_SYSTEM = """Du bist ein wissenschaftlicher Rechercheassistent. Du beantwortest eine Überblicksfrage über die Literatur der Nutzerin bzw. des Nutzers. Du erhältst von jedem Text im Suchbereich eine nummerierte Karte (Autor, Jahr, Titel, Art, Abstract, falls vorhanden ein Auswertungsblatt) und dazu, weiter nummeriert, die zur Frage passendsten Textstellen aus den Volltexten (mit Seitenangabe).
 
 Regeln:
 - Beziehe alle Karten ein und ordne die Texte (z. B. nach Thema, Methode, Stichprobe oder Ergebnis); sage, wie viele Texte zu einem Punkt etwas beitragen.
-- Belege jede Aussage mit der Nummer der Karte in eckigen Klammern, z. B. [3] oder [2][5]. Setze den Beleg direkt hinter die Aussage.
-- Die Karten fassen die Texte nur zusammen. Braucht die Frage Einzelheiten aus dem Inneren der Texte, sage das und schlage vor, einzelne Texte genauer zu befragen.
-- Verwende nur, was auf den Karten steht. Erfinde keine Quellen, Zahlen oder Zitate.
+- Nutze die Textstellen für Einzelheiten, Begriffe, Definitionen und wörtliche Zitate; die Karten für den Überblick über alle Texte.
+- Belege jede Aussage mit der Nummer der Karte oder Textstelle in eckigen Klammern, z. B. [3] oder [2][25]. Setze den Beleg direkt hinter die Aussage.
+- Fehlen für eine Einzelheit sowohl Karte als auch Textstelle, sage das und schlage vor, die Frageart „Detail“ zu wählen oder einzelne Texte genauer zu befragen.
+- Verwende nur, was auf den Karten und in den Textstellen steht. Erfinde keine Quellen, Zahlen oder Zitate.
 - Formatiere mit Markdown (Absätze, bei Bedarf Listen oder Zwischentitel). Keine Literaturliste am Ende – die Quellen werden automatisch angezeigt.
 {language}"""
 
@@ -104,9 +105,9 @@ QUERY_PROMPT = """{history}Frage: {question}
 Formuliere {n} unterschiedliche, eigenständige Suchanfragen, die zusammen alle Aspekte der Frage abdecken. Die Bibliothek enthält deutsch- und englischsprachige Fachliteratur: formuliere etwa die Hälfte auf Deutsch, die andere Hälfte auf Englisch. Nutze Fachbegriffe und Synonyme. Wenn sich die Frage auf den bisherigen Gesprächsverlauf bezieht, mache die Suchanfragen trotzdem eigenständig verständlich.
 
 Ordne die Frage ausserdem ein („type“):
-- "overview": Überblick oder Vergleich über den Bestand als Ganzes – z. B. welche Texte, Methoden, Stichproben, Positionen oder Ergebnisse es gibt, oder ein Vergleich der Texte;
+- "overview": eine Frage nach dem Bestand als Ganzes – welche Texte es gibt, welche Methoden, Stichproben, Länder, Zeiträume oder Ergebnisse darin vorkommen, wie viele Texte etwas untersuchen, oder eine Übersicht über alle Texte;
 - "evidence": Suche nach Belegen oder Zitaten für eine bestimmte Aussage;
-- "detail": eine inhaltliche Einzelfrage (im Zweifel diese).
+- "detail": eine inhaltliche Frage, auch ein Vergleich von Begriffen, Definitionen, Theorien, Argumenten oder Positionen bestimmter Autorinnen und Autoren (im Zweifel diese).
 
 JSON-Format: {{"type": "detail", "queries": ["...", "..."]}}"""
 

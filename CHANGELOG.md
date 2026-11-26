@@ -2,6 +2,23 @@
 
 All notable changes, newest first.
 
+## 1.2.9 – 2026-11-26
+
+### Added
+- **Backup to a folder of your choice** (Settings → Index). Zotivity copies the index with projects, chats and
+  literature reviews, the database searches (`research.db`), the settings and your own citation styles to a folder
+  you choose, e.g. in switchdrive, OneDrive or on a USB stick: daily or weekly (after indexing runs and shortly after
+  start-up) or only by hand. The newest three backups are kept (adjustable); each is a subfolder of its own with
+  restore instructions, and other files in the folder are left alone. API keys stay in the credential store.
+
+### Changed
+- **Overview questions under Ask also get passages from the full texts.** Next to one card per text (abstract,
+  details, evaluation sheet), the model now receives the best matching passages, so an overview can name details and
+  quote with page numbers. Before, an overview answer saw only abstracts and evaluation sheets.
+- **Comparisons of concepts, definitions or positions count as detail questions**, so they are answered from
+  passages of the full texts. "Overview" is kept for questions about the texts as a whole (which texts, methods,
+  samples or results there are).
+
 ## 1.2.8 – 2026-11-23
 
 ### Added

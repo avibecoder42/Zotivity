@@ -54,11 +54,47 @@ def test_overview_question_uses_cards(library, monkeypatch):
     qt = next(e for e in events if e["type"] == "qtype")
     assert qt["qtype"] == "overview" and qt["detected"] == "overview" and qt["chosen"] == "auto"
     sources = next(e for e in events if e["type"] == "sources")["sources"]
-    assert len(sources) == 5 and all(s["kind"] == "card" for s in sources)
-    assert "Karten der Texte im Suchbereich (5 von 5)" in main.calls[0] and "Überblicks- oder Vergleichsfrage" in main.calls[0]
-    assert events[-1]["basis"] == {"mode": "cards", "cards": 5, "scope_docs": 5, "qtype": "overview"}
+    cards = [s for s in sources if s["kind"] == "card"]
+    passages = sources[len(cards):]
+    # Karten zuerst, dann die passendsten Textstellen aus den Volltexten, durchgehend nummeriert, ohne Abstracts
+    assert len(cards) == 5 and sources[:5] == cards and passages and all(s["kind"] == "text" for s in passages)
+    assert [s["n"] for s in sources] == list(range(1, len(sources) + 1))
+    assert all(s["page_index"] is not None for s in passages)
+    prompt = main.calls[0]
+    assert "Karten der Texte im Suchbereich (5 von 5)" in prompt and "Passende Textstellen aus den Volltexten" in prompt
+    assert prompt.index("Karten der Texte") < prompt.index("Passende Textstellen") and "Überblicksfrage" in prompt
+    assert f"[{len(cards) + 1}] " in prompt.split("Passende Textstellen", 1)[1]
+    basis = events[-1]["basis"]
+    assert basis == {"mode": "cards", "cards": 5, "passages": len(passages),
+                     "passage_docs": len({s["item_key"] for s in passages}), "scope_docs": 5, "qtype": "overview"}
 
     # Frageart von Hand: Detail → wieder Textstellen, obwohl das Hilfsmodell „overview“ meldet
     main.rules.insert(0, ("Textstellen aus der Bibliothek", "Antwort [1]."))
     events = list(ChatService(library).ask("Welche Methoden?", None, AskOptions(scope="auto", qtype="detail")))
     assert events[-1]["basis"]["mode"] == "passages" and events[-1]["basis"]["qtype"] == "detail"
+
+
+def test_overview_survives_a_failing_search(library, monkeypatch):
+    """Scheitert die Suche nach Textstellen, stützt sich die Antwort auf die Karten (mit Hinweis)."""
+    helper = ScriptedModel([("Suchanfragen", json.dumps({"type": "overview", "queries": ["Methoden"]}))])
+    main = ScriptedModel([("Karten der Texte", "Überblick [1].")])
+    install_models(monkeypatch, helper, main)
+    library.settings_store.update({"retrieval": {"fulltext_limits": {"anthropic": 50}}})
+    service = ChatService(library)
+
+    def broken(*a, **k):
+        raise RuntimeError("Index gesperrt")
+    monkeypatch.setattr(service.searcher, "search", broken)
+    events = list(service.ask("Welche Methoden verwenden die Studien?", None, AskOptions(scope="auto")))
+    assert any(e["type"] == "warning" and "Karten" in e["text"] for e in events)
+    assert events[-1]["basis"]["passages"] == 0 and events[-1]["basis"]["cards"] == 5
+    assert "Passende Textstellen" not in main.calls[0]
+
+
+def test_query_prompt_treats_comparisons_of_concepts_as_detail():
+    from zotivity.rag import prompts
+
+    overview = prompts.QUERY_PROMPT.split('- "overview":', 1)[1].split("\n", 1)[0]
+    detail = prompts.QUERY_PROMPT.split('- "detail":', 1)[1].split("\n", 1)[0]
+    assert "Positionen" not in overview and "Vergleich der Texte" not in overview and "Bestand" in overview
+    assert all(w in detail for w in ("Begriffen", "Definitionen", "Positionen", "im Zweifel"))

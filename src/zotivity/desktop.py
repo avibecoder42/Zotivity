@@ -268,6 +268,17 @@ class JsApi:
             return False
         return open_external(p.as_uri()) if sys.platform != "win32" else (os.startfile(str(p)) or True)  # noqa: S606
 
+    def choose_folder(self, start=None):
+        """Ordner wählen (Sicherung in einen eigenen Ordner); None, wenn abgebrochen."""
+        import webview
+
+        kind = getattr(getattr(webview, "FileDialog", None), "FOLDER", None) or webview.FOLDER_DIALOG
+        begin = Path(str(start)) if start and Path(str(start)).is_dir() else Path.home()
+        result = self._host.window.create_file_dialog(kind, directory=str(begin))
+        if not result:
+            return None
+        return result if isinstance(result, str) else result[0]
+
     def _ask_save_path(self, filename: str) -> str | None:
         import webview
 
@@ -306,6 +317,9 @@ class DesktopHost:
         from zotivity.install_options import take_installer_choice
 
         take_installer_choice(self.engine.settings_store)  # «Beim Start nach Updates suchen» aus dem Setup
+        from zotivity.backup import schedule_startup_backup
+
+        schedule_startup_backup(self.engine)  # Sicherung in den gewählten Ordner, falls fällig
         cfg = self.engine.settings.server
         app = create_app(self.engine, on_exit=self.quit, exit_after_minutes=self.exit_with_zotero,
                          on_open_ui=self.show, on_idle_exit=self.quit_if_hidden)

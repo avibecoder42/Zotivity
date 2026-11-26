@@ -39,6 +39,9 @@ def cmd_serve(args) -> None:
     from zotivity.install_options import take_installer_choice
 
     take_installer_choice(engine.settings_store)  # «Beim Start nach Updates suchen» aus dem Setup
+    from zotivity.backup import schedule_startup_backup
+
+    schedule_startup_backup(engine)  # Sicherung in den gewählten Ordner, falls fällig
     settings = engine.settings
     host = args.host or settings.server.host
     port = args.port or settings.server.port

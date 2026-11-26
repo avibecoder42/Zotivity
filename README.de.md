@@ -358,6 +358,8 @@ endgültige Text bleiben deine Arbeit (siehe [die Gefahr des Deskilling](#werkze
   Datei `zotivity-update.json` des neuesten Releases von GitHub. Abschalten bei der Installation (Kontrollkästchen
   «Beim Start nach Updates suchen») oder unter Einstellungen → Programm & Daten. Einzelheiten:
   [Datenschutzerklärung](PRIVACY.de.md).
+- **Sicherungen** bleiben auf dem Computer, ausser du wählst unter Einstellungen → Index einen Ordner (z. B.
+  switchdrive): Dann kommen Index, Recherchen, Einstellungen und eigene Zitierstile dorthin, API-Schlüssel nie.
 - **Downloads** von Modellen sind mit Commit und SHA-256 festgelegt; die eingebaute Laufzeit nimmt nur Anfragen mit dem
   zufälligen Schlüssel von Zotivity an.
 
