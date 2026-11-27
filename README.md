@@ -28,7 +28,7 @@ of the active project.
 <table>
   <tr>
     <td width="50%" valign="top"><img src="docs/img/feature-research.svg" width="40" height="40" alt=""><br><b>Database search</b><br>From the research question to the selected literature in Zotero: search strings for open databases, RIS import, a de-duplicated pool, screening, full texts and a flow diagram in the style of PRISMA.</td>
-    <td width="50%" valign="top"><img src="docs/img/feature-ask.svg" width="40" height="40" alt=""><br><b>Ask</b><br>Questions about your own texts, answered only from the retrieved passages. Every citation opens the passage and its page.</td>
+    <td width="50%" valign="top"><img src="docs/img/feature-ask.svg" width="40" height="40" alt=""><br><b>Ask</b><br>Questions about your own texts and their figures, answered only from the retrieved passages. Every citation opens the passage and its page.</td>
   </tr>
   <tr>
     <td width="50%" valign="top"><img src="docs/img/feature-review.svg" width="40" height="40" alt=""><br><b>Literature review</b><br>From search strategy to a checked synthesis: every citation and verbatim quotation is verified against the PDFs.</td>
@@ -51,6 +51,10 @@ always yours. See [Database search](#database-search).
 New in 1.2: **Mistral** as a language model; database search shows the status and the next step; **Search** applies to all
 projects.
 
+New in 1.3: **Figures** – images and charts in your PDFs are found while reading and described by a language model
+(with the image, if it understands images); ask e.g. "Describe Figure 1 in …". A new PDF engine (PDFium) reads text
+and page numbers; texts with errors can be tried again per corpus. See [First steps](#first-steps).
+
 <p align="center"><img src="docs/screenshots/en/ask.png" alt="Ask: answer with numbered citations and the cited passage"></p>
 <p align="center"><sub>Answers with citations; a click shows the passage and its page. Demo library with fictitious sources.</sub></p>
 
@@ -71,7 +75,7 @@ projects.
 > application, the Zotero plugin, the installer scripts, the tests and the documentation. The project's initiator,
 > [avibecoder](https://github.com/avibecoder42), defined what to build, tested every version in day-to-day research and decided
 > on each next step; no code was written by hand. Read the code with that in mind: it is extensively tested
-> (≈ 350 automated tests), but it has not been reviewed line by line by a human developer.
+> (≈ 490 automated tests), but it has not been reviewed line by line by a human developer.
 
 > **Use it as a tool, not as a replacement for your own scholarly work.** See
 > [Use it as a tool – the risk of deskilling](#use-it-as-a-tool--the-risk-of-deskilling).
@@ -107,6 +111,7 @@ Zotero 10 (local API)  ←→  Zotivity service (Python, 127.0.0.1:23120)  ←�
   + slim plugin               – text + page numbers from PDF/EPUB/HTML/Word   Claude · GPT · Gemini
     (context menu, autostart) – chunking, reference-list detection            DeepSeek · Mistral · local (Ollama)
                               – embedding: built in (llama.cpp), Ollama, OpenAI …
+                              – figures in PDFs: described by the LLM
 Browser / app window  ←→      – SQLite index: full-text search + vectors
                               – notes & collections back to Zotero
 Claude Desktop (MCP)  ←→      – MCP server
@@ -265,6 +270,9 @@ only embedded for the new model.
 
 - Every text is saved immediately; a crash or cancellation loses at most the current text.
 - Texts are read in a separate process with a time limit – a broken PDF is marked as an error, indexing continues.
+- **Texts with errors** are not read again by every run; the run says how many remain and offers **Try again**
+  (per corpus also via ↻ in the corpus list under Index). After an update they are read again once by themselves.
+  Scans without text: text recognition (OCR) with Tesseract, installed separately.
 - Short outages of the embedding service are bridged; the computer stays awake while indexing; disk space is checked.
 - Background mode in stages (time window, maximum texts per run), index backups, a queue for further runs.
 - **Duplicates:** the same work in several libraries is recognised by DOI or by title, first author and year; only one
@@ -310,8 +318,9 @@ Zotero. Every database search belongs to a Zotivity project (the project page sh
 - **PRISMA:** database search covers searching and selection. It does not cover data extraction, risk of bias or synthesis,
   and each record holds one person's decision (no independent double screening). The log says so.
 - **Zotero:** locally through Zotero's API (write permission as elsewhere in Zotivity) or, with a key, through the Zotero web API.
-  Keys for the web API and the databases are read from the key store (`zotero-web`, `openalex` – required by OpenAlex
-  since February 2026 –, `ncbi`, `semanticscholar`); a settings section for entering them is planned.
+  Keys for the web API and the databases are stored in the key store and entered in the settings: the Zotero web API
+  key under *Settings → Zotero and export*, the database keys (`openalex` – required by OpenAlex since February
+  2026 –, `ncbi`, `semanticscholar`) under *Settings → Databases*, where **Test** checks each one.
 
 ## Literature review
 
@@ -385,6 +394,25 @@ In `claude_desktop_config.json`:
 Tools: `search_library`, `list_collections`, `get_item`, `get_sheet` – Claude can search repeatedly with its own terms
 and cite with page number and Zotero link.
 
+## Troubleshooting
+
+- **"Local API off":** enable the option in Zotero (see above); Zotero must be running.
+- **"The add-on could not be installed …":** Zotero shows this general message for any installation error – save
+  the current `.xpi` again under *Settings → Zotero and export* and install it.
+- **Embedding error "not downloaded yet":** download the model under *Settings → Embedding*. With Ollama:
+  `ollama pull bge-m3`.
+- **The built-in runtime does not start:** if a program file is missing (e.g. removed by a virus scanner), reinstall
+  Zotivity. Loading errors of a model are in `Logs\llama-<model>.log`.
+- **Documents "without text":** scans without a text layer. Text recognition via *Settings → Expert → Reading → OCR*
+  (requires a Tesseract installation; Zotivity calls `tesseract.exe`) or add OCR to the PDFs beforehand.
+- **Texts with errors:** *Try again* in the message at the end of a run, ↻ next to *Index* in the corpus list, or
+  the card *Texts without text or with errors* under Index. After an update they are read again once.
+- **Figures described without the image:** the chosen model must understand images (*Settings → Index → Figures*,
+  *Send the image*). Choose a reasoning depth the server knows (some have no "medium").
+- **Logs:** `%LOCALAPPDATA%\Zotivity\Logs\zotivity.log`.
+- **Zotero data folder in a cloud folder** (OneDrive, Dropbox …): Zotero advises against it because it can damage
+  the database; use Zotero's own sync instead. Zotivity is not affected (it reads only through the API).
+
 ## Development
 
 ```
@@ -399,7 +427,8 @@ For the built-in runtime during development, run `python packaging/fetch_llama.p
 ```
 src/zotivity/
   zotero/      client for the local API (read, write, authorisation)
-  extract/     PDF/EPUB/HTML/Word/ODT text with page numbers, chunking, reference-list detection
+  extract/     PDF (PDFium)/EPUB/HTML/Word/ODT text with page numbers, OCR via Tesseract, figures, chunking,
+               reference-list detection
   embeddings/  built in (llama.cpp: runtime, catalog, download, short test, name search), Ollama, OpenAI, Gemini, …
   llm/         Anthropic, OpenAI/DeepSeek/Mistral/Ollama, Gemini – one interface
   index/       SQLite (FTS5 + vectors per embedding space), indexer, duplicates
