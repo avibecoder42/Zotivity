@@ -130,6 +130,11 @@ export async function removeQueued(id) {
   update();
 }
 
+// Texte mit Fehler oder ohne Text erneut lesen: eines Korpus (corpusId) oder aller Korpora
+export function retryProblems(corpusId) {
+  return submitIndexRun(corpusId ? `/api/corpora/${corpusId}/index` : '/api/index/run', { retry_errors: true });
+}
+
 function notifyIndexDone(j) {
   const c = j.counters || {};
   const n = c.docs_done || 0;
@@ -138,8 +143,14 @@ function notifyIndexDone(j) {
   if (j.status === 'error') { toast(t('Indexierung abgebrochen: {e}', { e: j.error }), 'error', 12000, show); return; }
   if (j.status === 'cancelled') { toast(t('Indexierung abgebrochen. Bereits verarbeitete Texte bleiben im Index.'), 'warning', 6000, show); return; }
   if (j.status !== 'done') return;
+  // Texte mit Fehler oder ohne Text im Bereich liest ein normaler Lauf nicht neu: sagen und „Erneut versuchen“ anbieten
+  const open = (c.open_errors || 0) + (c.open_no_text || 0);
+  const retry = open ? { label: t('Erneut versuchen'), onClick: () => retryProblems(c.corpus_id) } : null;
   if (!n && !chunks) {
-    if (c.trigger !== 'background') toast(t('Alle Texte sind aktuell.'), 'success', 4000);
+    if (c.trigger !== 'background') {
+      if (open) toast(t('Alle übrigen Texte sind aktuell. Nicht erneut gelesen – mit Fehler oder ohne Text: {n}.', { n: fmtInt(open) }), 'warning', 12000, retry);
+      else toast(t('Alle Texte sind aktuell.'), 'success', 4000);
+    }
     return;
   }
   const p = c.problems || 0;
@@ -148,7 +159,7 @@ function notifyIndexDone(j) {
     : embedOnly ? t('Einbetten fertig: {t} für {m} eingebettet ({c} Abschnitte).', { t: nTexts(c.embedded_docs), m: c.model || '', c: fmtInt(chunks) })
       : t('Indexierung fertig: {t} verarbeitet, {c} Abschnitte eingebettet.', { t: nTexts(n), c: fmtInt(chunks) })
         + (p ? ' ' + t('Davon ohne Text oder mit Fehler: {p}.', { p }) : '');
-  toast(text, p ? 'warning' : 'success', 9000, state.view === 'index' ? null : show);
+  toast(text, p || open ? 'warning' : 'success', 9000, c.trigger !== 'background' && retry ? retry : state.view === 'index' ? null : show);
 }
 
 export async function loadStatus() {

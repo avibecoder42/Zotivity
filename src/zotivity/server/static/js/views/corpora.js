@@ -3,7 +3,7 @@
 // Einzelne Einträge kommen aus der Suche hinzu („lib:@KEY“).
 import { h } from '../core/vdom.js';
 import { state, update, ui, toast, run, confirmDialog, openModal, closeModal, loadCorpora, loadSetup, loadStatus, watchJob, runningJob, loadProjects,
-  project, projectCorpora, submitIndexRun } from '../core/store.js';
+  project, projectCorpora, submitIndexRun, retryProblems } from '../core/store.js';
 import * as api from '../core/api.js';
 import { t } from '../core/i18n.js';
 import { icon } from '../ui/icons.js';
@@ -167,6 +167,7 @@ function corpusMenu(e, c) {
     inProject ? { label: t('Aus diesem Projekt entfernen'), icon: 'minus', onClick: () => assignToProject(c, false) }
       : { label: t('Zu diesem Projekt hinzufügen'), icon: 'plus', onClick: () => assignToProject(c, true) },
     { label: runningJob('index') ? t('Indexieren (in die Warteschlange)') : t('Indexieren'), icon: 'play', onClick: () => indexCorpus(c) },
+    ...(problems(c) ? [{ label: t('Fehlerhafte Texte erneut versuchen ({n})', { n: fmtInt(problems(c)) }), icon: 'refresh', onClick: () => retryCorpus(c) }] : []),
     '-',
     { label: t('Korpus löschen …'), icon: 'trash', danger: true, onClick: () => removeCorpus(c) }]);
 }
@@ -184,6 +185,17 @@ export async function indexCorpus(c) {
   Object.assign(ui('index', {}), { corpus: c.id, corpusFor: state.projectId });  // rechts diesen Korpus zeigen
   navigate('index');
   if (job) watchJob(job.id).then(() => { loadCorpora(); loadSetup(); });  // Ergebnis meldet store.js
+}
+
+// Texte mit Fehler oder ohne Text eines Korpus nochmals lesen (ein normaler Lauf überspringt sie)
+const problems = c => ((c.stats && c.stats.error) || 0) + ((c.stats && c.stats.no_text) || 0);
+
+export async function retryCorpus(c) {
+  const job = await retryProblems(c.id);
+  if (job === false) return;
+  Object.assign(ui('index', {}), { corpus: c.id, corpusFor: state.projectId });
+  navigate('index');
+  if (job) watchJob(job.id).then(() => { loadCorpora(); loadSetup(); });
 }
 
 async function syncLibraries() {

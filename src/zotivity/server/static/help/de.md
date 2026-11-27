@@ -248,9 +248,17 @@ Diese Einstellungen stehen unter **Einstellungen → Index**; das Zahnrad oben i
 - **Sicherung des Index**: nach Indexierläufen höchstens alle 12 Stunden; die zwei neuesten bleiben. Sie liegt im Datenordner, also auf demselben Laufwerk.
 - **Sicherung in einen eigenen Ordner** (Einstellungen → Index): kopiert Index, Projekte, Chats, Forschungsstände, Recherchen (`research.db`), Einstellungen und eigene Zitierstile in einen Ordner Ihrer Wahl, z. B. in switchdrive, OneDrive oder auf einen USB-Stick. Automatisch täglich oder wöchentlich (nach Indexierläufen und kurz nach dem Start) oder nur von Hand mit **Jetzt sichern**; die neuesten drei bleiben (einstellbar). Jede Sicherung ist ein eigener Unterordner „Zotivity-Sicherung-Datum-Zeit“; andere Dateien im Ordner fasst Zotivity nicht an. API-Schlüssel gehören nicht dazu, sie bleiben im Schlüsselspeicher. Wiederherstellen: Zotivity beenden und die Dateien einer Sicherung in den Datenordner kopieren (Anleitung in `WIEDERHERSTELLEN.txt` jeder Sicherung).
 
-### Texte ohne Text
+### Texte ohne Text oder mit Fehler
 
 „Ohne Text“ sind meist Scans ohne Textebene. Abhilfe: unter **Einstellungen → Experten → Einlesen** die Texterkennung (OCR) einschalten (benötigt eine Tesseract-Installation: Zotivity sucht `tesseract.exe` im Suchpfad und unter „Programme\Tesseract-OCR“) oder die PDF mit Texterkennung neu speichern. Danach **Erneut versuchen**.
+
+Ein normaler Lauf („Indexieren“) liest Texte ohne Text oder mit Fehler nicht neu, sonst würde jeder Lauf dieselben Dateien erneut versuchen. Bleiben solche Texte im Bereich des Laufs, sagt die Meldung am Ende das („Alle übrigen Texte sind aktuell. Nicht erneut gelesen – mit Fehler oder ohne Text: 16.“) und bietet **Erneut versuchen** an. Weitere Wege:
+
+- **Index → Korpora:** Das Symbol ↻ neben „Indexieren“ erscheint bei einem Korpus mit Problemen und liest nur dessen Problemtexte nochmals.
+- **Korpora → „…“ eines Korpus → Fehlerhafte Texte erneut versuchen**.
+- Die Karte **Texte ohne Text oder mit Fehler** unter Index: **Erneut versuchen** für alle Korpora.
+
+Nach einem **Update** liest der erste Lauf Texte mit Fehler von selbst einmal neu, denn die neue Version kann den Fehler behoben haben. Texte ohne Text gehören nicht dazu. Scheitert ein Text wieder, bleibt er bis zum nächsten Update stehen.
 
 ### Abbildungen
 

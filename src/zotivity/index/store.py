@@ -781,6 +781,14 @@ class Store:
             out = [r for r in out if (r["lib"], r["parent"]) in scope]
         return out
 
+    def problem_counts(self, scope: set[tuple[str, str]] | None = None) -> dict[str, int]:
+        """Anhänge mit Fehler bzw. ohne Text im Bereich (scope: (lib, Eintrag); None = alle)."""
+        out = {"error": 0, "no_text": 0}
+        for r in self.con.execute("SELECT lib, parent, status FROM attachments WHERE status IN ('error','no_text')"):
+            if scope is None or (r["lib"], r["parent"]) in scope:
+                out[r["status"]] += 1
+        return out
+
     def reset_attachments(self, scope: set[tuple[str, str]] | None = None, statuses=("error", "no_text")) -> int:
         ph = ",".join("?" * len(statuses))
         rows = self.con.execute(f"SELECT lib, key, parent FROM attachments WHERE status IN ({ph})", statuses).fetchall()

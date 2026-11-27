@@ -29,6 +29,10 @@ All notable changes, newest first.
   and text and says so; **Describe the figure and answer again** describes just this figure and asks again.
 - **Named text first:** if a question contains the title of a text in scope, its passages are searched separately
   and fill a little over half of the budget; the basis line names it.
+- **Texts with errors:** a run that leaves texts with errors or without text in its scope says so ("All other texts
+  are up to date. Not read again – with errors or without text: 16.") and offers **Try again**; per corpus also via ↻ in the corpus
+  list under Index and "Try texts with errors again" in the corpus menu. After an update, the first run reads texts
+  with errors again once by itself.
 
 ## 1.2.9 – 2026-11-26
 

@@ -9,7 +9,7 @@ import { icon } from '../ui/icons.js';
 import { btn, iconBtn, card, notice, spinner, progress, progressRing, toggle, numberInput, field, badge, emptyState, select, textInput, paneProps, splitter } from '../ui/components.js';
 import { fmtInt, fmtNum, fmtDuration, fmtBytes, fmtDate, fmtAgo, plural, nTexts, nIndexed, embedHint, refreshHint, openHint } from '../core/util.js';
 import { navigate, viewHeader } from './shell.js';
-import { indexCorpus } from './corpora.js';
+import { indexCorpus, retryCorpus } from './corpora.js';
 import { startEmbedding } from './embedmodels.js';
 import { duplicatesCard, resetDuplicates } from './duplicates.js';
 
@@ -206,10 +206,11 @@ function corporaTable() {
   anyToEmbed && h('td', { class: 'num' }, c.stats.to_embed ? badge(fmtInt(c.stats.to_embed), 'info') : '0'),
   h('td', { class: 'num' }, c.stats.pending ? badge(fmtInt(c.stats.pending), 'warning') : '0'),
   h('td', { class: 'num' }, c.stats.no_text + c.stats.error ? badge(fmtInt(c.stats.no_text + c.stats.error), 'danger') : '0'),
-  h('td', { class: 'num', onclick: e => e.stopPropagation() },
+  h('td', { class: 'num nowrap', onclick: e => e.stopPropagation() },
     c.stats.to_embed && !c.stats.pending
       ? btn(t('Einbetten'), { size: 'sm', kind: 'ghost', icon: 'play', title: queueHint(t('Texte dieses Korpus für {m} einbetten', { m: model || '' })), onClick: () => startEmbedding(c.id) })
-      : btn(t('Indexieren'), { size: 'sm', kind: 'ghost', icon: 'play', title: queueHint(null), onClick: () => indexCorpus(c) })));
+      : btn(t('Indexieren'), { size: 'sm', kind: 'ghost', icon: 'play', title: queueHint(null), onClick: () => indexCorpus(c) }),
+    c.stats.no_text + c.stats.error ? iconBtn('refresh', queueHint(t('Erneut versuchen: die Texte mit Fehler oder ohne Text dieses Korpus nochmals lesen ({n})', { n: fmtInt(c.stats.no_text + c.stats.error) })), () => retryCorpus(c)) : null));
   const body = others.length ? [
     group(p ? t('Dieses Projekt: {name}', { name: p.name }) : t('Dieses Projekt'), 'g-own'),
     own.length ? own.map(c => row(c, false)) : h('tr', { key: 'none', class: 'group-empty' }, h('td', { colspan: cols, class: 'muted small' }, t('Noch kein Korpus in diesem Projekt.'))),

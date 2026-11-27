@@ -25,7 +25,7 @@ from pathlib import Path
 
 import numpy as np
 
-from zotivity import paths
+from zotivity import __version__, paths
 from zotivity.embeddings import EmbeddingError
 from zotivity.engine import Engine
 from zotivity.extract import chunk_pages, extract_file, make_abstract_chunk, text_as_document
@@ -654,6 +654,8 @@ class Indexer:
             return result
         if retry_errors:
             self.store.reset_attachments(scope)
+        elif not embed_only:
+            self.retry_after_update(job)
 
         # Embedding-Modell früh prüfen – klare Meldung statt Abbruch mitten im Lauf
         job.update(phase="Vorbereitung", message="Embedding-Modell wird geladen …")
@@ -849,5 +851,22 @@ class Indexer:
         progress["eta"] = 0
         progress["fraction"] = 1.0
         job.check()
-        job.update(phase="Fertig", message=result.get("stopped") or "Index ist aktuell")
+        # Texte mit Fehler oder ohne Text im Bereich: liest dieser Lauf nicht neu – sagen, statt „aktuell“ zu melden
+        open_problems = self.store.problem_counts(scope)
+        progress.update(open_errors=open_problems["error"], open_no_text=open_problems["no_text"], corpus_id=corpus_id)
+        n_open = open_problems["error"] + open_problems["no_text"]
+        message = result.get("stopped") or (f"Index ist aktuell – Texte mit Fehler oder ohne Text: {n_open}"
+                                            if n_open else "Index ist aktuell")
+        job.update(phase="Fertig", message=message)
         return result
+
+    def retry_after_update(self, job: Job | None = None) -> int:
+        """Beim ersten Lauf nach einem Update: Texte mit Fehler einmal neu lesen – das Update kann den Fehler behoben
+        haben. Texte ohne Text (Scans) nicht; scheitert ein Text wieder, bleibt er bis zum nächsten Update stehen."""
+        if self.store.get_meta("errors_retried_version") == __version__:
+            return 0
+        n = self.store.reset_attachments(None, statuses=("error",))
+        self.store.set_meta("errors_retried_version", __version__)
+        if n and job:
+            job.note(f"Neue Version {__version__}: Texte mit Fehler werden erneut gelesen ({n})")
+        return n

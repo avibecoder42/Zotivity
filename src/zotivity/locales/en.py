@@ -104,6 +104,8 @@ MESSAGES: dict[str, str] = {
     "{n} Abstracts": "{n} abstracts",
     "{a} Texte zu lesen, {b} Texte nur für {m} einzubetten": "{a} texts to read, {b} texts only to embed for {m}",
     "Index ist aktuell": "Index is up to date",
+    "Index ist aktuell – Texte mit Fehler oder ohne Text: {n}": "Index is up to date – texts with errors or without text: {n}",
+    "Neue Version {v}: Texte mit Fehler werden erneut gelesen ({n})": "New version {v}: texts with errors are read again ({n})",
     "Zeitfenster beendet nach {i} Texten – Fortsetzung im nächsten Zeitfenster":
         "Time window ended after {i} texts – continuing in the next time window",
     "Etappe beendet: {a} Texte verarbeitet, {b} folgen im nächsten Lauf":

@@ -2744,5 +2744,8 @@ export default {
   'Automatisches Beschreiben pausiert bis {t}: Beim letzten Versuch gelang keine Beschreibung (Modell nicht erreichbar?). „Beschreiben“ von Hand hebt die Pause auf.': 'Automatic describing is paused until {t}: the last attempt produced no description (model not reachable?). Describing by hand lifts the pause.',
   'Bereich für Zahlen und „Beschreiben“': 'Scope for the numbers and “Describe”',
   'Ganzer Index (alle Korpora)': 'Whole index (all corpora)',
+  'Alle übrigen Texte sind aktuell. Nicht erneut gelesen – mit Fehler oder ohne Text: {n}.': 'All other texts are up to date. Not read again – with errors or without text: {n}.',
+  'Erneut versuchen: die Texte mit Fehler oder ohne Text dieses Korpus nochmals lesen ({n})': 'Try again: read the texts with errors or without text of this corpus once more ({n})',
+  'Fehlerhafte Texte erneut versuchen ({n})': 'Try texts with errors again ({n})',
   'Abbildungen in PDFs: unter Einstellungen → Index einschalten. Zotivity findet sie beim Einlesen und lässt sie beschreiben, auf Wunsch nach jedem Indexieren automatisch. Unter Fragen z. B. „Beschreibe Abbildung 1 in …“ fragen.': 'Figures in PDFs: turn them on under Settings → Index. Zotivity finds them while reading and has them described, automatically after each indexing run if you like. Under Ask, ask e.g. “Describe Figure 1 in …”.',
 };

@@ -247,9 +247,17 @@ These settings are under **Settings → Index**; the gear at the top of the Inde
 - **Index backup**: after indexing runs, at most every 12 hours; the two newest are kept. It is stored in the data folder, i.e. on the same drive.
 - **Backup to a folder of your choice** (Settings → Index): copies index, projects, chats, literature reviews, database searches (`research.db`), settings and your own citation styles to a folder you choose, e.g. in switchdrive, OneDrive or on a USB stick. Automatically daily or weekly (after indexing runs and shortly after start-up) or manually with **Back up now**; the newest three are kept (adjustable). Each backup is a subfolder "Zotivity-Sicherung-date-time"; Zotivity does not touch other files in the folder. API keys are not included, they stay in the credential store. To restore: quit Zotivity and copy the files of a backup into the data folder (instructions in `WIEDERHERSTELLEN.txt` in each backup).
 
-### Texts without text
+### Texts without text or with errors
 
 "No text" usually means scans without a text layer. Remedy: enable text recognition (OCR) under **Settings → Expert → Reading** (requires a Tesseract installation: Zotivity looks for `tesseract.exe` on the path and under "Program Files\Tesseract-OCR") or save the PDF again with text recognition. Then click **Try again**.
+
+A normal run ("Index") does not read texts without text or with errors again – otherwise every run would retry the same files. If such texts remain in the scope of the run, the message at the end says so ("All other texts are up to date. Not read again – with errors or without text: 16.") and offers **Try again**. Other ways:
+
+- **Index → corpora:** the ↻ icon next to "Index" appears for a corpus with problems and reads only its problem texts again.
+- **Corpora → "…" of a corpus → Try texts with errors again**.
+- The card **Texts without text or with errors** under Index: **Try again** for all corpora.
+
+After an **update**, the first run reads texts with errors again once by itself, as the new version may have fixed the error. Texts without text are not included. If a text fails again, it stays until the next update.
 
 ### Figures
 
