@@ -19,6 +19,16 @@ All notable changes, newest first.
   with caption and the text inside the chart. "Describe" has the helper or main model describe them – with the image
   if the model understands images – after showing the estimated tokens. The descriptions become searchable with their
   page, appear as "Figure (machine-described)" and are not quoted verbatim. Reading the same file again keeps them.
+  **Describe automatically after each indexing run** (off by default) starts a separate task for the figures still
+  open, at most 200 per run (adjustable), figures with a caption first; it pauses for six hours if a run produced no
+  description. **Scope** shows the numbers and describes for a single corpus instead of the whole index. Whole texts
+  under Ask carry their described figures as a section with page.
+- **Questions about a figure:** "Describe Figure 1 in …", "Fig. 3", "Abb. 2 and 4" find the figure by the number in
+  its caption – in the named text, via the first author, the previous question, or (if unambiguous) the whole scope.
+  The figure and the passage with its caption come first. If it is not described yet, the answer relies on caption
+  and text and says so; **Describe the figure and answer again** describes just this figure and asks again.
+- **Named text first:** if a question contains the title of a text in scope, its passages are searched separately
+  and fill a little over half of the budget; the basis line names it.
 
 ## 1.2.9 – 2026-11-26
 

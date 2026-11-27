@@ -212,7 +212,11 @@ der Breite ziehen (Doppelklick: Standardbreite), und im Programmfenster lässt s
    Suchbereich ins Sprachmodell, erhält es die **ganzen Texte** mit Seitenangaben (Umfang «Automatisch», «Textstellen»,
    «Ganze Texte»; «Diesen Text befragen» im Korpus). Sonst passt «Automatisch» die Suche an die Zahl der Texte an;
    Überblicksfragen erhalten eine Karte je Text. Lange Texte lassen sich «In Etappen» kapitelweise lesen. Eine
-   Planzeile zeigt vor dem Senden, wie viel Text verwendet wird.
+   Planzeile zeigt vor dem Senden, wie viel Text verwendet wird. Nennt die Frage einen Titel, sucht Zotivity zuerst in
+   diesem Text; «Beschreibe Abbildung 1 in …» findet die Abbildung über ihre Nummer.
+6. **Abbildungen** (optional, Einstellungen → Index): Bilder und Diagramme in PDFs werden beim Einlesen gefunden und von
+   einem Sprachmodell beschrieben – von Hand, je Korpus oder nach jedem Indexieren automatisch. Die Beschreibungen sind
+   durchsuchbar und als «maschinell beschrieben» gekennzeichnet.
 
 Tastatur: Strg+1–5 Ansichten des Projekts, Strg+6 Suchen, Strg+7 CSL-Editor, Strg+8 Index, Strg+, Einstellungen, F1 Hilfe, Strg+P Projekt wechseln.
 Darstellung: System, Hell, Grau, Dunkel (die Titelleiste des Fensters passt sich an).
@@ -361,7 +365,8 @@ endgültige Text bleiben deine Arbeit (siehe [die Gefahr des Deskilling](#werkze
 - **Sicherungen** bleiben auf dem Computer, ausser du wählst unter Einstellungen → Index einen Ordner (z. B.
   switchdrive): Dann kommen Index, Recherchen, Einstellungen und eigene Zitierstile dorthin, API-Schlüssel nie.
 - **Abbildungen** (optional): Bildunterschrift, Text der Seite und – für Modelle, die Bilder verstehen – ein Bild
-  der Abbildung gehen nur an das gewählte Sprachmodell, wenn du «Beschreiben» wählst.
+  der Abbildung gehen nur an das gewählte Sprachmodell, wenn du «Beschreiben» wählst (auch «Abbildung beschreiben und
+  neu antworten» unter «Fragen») oder «Nach jedem Indexieren automatisch beschreiben» einschaltest.
 - **Downloads** von Modellen sind mit Commit und SHA-256 festgelegt; die eingebaute Laufzeit nimmt nur Anfragen mit dem
   zufälligen Schlüssel von Zotivity an.
 

@@ -1754,11 +1754,18 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
         return index_backups()
 
     # Abbildungen in PDFs (Einstellungen → Index): suchen, beschreiben lassen, Stand
+    def _figure_items(corpus_id) -> set[tuple[str, str]] | None:
+        """Einträge eines Korpus (für Abbildungen je Korpus); None = ganzer Index."""
+        if corpus_id in (None, "", "all"):
+            return None
+        return indexer.scope(corpus_id=int(corpus_id))
+
     @app.get("/api/figures")
-    def figures_status():
+    def figures_status(corpus_id: int | None = None):
         from zotivity import figures as figures_mod
 
-        return figures_mod.estimate(engine)
+        return {**figures_mod.estimate(engine, _figure_items(corpus_id)),
+                "auto_paused_until": float(engine.store.get_meta("figures_auto_pause_until") or 0)}
 
     @app.post("/api/figures/scan")
     def figures_scan():
@@ -1772,8 +1779,11 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
         from zotivity import figures as figures_mod
 
         limit = body.get("limit")
+        fkeys = {str(k) for k in body.get("fkeys") or []} or None
+        items = _figure_items(body.get("corpus_id"))
         return job_or_409("figures", "Abbildungen beschreiben",
-                          lambda job: figures_mod.describe(engine, job, limit=int(limit) if limit else None),
+                          lambda job: figures_mod.describe(engine, job, items=items, fkeys=fkeys,
+                                                           limit=int(limit) if limit else None),
                           group="figures")
 
     # Sicherung in einen selbst gewählten Ordner (Einstellungen → Index): Index, Recherchen, Einstellungen, Zitierstile

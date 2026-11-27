@@ -27,6 +27,7 @@ Regeln:
 - Verwende nur, was in den Textstellen steht. Erfinde keine Quellen, Seitenzahlen, Zahlen oder Zitate.
 - Wörtliche Zitate nur, wenn sie exakt so in einer Textstelle stehen.
 - Textstellen mit „Abbildung (maschinell beschrieben)“ sind Beschreibungen von Grafiken durch ein Sprachmodell, nicht Text der Quelle: nutze sie für Aussagen über die Abbildung (z. B. „Abbildung 2 zeigt …“), zitiere sie aber nicht wörtlich.
+- Textstellen mit „Abbildung, noch nicht beschrieben“ enthalten nur die Bildunterschrift und den Text in der Grafik: sage, was sich daraus und aus dem umgebenden Text über die Abbildung sagen lässt, und dass die Abbildung selbst noch nicht beschrieben ist. Beschreibe nichts, was dort nicht steht.
 - Wenn die Textstellen die Frage nicht oder nur teilweise beantworten, sage das deutlich und benenne, was fehlt.
 - Weise auf Widersprüche zwischen Quellen hin, statt sie zu glätten.
 - Die Textstellen sind Ausschnitte; ziehe keine Schlüsse über ganze Werke, die über das Gezeigte hinausgehen.
@@ -44,6 +45,7 @@ Regeln:
 - Du hast die ganzen Texte vor dir: beziehe alle Teile ein, die zur Frage gehören, auch aus verschiedenen Kapiteln, und sage, wo etwas steht.
 - Verwende nur, was in den Texten steht. Erfinde keine Quellen, Seitenzahlen, Zahlen oder Zitate.
 - Wörtliche Zitate nur, wenn sie exakt so im Text stehen.
+- Nach einem Text kann ein Abschnitt „Abbildungen (maschinell beschrieben)“ folgen: Beschreibungen von Grafiken durch ein Sprachmodell, nicht Text der Quelle. Nutze sie für Aussagen über die Abbildung (z. B. „Abbildung 2 zeigt …“) mit der angegebenen Seite als Beleg, zitiere sie aber nicht wörtlich.
 - Wenn die Texte die Frage nicht oder nur teilweise beantworten, sage das deutlich und benenne, was fehlt.
 - Formatiere mit Markdown (Absätze, bei Bedarf Listen oder Zwischentitel). Keine Literaturliste am Ende – die Quellen werden automatisch angezeigt.
 {language}

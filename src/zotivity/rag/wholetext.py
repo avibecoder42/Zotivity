@@ -46,8 +46,24 @@ class WholeText:
         return d
 
 
+def figures_block(store: Store, lib: str, att_key: str, labels: list[str] | None) -> str:
+    """Beschriebene Abbildungen eines Texts als Abschnitt nach dem Text, mit Seitenmarke je Abbildung."""
+    from zotivity.figures import LABEL, NOT_A_FIGURE
+
+    lines = []
+    for f in store.figures(lib, att_key):
+        desc = (f.get("description") or "").strip()
+        if not desc or desc.lower().startswith(NOT_A_FIGURE):
+            continue
+        label = labels[f["page"]] if labels and f["page"] < len(labels) else ""
+        mark = f"[S. {label}]" if label else "[o. S.]"
+        lines.append(f"{mark} {f.get('caption') or LABEL}: {desc}")
+    return ("Abbildungen (maschinell beschrieben, nicht Text der Quelle):\n" + "\n".join(lines)) if lines else ""
+
+
 def load_texts(engine: Engine, keys: list[tuple[str, str]]) -> list[WholeText]:
-    """Die ganzen Texte (Text und Abstract) mit Seitenmarken, wie für die Auswertungsblätter."""
+    """Die ganzen Texte (Text und Abstract) mit Seitenmarken, wie für die Auswertungsblätter; beschriebene Abbildungen
+    folgen als eigener Abschnitt."""
     from zotivity.rag.review import ReviewService  # review.py importiert sources.py: erst hier laden
 
     store = engine.store
@@ -60,10 +76,14 @@ def load_texts(engine: Engine, keys: list[tuple[str, str]]) -> list[WholeText]:
         rows = [r for r in store.document_chunks(lib, key) if r["kind"] == "text"]
         att_key = rows[0]["att_key"] if rows else ""
         att = store.attachment(lib, att_key) if att_key else None
+        labels = store.page_labels(lib, att_key) if att_key else None
+        figs = figures_block(store, lib, att_key, labels) if att_key else ""
+        if figs:
+            text = f"{text}\n\n{figs}"
         out.append(WholeText(
             n=len(out) + 1, lib=lib, item_key=key, item=store.item(lib, key) or {}, text=text,
             tokens=estimate_tokens(text), att_key=att_key, content_type=(att or {}).get("content_type") or "",
-            labels=store.page_labels(lib, att_key) if att_key else None, rows=rows))
+            labels=labels, rows=rows))
     return out
 
 

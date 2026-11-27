@@ -406,9 +406,13 @@ export function figuresCard() {
   const s = st();
   const cfg = state.settings && state.settings.figures;
   if (!cfg) return null;
+  // Bereich für Zahlen und „Beschreiben“: ganzer Index oder ein Korpus
+  const corpora = state.corpora || [];
+  if (s.figCorpus && !corpora.some(c => String(c.id) === String(s.figCorpus))) s.figCorpus = '';
+  const scope = s.figCorpus ? { corpus_id: Number(s.figCorpus) } : {};
   if (cfg.enabled && s.figures === undefined) {
     s.figures = null;
-    api.get('/api/figures').then(r => { s.figures = r; update(); }).catch(() => { s.figures = { error: true }; update(); });
+    api.get(`/api/figures${s.figCorpus ? `?corpus_id=${s.figCorpus}` : ''}`).then(r => { s.figures = r; update(); }).catch(() => { s.figures = { error: true }; update(); });
   }
   const f = s.figures;
   const reload = () => { s.figures = undefined; update(); };
@@ -424,10 +428,11 @@ export function figuresCard() {
     const m = cfg.model === 'main' ? t('Hauptmodell') : t('Hilfsmodell');
     if (!await confirmDialog(t('Abbildungen beschreiben?'), t('{n} Abbildungen mit dem {m} beschreiben lassen. Geschätzt rund {i} Input-Token (mit Bild mehr) und {o} Output-Token; bei kostenpflichtigen Modellen fallen Kosten an.',
       { n: fmtInt(f.open), m, i: fmtInt(f.input_tokens), o: `${fmtInt(f.output_tokens[0])}–${fmtInt(f.output_tokens[1])}` }), { ok: t('Beschreiben'), ai: true })) return;
-    const job = await run(() => api.post('/api/figures/describe', {}));
+    const job = await run(() => api.post('/api/figures/describe', scope));
     if (job) follow(job);
   };
   const busy = !!s.figJob || !!runningJob('index') || !!runningJob('figures');
+  const paused = f && f.auto_paused_until && f.auto_paused_until * 1000 > Date.now();
   return card(t('Abbildungen'), 'file', h('div', { class: 'stack' },
     toggle({ checked: cfg.enabled, label: t('Abbildungen in PDFs erkennen und beschreiben lassen'), onChange: v => { saveSettings({ figures: { enabled: v } }); reload(); } }),
     h('p', { class: 'muted small' }, t('Beim Einlesen findet Zotivity Bilder und Diagramme mit Bildunterschrift. Ein Sprachmodell beschreibt sie; die Beschreibung wird mit Seite durchsuchbar und ist als „maschinell beschrieben“ gekennzeichnet. Zahlen aus Diagrammen können falsch gelesen sein – im Zweifel die Abbildung im PDF ansehen.')),
@@ -436,11 +441,18 @@ export function figuresCard() {
         options: [{ value: 'helper', label: t('Hilfsmodell') }, { value: 'main', label: t('Hauptmodell') }] })),
       field(t('Höchstens je Text'), numberInput({ value: cfg.max_per_doc, min: 1, max: 500, int: true, label: t('Höchstens je Text'), onChange: v => saveSettings({ figures: { max_per_doc: v } }) }))) : null,
     cfg.enabled ? toggle({ checked: cfg.send_image, label: t('Bild mitschicken (für Modelle, die Bilder verstehen; sonst nur Bildunterschrift und Text in der Grafik)'), onChange: v => saveSettings({ figures: { send_image: v } }) }) : null,
+    cfg.enabled ? toggle({ checked: cfg.auto_describe, label: t('Nach jedem Indexieren automatisch beschreiben'), onChange: v => { saveSettings({ figures: { auto_describe: v } }); reload(); } }) : null,
+    cfg.enabled && cfg.auto_describe ? h('div', { class: 'stack-sm' },
+      field(t('Höchstens je Lauf'), numberInput({ value: cfg.auto_limit, min: 1, max: 5000, int: true, label: t('Höchstens je Lauf'), onChange: v => saveSettings({ figures: { auto_limit: v } }) })),
+      h('p', { class: 'muted small' }, t('Nach jedem Indexierlauf beschreibt ein eigener Auftrag die noch offenen Abbildungen – höchstens so viele je Lauf, Abbildungen mit Bildunterschrift zuerst; der Rest folgt beim nächsten Lauf. Ohne Rückfrage: Bei kostenpflichtigen Modellen fallen Kosten an.')),
+      paused ? notice('warning', t('Automatisches Beschreiben pausiert bis {t}: Beim letzten Versuch gelang keine Beschreibung (Modell nicht erreichbar?). „Beschreiben“ von Hand hebt die Pause auf.', { t: fmtDate(f.auto_paused_until) })) : null) : null,
+    cfg.enabled && corpora.length ? field(t('Bereich'), select({ value: s.figCorpus || '', label: t('Bereich für Zahlen und „Beschreiben“'), onChange: v => { s.figCorpus = v; reload(); },
+      options: [{ value: '', label: t('Ganzer Index (alle Korpora)') }, ...corpora.map(c => ({ value: String(c.id), label: c.name }))] })) : null,
     cfg.enabled && f && !f.error ? h('p', { class: 'small' }, t('{a} Abbildungen in {b} Texten gefunden, {c} beschrieben.', { a: fmtInt(f.figures), b: fmtInt(f.texts), c: fmtInt(f.described) })) : null,
     cfg.enabled ? h('div', { class: 'row wrap' },
       btn(t('In eingelesenen PDFs suchen'), { size: 'sm', icon: 'search', disabled: busy, why: t('Es läuft bereits ein Auftrag.'), onClick: scan }),
       btn(f && f.open ? t('Beschreiben ({n} offen)', { n: fmtInt(f.open) }) : t('Beschreiben'), { size: 'sm', kind: 'ai', icon: 'ai', disabled: busy || !(f && f.open), why: busy ? t('Es läuft bereits ein Auftrag.') : t('Keine Abbildung offen.'), onClick: describe })) : null,
-    cfg.enabled ? h('p', { class: 'muted small' }, t('Neu eingelesene PDFs werden beim Indexieren durchsucht; schon eingelesene mit „In eingelesenen PDFs suchen“ (liest nur, bettet den Text nicht neu ein).')) : null));
+    cfg.enabled ? h('p', { class: 'muted small' }, t('Neu eingelesene PDFs werden beim Indexieren durchsucht; schon eingelesene mit „In eingelesenen PDFs suchen“ (liest nur, bettet den Text nicht neu ein). Die Suche gilt immer für den ganzen Index.')) : null));
 }
 
 // Sicherung in einen selbst gewählten Ordner (z. B. switchdrive): Index, Recherchen, Einstellungen, eigene Zitierstile

@@ -120,15 +120,20 @@ def _no_images_key(model) -> str:
     return f"figures_no_images:{model.label}"
 
 
-def describe(engine, job, items: set[tuple[str, str]] | None = None, limit: int | None = None) -> dict:
-    """Abbildungen ohne Beschreibung beschreiben lassen; danach je Anhang die Abschnitte schreiben und einbetten."""
+def describe(engine, job, items: set[tuple[str, str]] | None = None, limit: int | None = None,
+             fkeys: set[str] | None = None) -> dict:
+    """Abbildungen ohne Beschreibung beschreiben lassen; danach je Anhang die Abschnitte schreiben und einbetten.
+    items: nur diese Einträge (z. B. ein Korpus), fkeys: nur diese Abbildungen (Knopf unter „Fragen“), limit: höchstens
+    so viele (Abbildungen mit Bildunterschrift zuerst)."""
     from zotivity.extract.pdf import FIGURE_MARGIN, render_page_png
     from zotivity.rag.sources import author_year
 
     store = engine.store
     todo = store.figures_to_describe(items)
-    if limit:
-        todo = todo[:limit]
+    if fkeys is not None:
+        todo = [f for f in todo if f["fkey"] in fkeys]
+    if limit and len(todo) > limit:
+        todo = sorted(todo, key=lambda f: not f.get("caption"))[:limit]
     model, effort = _model(engine, job)
     send_image = engine.settings.figures.send_image and store.get_meta(_no_images_key(model)) != "1"
     job.update(phase="Abbildungen beschreiben", total=len(todo), done=0,
@@ -194,12 +199,72 @@ def describe(engine, job, items: set[tuple[str, str]] | None = None, limit: int 
         if job.cancelled:
             for fut in futures:
                 fut.cancel()
-    for (lib, att_key), item_key in touched.items():
-        result["chunks"] += refresh_chunks(engine, lib, att_key, item_key, job)
+    if touched:
+        # Einbetten nicht gleichzeitig mit einem Indexierlauf (beide schreiben in den Vektorindex)
+        lock = engine.index_lock
+        while not lock.acquire(timeout=2):
+            job.check()
+            job.update(phase="Wartet auf die laufende Indexierung")
+        try:
+            job.update(phase="Abbildungen einbetten")
+            for (lib, att_key), item_key in touched.items():
+                result["chunks"] += refresh_chunks(engine, lib, att_key, item_key, job)
+        finally:
+            lock.release()
+    if result["described"]:  # das Modell antwortet wieder: automatisches Beschreiben nicht mehr pausieren
+        store.set_meta("figures_auto_pause_until", "0")
+    job.counters.update(described=result["described"], errors=result["errors"], todo=len(todo))  # für die Oberfläche
     job.check()
     job.update(phase="Fertig", message=f"{result['described']} Abbildungen beschrieben"
-               + (f", {result['with_image']} mit Bild" if result["with_image"] else ", ohne Bild"))
+               + (f", {result['with_image']} mit Bild" if result["with_image"] else ", ohne Bild")
+               + (f", {result['errors']} Fehler" if result["errors"] else ""))
     return result
+
+
+AUTO_TITLE = "Abbildungen beschreiben (automatisch)"
+AUTO_PAUSE_HOURS = 6  # nach einem automatischen Auftrag, bei dem keine Beschreibung gelang
+
+
+def start_auto(engine, note=None) -> bool:
+    """Nach einem Indexierlauf: offene Abbildungen als eigenen Auftrag beschreiben lassen, wenn unter Einstellungen →
+    Index eingeschaltet (höchstens auto_limit, Bildunterschriften zuerst). note: Meldung an den Indexierlauf.
+    Gelang beim letzten Mal keine einzige Beschreibung (Modell nicht erreichbar o. ä.), wartet der nächste Versuch
+    AUTO_PAUSE_HOURS Stunden – sonst würde jeder Lauf im Hintergrund dieselben Abbildungen erneut schicken."""
+    import time
+
+    cfg = engine.settings.figures
+    if not (cfg.enabled and cfg.auto_describe):
+        return False
+    store = engine.store
+    if float(store.get_meta("figures_auto_pause_until") or 0) > time.time():
+        return False
+    open_n = len(store.figures_to_describe())
+    if not open_n:
+        return False
+    from zotivity.rag.chat import missing_key_message
+
+    llm = engine.settings.llm
+    provider = llm.provider if cfg.model == "main" else (llm.helper_provider or llm.provider)
+    problem = missing_key_message(provider)
+    if problem:
+        if note:
+            note(f"Abbildungen nicht automatisch beschrieben: {problem}")
+        return False
+    n = min(open_n, cfg.auto_limit)
+
+    def run(job):
+        res = describe(engine, job, limit=cfg.auto_limit)
+        if res["errors"] and not res["described"]:
+            store.set_meta("figures_auto_pause_until", str(time.time() + AUTO_PAUSE_HOURS * 3600))
+        return res
+
+    try:
+        engine.jobs.start("figures", AUTO_TITLE, run, group="figures")
+    except RuntimeError:  # es läuft schon ein Auftrag „Abbildungen beschreiben“
+        return False
+    if note:
+        note(f"Beschreibe {n} von {open_n} offenen Abbildungen (eigener Auftrag)")
+    return True
 
 
 def scan(engine, job, items: set[tuple[str, str]] | None = None) -> dict:
@@ -233,4 +298,5 @@ def scan(engine, job, items: set[tuple[str, str]] | None = None) -> dict:
         found += len(recs)
         job.step(1, f"{len(recs)} Abbildungen")
     job.update(phase="Fertig", message=f"{found} Abbildungen in {len(rows)} PDFs gefunden")
+    start_auto(engine, job.note)
     return {"pdfs": len(rows), "figures": found}

@@ -534,6 +534,13 @@ class Indexer:
             if worker is not None:
                 worker.stop()
             lock.release()
+            if status not in ("error", "cancelled"):
+                try:  # Einstellungen → Index → Abbildungen: „Nach jedem Indexieren automatisch beschreiben“
+                    from zotivity import figures as figures_mod
+
+                    figures_mod.start_auto(self.engine, job.note)
+                except Exception:  # noqa: BLE001 - darf den Lauf nicht verderben
+                    log.exception("Abbildungen nicht automatisch beschrieben")
             try:
                 self.record_run(job, trigger, status, error, result, processed, corpus_id)
             except Exception:  # noqa: BLE001 - der Verlauf darf den Lauf nicht verderben

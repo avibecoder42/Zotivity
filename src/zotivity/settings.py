@@ -183,6 +183,9 @@ class FigureSettings(BaseModel):
     # das Bild mitschicken (für Modelle, die Bilder verstehen); sonst nur Bildunterschrift und Text in der Grafik
     send_image: bool = True
     max_per_doc: int = Field(40, ge=1, le=500)
+    # nach jedem Indexierlauf die offenen Abbildungen beschreiben (eigener Auftrag, höchstens auto_limit je Lauf)
+    auto_describe: bool = False
+    auto_limit: int = Field(200, ge=1, le=5000)
 
 
 class BackupSettings(BaseModel):

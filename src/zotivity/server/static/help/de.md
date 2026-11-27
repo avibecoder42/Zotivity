@@ -256,6 +256,10 @@ Diese Einstellungen stehen unter **Einstellungen → Index**; das Zahnrad oben i
 
 Unter **Einstellungen → Index → Abbildungen** lassen sich Abbildungen in PDFs nutzen. Beim Einlesen findet Zotivity eingebettete Bilder und gezeichnete Diagramme, die gross genug sind, mit ihrer Bildunterschrift („Abbildung 3 …“, „Fig. 2 …“) und dem Text in der Grafik (Achsen, Legende). Logos, Zierrat und ganze Scan-Seiten zählen nicht. **Beschreiben** lässt ein Sprachmodell (Hilfs- oder Hauptmodell) jede Abbildung in wenigen Sätzen beschreiben – mit dem Bild, wenn das Modell Bilder versteht, sonst nur aus Bildunterschrift und Text; vorher zeigt Zotivity die geschätzten Token. Die Beschreibungen werden mit Seite durchsuchbar und erscheinen unter „Fragen“ als **Abbildung (maschinell beschrieben)**; das Modell zitiert sie nicht wörtlich. Zahlen aus Diagrammen können falsch gelesen sein – im Zweifel die Abbildung im PDF ansehen. Schon eingelesene PDFs durchsucht **In eingelesenen PDFs suchen** (liest nur, bettet den Text nicht neu ein). Die Beschreibungen hängen an der Datei: Wird dieselbe Datei neu eingelesen, bleiben sie und kosten nichts.
 
+Die Zahlen auf der Karte („1766 Abbildungen in 308 Texten gefunden, 0 beschrieben“) gelten für den **ganzen Index**, also für alle Korpora. Mit **Bereich** wählen Sie einen einzelnen Korpus; Zahlen und **Beschreiben** gelten dann nur für dessen Texte. „In eingelesenen PDFs suchen“ geht immer durch den ganzen Index.
+
+**Nach jedem Indexieren automatisch beschreiben** (aus als Standard): Nach jedem Indexierlauf – von Hand, aus der Warteschlange, im Hintergrund oder aus Zotero – und nach „In eingelesenen PDFs suchen“ beschreibt ein eigener Auftrag die noch offenen Abbildungen, im ganzen Index. Das Indexieren wartet nicht darauf. **Höchstens je Lauf** (Vorgabe 200) begrenzt die Menge; Abbildungen mit Bildunterschrift kommen zuerst, der Rest folgt beim nächsten Lauf. Da keine Rückfrage mit Schätzung erscheint, fallen bei kostenpflichtigen Modellen ohne weitere Bestätigung Kosten an. Fehlt der Schlüssel für das gewählte Modell, steht das im Bericht des Laufs. Gelingt bei einem automatischen Auftrag keine einzige Beschreibung (Modell nicht erreichbar), pausiert das automatische Beschreiben sechs Stunden; „Beschreiben“ von Hand hebt die Pause auf.
+
 Die Liste der Probleme führt jeden Anhang einzeln auf. Hat ein Eintrag mehrere Anhänge, kann er trotz eines Problems durchsuchbar sein – die Suche zeigt dann „indexiert“.
 
 ### Webseiten-Schnappschüsse
@@ -374,6 +378,17 @@ Bei einer Überblicksfrage über mehr als drei Texte erhält das Sprachmodell vo
 2. Jede Anfrage sucht nach Bedeutung (Embeddings) und nach Stichworten (BM25); die Ranglisten werden zusammengeführt.
 3. Ähnliche Textstellen werden zugunsten von Vielfalt ausgedünnt, höchstens wenige je Text (bei „Automatisch“ abhängig von der Zahl der Texte, siehe oben).
 4. Optional prüfen **Recherche-Runden**, ob Aspekte fehlen, und suchen gezielt nach; die **Neusortierung** ordnet die Kandidaten mit dem Hilfsmodell oder einem lokalen Cross-Encoder neu.
+
+### Fragen zu einem bestimmten Text oder einer Abbildung
+
+**Genannter Text:** Steht der Titel eines Texts aus dem Suchbereich in der Frage – ganz oder der Haupttitel vor dem Doppelpunkt, wenn er mindestens fünf Wörter hat –, sucht Zotivity zuerst nur in diesem Text. Seine Textstellen erhalten gut die Hälfte des Umfangs, die übrigen Texte füllen den Rest. Die Grundlage unter der Antwort nennt ihn („zuerst im genannten Text: …“). Kürzere Haupttitel gelten nicht, weil sie oft einfach das Thema der Frage sind. Für eine Frage nur zu diesem Text eignet sich **Diesen Text befragen** (Index → Texte im Korpus).
+
+**Abbildung nach Nummer:** „Beschreibe Abbildung 1 in …“, „Was zeigt Fig. 3?“, „Abb. 2 und 4“: Zotivity sucht die Abbildungen mit dieser Nummer in der Bildunterschrift. Gesucht wird im genannten Text; nennt die Frage keinen, auch über den Nachnamen der Erstautorin bzw. des Erstautors oder den Text der vorigen Frage („Und Abbildung 2?“). Ohne genannten Text nur dann, wenn die Nummer in höchstens zwei Texten des Suchbereichs vorkommt. Gefundene Abbildungen stehen an erster Stelle der Textstellen, dazu der Textabschnitt mit der Bildunterschrift.
+
+- **Beschrieben:** Das Modell erhält die Beschreibung („Abbildung (maschinell beschrieben)“).
+- **Noch nicht beschrieben:** Das Modell erhält nur Bildunterschrift und Text in der Grafik („Abbildung (noch nicht beschrieben)“) und sagt das in der Antwort. Darunter erscheint **Abbildung beschreiben und neu antworten**: Zotivity lässt nur diese Abbildung beschreiben (wie unter Einstellungen → Index → Abbildungen eingestellt) und stellt dieselbe Frage nochmals.
+
+Bei **ganzen Texten** folgen auf jeden Text seine beschriebenen Abbildungen als eigener Abschnitt mit Seite.
 
 ### Antwort und Belege
 
@@ -561,6 +576,7 @@ Die Abfrage geht an github.com; GitHub sieht dabei die IP-Adresse des Rechners, 
 - Index, Projekte, Chats und Forschungsstände liegen lokal im Datenordner (Einstellungen → Programm & Daten). Er liegt bewusst nicht in einem synchronisierten Ordner.
 - Mit einem lokalen Embedding-Modell (eingebaut oder Ollama) verlassen die Texte den Rechner beim Indexieren nicht. Mit einem Cloud-Embedding gehen alle Textabschnitte an den Anbieter. Die eingebaute Laufzeit nimmt nur Anfragen von Zotivity an (zufälliger Schlüssel, nur 127.0.0.1) und greift nie aufs Netz zu; Hugging Face wird nur für Downloads per Knopf und für die Namenssuche angefragt.
 - Beim Fragen und beim Forschungsstand gehen die gefundenen Textstellen bzw. die Texte der Auswahl an den Anbieter des Sprachmodells. Mit Ollama als Sprachmodell bleibt alles lokal.
+- **Abbildungen** gehen nur an das Sprachmodell, wenn Sie sie beschreiben lassen („Beschreiben“, „Abbildung beschreiben und neu antworten“) oder „Nach jedem Indexieren automatisch beschreiben“ einschalten: Bildunterschrift, Text der Seite und – für Modelle, die Bilder verstehen – ein Bild der Abbildung.
 - **Suchen** arbeitet ganz ohne Sprachmodell.
 - Beim Start fragt Zotivity auf GitHub nach einer neuen Version (abschaltbar bei der Installation und unter Einstellungen → Programm & Daten). Dabei geht nur die Anfrage selbst an GitHub, keine Daten aus Zotivity. Das ist die einzige Verbindung, die Zotivity von sich aus aufbaut; die Datenschutzerklärung (PRIVACY.de.md im Repository, auch im Installer) nennt alle.
 - API-Schlüssel liegen verschlüsselt im Anmeldeinformationsspeicher des Betriebssystems.

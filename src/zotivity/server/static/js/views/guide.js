@@ -112,6 +112,8 @@ function workflowSection() {
     h('div', { class: 'guide-more' },
       h('div', { class: 'row wrap' }, icon('search', 15), h('span', { class: 'grow' }, t('Jederzeit: Suchen durchsucht die eigene Bibliothek und alle Gruppen, auch ohne Sprachmodell.')),
         link(t('Suchen'), () => navigate('search'))),
+      h('div', { class: 'row wrap' }, icon('file', 15), h('span', { class: 'grow' }, t('Abbildungen in PDFs: unter Einstellungen → Index einschalten. Zotivity findet sie beim Einlesen und lässt sie beschreiben, auf Wunsch nach jedem Indexieren automatisch. Unter Fragen z. B. „Beschreibe Abbildung 1 in …“ fragen.')),
+        link(t('Abbildungen'), () => { ui('settings', {}).tab = 'index'; navigate('settings'); })),
       h('div', { class: 'row wrap' }, icon('settings', 15), h('span', { class: 'grow' }, t('Sprache, Modelle, Schlüssel und alles Weitere stehen unter Einstellungen.')),
         link(t('Einstellungen'), () => navigate('settings'))))));
 }

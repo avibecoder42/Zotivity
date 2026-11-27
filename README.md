@@ -204,7 +204,11 @@ whole interface can be zoomed.
    in scope fit the language model, it gets the **whole texts** with page marks (scope "Automatic", "Passages", "Whole
    texts"; "Ask this text" in a corpus). Otherwise "Automatic" adapts the search to the number of texts; overview
    questions get a card per text. Long texts can be read chapter by chapter ("In stages"). A plan line shows before
-   sending how much text is used.
+   sending how much text is used. If the question names a title, Zotivity searches that text first; "Describe Figure 1
+   in …" finds the figure by its number.
+6. **Figures** (optional, Settings → Index): images and charts in PDFs are found while reading and described by a
+   language model – by hand, per corpus or automatically after each indexing run. The descriptions are searchable and
+   labelled "machine-described".
 
 Keyboard: Ctrl+1–5 project views, Ctrl+6 search, Ctrl+7 CSL editor, Ctrl+8 index, Ctrl+, settings, F1 help, Ctrl+P switch project. Appearance: system,
 light, grey, dark (the window title bar follows).
@@ -349,7 +353,8 @@ work (see [the risk of deskilling](#use-it-as-a-tool--the-risk-of-deskilling)).
 - **Backups** stay on your computer unless you choose a folder under Settings → Index (e.g. switchdrive): then
   index, database searches, settings and own citation styles are copied there; API keys never are.
 - **Figures** (optional): the caption, page text and, for models that understand images, an image of the figure go
-  to the chosen language model only when you choose "Describe".
+  to the chosen language model only when you choose "Describe" (also "Describe the figure and answer again" under
+  Ask) or turn on "Describe automatically after each indexing run".
 - **Model downloads** are pinned to a commit and SHA-256; the built-in runtime only accepts requests carrying
   Zotivity's random key.
 

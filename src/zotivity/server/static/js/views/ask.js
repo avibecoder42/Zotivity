@@ -1,7 +1,7 @@
 // Fragen an die Korpora des Projekts: Antwort mit anklickbaren Belegen, Textstellen eingeklappt darunter.
 // Mehrere Korpora gleichzeitig wählbar; Antworten und Textstellen lassen sich kopieren und exportieren.
 import { h } from '../core/vdom.js';
-import { state, update, ui, toast, confirmDialog, providerLabel, loadStatus, loadProjects, loadPresets, loadSettings, project, projectCorpora, run } from '../core/store.js';
+import { state, update, ui, toast, confirmDialog, providerLabel, loadStatus, loadProjects, loadPresets, loadSettings, project, projectCorpora, run, watchJob } from '../core/store.js';
 import * as api from '../core/api.js';
 import { t } from '../core/i18n.js';
 import { icon } from '../ui/icons.js';
@@ -142,7 +142,7 @@ async function send() {
         case 'rewrite': msg.content = ev.text; break;  // ganze Texte: Belege [1, S. 64] → [n]
         case 'warning': msg.warnings.push(ev.text); break;
         case 'error': msg.status = ''; msg.errors.push({ message: ev.message, kind: ev.kind }); break;
-        case 'done': msg.status = ''; msg.meta = { model: ev.model, usage: ev.usage, basis: ev.basis, stages: ev.stages }; msg.id = ev.message_id; break;
+        case 'done': msg.status = ''; msg.meta = { model: ev.model, usage: ev.usage, basis: ev.basis, stages: ev.stages, figures_open: ev.figures_open }; msg.id = ev.message_id; break;
         default: break;
       }
       update();
@@ -178,13 +178,57 @@ function sourcesBlock(m) {
     h('div', { class: 'source-list' }, m.sources.map(x => h('div', { class: 'source', key: x.chunk_id, id: `src-${x.chunk_id}` },
       h('div', { class: 'source-head' }, h('span', { class: 'cite static' }, x.n),
         h('div', { class: 'source-title' }, h('b', null, x.citation), ' · ', x.title),
-        h('span', { class: 'muted small' }, x.kind === 'abstract' ? 'Abstract' : x.kind === 'figure' ? `${t('Abbildung (maschinell beschrieben)')}${x.page_label ? `, ${t('S.')} ${x.page_label}` : ''}` : x.page_label ? `${t('S.')} ${x.page_label}` : '')),
+        h('span', { class: 'muted small' }, sourceKind(x))),
       h('div', { class: ['source-text', !x.text && 'muted'] }, x.text || (x.whole ? t('Diese Seite liess sich im Text nicht finden.') : '')),
       h('div', { class: 'source-links' },
         x.zotero_pdf && h('a', { href: x.zotero_pdf }, icon('pdf', 13), ' ', x.page_label ? t('PDF öffnen (S. {p})', { p: x.page_label }) : t('PDF öffnen')),
         h('a', { href: x.zotero_select }, icon('zotero', 13), ' ', t('In Zotero zeigen')),
         h('span', { class: 'spacer' }),
         relevanceMeter(x.relevance))))));
+}
+
+// Art und Seite einer Textstelle (Abstract, Abbildung, Seite)
+function sourceKind(x) {
+  const page = x.page_label ? `, ${t('S.')} ${x.page_label}` : '';
+  if (x.kind === 'abstract') return 'Abstract';
+  if (x.kind === 'figure') return t('Abbildung (maschinell beschrieben)') + page;
+  if (x.kind === 'figure_open') return t('Abbildung (noch nicht beschrieben)') + page;
+  return x.page_label ? `${t('S.')} ${x.page_label}` : '';
+}
+
+// Gefragte Abbildungen, die noch nicht beschrieben sind: beschreiben lassen und dieselbe Frage nochmals stellen
+async function describeAndAsk(m, i) {
+  const s = st();
+  const figs = (m.meta && m.meta.figures_open) || [];
+  if (s.busy || m.describing || !figs.length) return;
+  const job = await run(() => api.post('/api/figures/describe', { fkeys: figs.map(f => f.fkey) }));
+  if (!job) return;
+  m.describing = true;
+  update();
+  const done = await watchJob(job.id);
+  m.describing = false;
+  const c = done.counters || {};
+  if (done.status !== 'done' || (c.errors && !c.described)) {
+    toast(done.error || done.message || t('Die Abbildung liess sich nicht beschreiben.'), 'error');
+    update();
+    return;
+  }
+  m.meta = { ...m.meta, figures_open: [] };
+  const question = s.messages[i - 1];
+  if (question && question.role === 'user' && !st().busy) { s.draft = question.content; send(); } else update();
+}
+
+function figuresOpenBlock(m, i) {
+  const figs = (m.meta && m.meta.figures_open) || [];
+  if (!m.done || !figs.length) return null;
+  const names = figs.map(f => `${(f.caption || t('Abbildung')).slice(0, 80)} (${f.citation})`).join('; ');
+  const text = figs.length === 1
+    ? t('Noch nicht beschrieben: {f}. Die Antwort stützt sich bei dieser Abbildung nur auf Bildunterschrift und umgebenden Text.', { f: names })
+    : t('Noch nicht beschrieben: {f}. Die Antwort stützt sich bei diesen Abbildungen nur auf Bildunterschrift und umgebenden Text.', { f: names });
+  return h('div', { key: 'figopen' }, notice('ai', text, h('div', { class: 'notice-actions' },
+    m.describing ? h('span', { class: 'row small' }, spinner(13), t('Beschreibe …'))
+      : btn(figs.length === 1 ? t('Abbildung beschreiben und neu antworten') : t('Abbildungen beschreiben und neu antworten'),
+        { size: 'sm', kind: 'ai', icon: 'ai', disabled: st().busy, onClick: () => describeAndAsk(m, i) }))));
 }
 
 // Relevanz einer Textstelle: fünf Stufen, gemessen am besten Treffer der Frage (keine Wahrscheinlichkeit)
@@ -229,6 +273,7 @@ function assistantMessage(m, i) {
         iconBtn('download', t('Antwort exportieren (Word, LaTeX, Markdown) …'), e => exportMenu(e, { kind: 'answer', id: m.id }, t('Antwort')))) : null),
     m.warnings.map((w, j) => h('div', { key: 'w' + j }, notice('warning', w, null, { dismiss: `chatwarn:${m.id || 'neu'}:${w}`, session: true }))),
     m.errors.map((e, j) => h('div', { key: 'e' + j }, errorBlock(e))),
+    figuresOpenBlock(m, i),
     sourcesBlock(m),
     basisLine(m),
     notesBlock(m),
@@ -260,8 +305,9 @@ function basisLine(m) {
       : t('Grundlage: Karten von {c} von {n} Texten (Abstract, Angaben, Auswertungsblatt)', { c: fmtInt(b.cards), n: fmtInt(b.scope_docs) });
     return h('div', { class: 'basis-line' }, icon('layers', 12), h('span', null, text + kind));
   }
+  const named = b.named && b.named.length ? ` · ${t('zuerst im genannten Text: {c}', { c: b.named.join('; ') })}` : '';
   return h('div', { class: 'basis-line' }, icon('quote', 12),
-    h('span', null, t('Grundlage: {p} Textstellen aus {d} von {n} Texten', { p: fmtInt(b.passages), d: fmtInt(b.docs), n: fmtInt(b.scope_docs) }) + kind));
+    h('span', null, t('Grundlage: {p} Textstellen aus {d} von {n} Texten', { p: fmtInt(b.passages), d: fmtInt(b.docs), n: fmtInt(b.scope_docs) }) + kind + named));
 }
 
 // Notizen je Etappe (Lesen in Etappen), eingeklappt unter der Antwort

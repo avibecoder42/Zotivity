@@ -255,6 +255,10 @@ These settings are under **Settings → Index**; the gear at the top of the Inde
 
 Under **Settings → Index → Figures** you can use figures in PDFs. While reading, Zotivity finds embedded images and drawn charts that are large enough, with their caption ("Figure 3 …", "Abbildung 2 …") and the text in the chart (axes, legend). Logos, decoration and whole scanned pages do not count. **Describe** has a language model (helper or main model) describe each figure in a few sentences – with the image if the model understands images, otherwise from caption and text only; Zotivity shows the estimated tokens first. The descriptions become searchable with their page and appear under Ask as **Figure (machine-described)**; the model does not quote them verbatim. Numbers in charts may be misread – if in doubt, look at the figure in the PDF. **Search already read PDFs** searches PDFs read earlier (reads only, does not re-embed the text). Descriptions belong to the file: reading the same file again keeps them at no cost.
 
+The numbers on the card ("1766 figures found in 308 texts, 0 described") cover the **whole index**, i.e. all corpora. With **Scope** you pick a single corpus; the numbers and **Describe** then cover only its texts. "Search already read PDFs" always covers the whole index.
+
+**Describe automatically after each indexing run** (off by default): after each indexing run – by hand, from the queue, in the background or from Zotero – and after "Search already read PDFs", a separate task describes the figures still open, across the whole index. Indexing does not wait for it. **At most per run** (default 200) limits the amount; figures with a caption come first, the rest follows with the next run. As no confirmation with an estimate is shown, paid models charge without further confirmation. If the key for the chosen model is missing, the run report says so. If an automatic task produces no description at all (model not reachable), automatic describing pauses for six hours; describing by hand lifts the pause.
+
 The list of problems shows each attachment separately. An item with several attachments can be searchable despite a problem – the search then shows "indexed".
 
 ### Web page snapshots
@@ -373,6 +377,17 @@ For an overview question about more than three texts, the language model gets a 
 2. Each query searches by meaning (embeddings) and by keyword (BM25); the rankings are merged.
 3. Similar passages are thinned out in favour of variety, with at most a few per text (with "Automatic" depending on the number of texts, see above).
 4. Optionally, **research rounds** check whether aspects are missing and search specifically for them; **re-ranking** reorders the candidates with the helper model or a local cross-encoder.
+
+### Questions about a particular text or figure
+
+**Named text:** If the question contains the title of a text in the search scope – the full title, or the main title before the colon if it has at least five words – Zotivity first searches that text alone. Its passages get a little over half of the budget; the other texts fill the rest. The basis below the answer names it ("first from the text you named: …"). Shorter main titles do not count, as they are often simply the topic of the question. For a question about this text only, use **Ask this text** (Index → Texts in the corpus).
+
+**Figure by number:** "Describe Figure 1 in …", "What does Fig. 3 show?", "Abb. 2 and 4": Zotivity looks for the figures with that number in their caption – in the named text; if the question names none, also via the first author's last name or the text of the previous question ("And Figure 2?"). Without a named text only if the number occurs in at most two texts of the search scope. Figures found come first among the passages, together with the passage containing the caption.
+
+- **Described:** the model gets the description ("Figure (machine-described)").
+- **Not described yet:** the model gets only the caption and the text in the chart ("Figure (not described yet)") and says so in the answer. Below it, **Describe the figure and answer again** has only this figure described (as set under Settings → Index → Figures) and asks the same question again.
+
+With **whole texts**, each text is followed by its described figures as a separate section with their page.
 
 ### Answer and citations
 
@@ -560,6 +575,7 @@ The request goes to github.com; GitHub sees the computer's IP address, nothing e
 - Index, projects, chats and literature reviews are stored locally in the data folder (Settings → Program & data). It deliberately does not sit in a synchronised folder.
 - With a local embedding model (built-in or Ollama), the texts do not leave the computer during indexing. With a cloud embedding, all passages are sent to the provider. The built-in runtime only accepts requests from Zotivity (random key, 127.0.0.1 only) and never accesses the network; Hugging Face is only contacted for downloads at the push of a button and for the name search.
 - When asking and for the literature review, the passages found or the texts of the selection are sent to the provider of the language model. With Ollama as language model everything stays local.
+- **Figures** go to the language model only if you have them described ("Describe", "Describe the figure and answer again") or turn on "Describe automatically after each indexing run": the caption, the text of the page and – for models that understand images – an image of the figure.
 - **Search** works entirely without a language model.
 - At start-up Zotivity asks GitHub for a new version (can be switched off during installation and under Settings → Program & data). Only the request itself goes to GitHub, no data from Zotivity. This is the only connection Zotivity makes on its own; the privacy policy (PRIVACY.md in the repository, also shown by the installer) lists them all.
 - API keys are stored encrypted in the operating system's credential store.

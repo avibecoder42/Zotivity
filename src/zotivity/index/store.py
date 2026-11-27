@@ -839,6 +839,35 @@ class Store:
             " WHERE f.lib=? AND f.att_key=? ORDER BY f.n", (lib, att_key)).fetchall()
         return [{**dict(r), "bbox": json.loads(r["bbox"])} for r in rows]
 
+    def figures_of_items(self, keys: Iterable[tuple[str, str]]) -> list[dict]:
+        """Abbildungen dieser Einträge mit Beschreibung (falls vorhanden) und Pfad des Anhangs."""
+        wanted = set(keys)
+        item_keys = sorted({k for _, k in wanted})
+        out: list[dict] = []
+        for i in range(0, len(item_keys), 500):
+            batch = item_keys[i:i + 500]
+            rows = self.con.execute(
+                "SELECT f.*, t.description, t.model, t.with_image, a.path FROM figures f"
+                " JOIN attachments a ON a.lib=f.lib AND a.key=f.att_key LEFT JOIN figure_texts t ON t.fkey=f.fkey"
+                f" WHERE f.item_key IN ({','.join('?' * len(batch))}) ORDER BY f.lib, f.item_key, f.att_key, f.n",
+                batch).fetchall()
+            out += [{**dict(r), "bbox": json.loads(r["bbox"])} for r in rows if (r["lib"], r["item_key"]) in wanted]
+        return out
+
+    def item_heads(self, keys: Iterable[tuple[str, str]]) -> dict[tuple[str, str], dict]:
+        """Titel und Erstautor je Eintrag (für „steht der Text in der Frage?“) – ein Durchgang über alle Einträge."""
+        wanted = set(keys)
+        out: dict[tuple[str, str], dict] = {}
+        for lib, key, title, creators in self.con.execute("SELECT lib, key, title, creators FROM items"):
+            if (lib, key) not in wanted:
+                continue
+            try:
+                first = (json.loads(creators or "[]") or [{}])[0]
+            except (ValueError, TypeError, IndexError):
+                first = {}
+            out[(lib, key)] = {"title": title or "", "last_name": first.get("lastName") or first.get("name") or ""}
+        return out
+
     def figures_to_describe(self, items: set[tuple[str, str]] | None = None) -> list[dict]:
         """Abbildungen ohne Beschreibung (items: nur dieser Einträge), samt Pfad des Anhangs."""
         rows = self.con.execute(
