@@ -260,15 +260,23 @@ Ein normaler Lauf („Indexieren“) liest Texte ohne Text oder mit Fehler nicht
 
 Nach einem **Update** liest der erste Lauf Texte mit Fehler von selbst einmal neu, denn die neue Version kann den Fehler behoben haben. Texte ohne Text gehören nicht dazu. Scheitert ein Text wieder, bleibt er bis zum nächsten Update stehen.
 
+Die Liste der Probleme führt jeden Anhang einzeln auf. Hat ein Eintrag mehrere Anhänge, kann er trotz eines Problems durchsuchbar sein – die Suche zeigt dann „indexiert“.
+
 ### Abbildungen
 
 Unter **Einstellungen → Index → Abbildungen** lassen sich Abbildungen in PDFs nutzen. Beim Einlesen findet Zotivity eingebettete Bilder und gezeichnete Diagramme, die gross genug sind, mit ihrer Bildunterschrift („Abbildung 3 …“, „Fig. 2 …“) und dem Text in der Grafik (Achsen, Legende). Logos, Zierrat und ganze Scan-Seiten zählen nicht. **Beschreiben** lässt ein Sprachmodell (Hilfs- oder Hauptmodell) jede Abbildung in wenigen Sätzen beschreiben – mit dem Bild, wenn das Modell Bilder versteht, sonst nur aus Bildunterschrift und Text; vorher zeigt Zotivity die geschätzten Token. Die Beschreibungen werden mit Seite durchsuchbar und erscheinen unter „Fragen“ als **Abbildung (maschinell beschrieben)**; das Modell zitiert sie nicht wörtlich. Zahlen aus Diagrammen können falsch gelesen sein – im Zweifel die Abbildung im PDF ansehen. Schon eingelesene PDFs durchsucht **In eingelesenen PDFs suchen** (liest nur, bettet den Text nicht neu ein). Die Beschreibungen hängen an der Datei: Wird dieselbe Datei neu eingelesen, bleiben sie und kosten nichts.
 
-Die Zahlen auf der Karte („1766 Abbildungen in 308 Texten gefunden, 0 beschrieben“) gelten für den **ganzen Index**, also für alle Korpora. Mit **Bereich** wählen Sie einen einzelnen Korpus; Zahlen und **Beschreiben** gelten dann nur für dessen Texte. „In eingelesenen PDFs suchen“ geht immer durch den ganzen Index.
+**So beginnen** – am besten vor dem ersten Indexieren, dann findet Zotivity die Abbildungen gleich beim Einlesen:
+
+1. Unter **Einstellungen → Sprachmodelle** ein Modell wählen, das Bilder versteht; meist reicht das Hilfsmodell. Das können z. B. Claude, GPT und Gemini, viele OpenAI-kompatible Server und lokal ein Vision-Modell über Ollama (dann bleiben die Bilder auf dem Rechner). Die **Denktiefe** auf einen Wert stellen, den der Server kennt – manche kennen kein „mittel“, nur „niedrig“, „hoch“ und höher.
+2. Unter **Einstellungen → Index → Abbildungen** einschalten und wählen: **Modell** (Hilfs- oder Hauptmodell), **Höchstens je Text** (Vorgabe 40; Abbildungen mit Bildunterschrift zuerst), **Bild mitschicken** (aus: nur Bildunterschrift und Text in der Grafik gehen ans Modell – günstiger, aber ungenauer) und auf Wunsch **Nach jedem Indexieren automatisch beschreiben**.
+3. Korpus indexieren. Beschrieben wird automatisch nach dem Lauf oder mit **Beschreiben**. Ist schon indexiert: einschalten und **In eingelesenen PDFs suchen**.
+
+**Kosten:** Je Abbildung rechnet Zotivity mit rund 1700 Input-Token mit Bild (900 ohne) und 150–400 Output-Token; 1000 Abbildungen sind also rund 1,7 Mio. Input-Token. Mit einem lokalen Modell oder einem Hochschulserver ohne Abrechnung kostet das nichts.
+
+Die Zahlen auf der Karte (z. B. „250 Abbildungen in 40 Texten gefunden, 0 beschrieben“) gelten für den **ganzen Index**, also für alle Korpora. Mit **Bereich** wählen Sie einen einzelnen Korpus; Zahlen und **Beschreiben** gelten dann nur für dessen Texte. „In eingelesenen PDFs suchen“ geht immer durch den ganzen Index.
 
 **Nach jedem Indexieren automatisch beschreiben** (aus als Standard): Nach jedem Indexierlauf – von Hand, aus der Warteschlange, im Hintergrund oder aus Zotero – und nach „In eingelesenen PDFs suchen“ beschreibt ein eigener Auftrag die noch offenen Abbildungen, im ganzen Index. Das Indexieren wartet nicht darauf. **Höchstens je Lauf** (Vorgabe 200) begrenzt die Menge; Abbildungen mit Bildunterschrift kommen zuerst, der Rest folgt beim nächsten Lauf. Da keine Rückfrage mit Schätzung erscheint, fallen bei kostenpflichtigen Modellen ohne weitere Bestätigung Kosten an. Fehlt der Schlüssel für das gewählte Modell, steht das im Bericht des Laufs. Gelingt bei einem automatischen Auftrag keine einzige Beschreibung (Modell nicht erreichbar), pausiert das automatische Beschreiben sechs Stunden; „Beschreiben“ von Hand hebt die Pause auf.
-
-Die Liste der Probleme führt jeden Anhang einzeln auf. Hat ein Eintrag mehrere Anhänge, kann er trotz eines Problems durchsuchbar sein – die Suche zeigt dann „indexiert“.
 
 ### Webseiten-Schnappschüsse
 

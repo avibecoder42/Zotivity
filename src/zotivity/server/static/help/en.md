@@ -259,15 +259,23 @@ A normal run ("Index") does not read texts without text or with errors again –
 
 After an **update**, the first run reads texts with errors again once by itself, as the new version may have fixed the error. Texts without text are not included. If a text fails again, it stays until the next update.
 
+The list of problems shows each attachment separately. An item with several attachments can be searchable despite a problem – the search then shows "indexed".
+
 ### Figures
 
 Under **Settings → Index → Figures** you can use figures in PDFs. While reading, Zotivity finds embedded images and drawn charts that are large enough, with their caption ("Figure 3 …", "Abbildung 2 …") and the text in the chart (axes, legend). Logos, decoration and whole scanned pages do not count. **Describe** has a language model (helper or main model) describe each figure in a few sentences – with the image if the model understands images, otherwise from caption and text only; Zotivity shows the estimated tokens first. The descriptions become searchable with their page and appear under Ask as **Figure (machine-described)**; the model does not quote them verbatim. Numbers in charts may be misread – if in doubt, look at the figure in the PDF. **Search already read PDFs** searches PDFs read earlier (reads only, does not re-embed the text). Descriptions belong to the file: reading the same file again keeps them at no cost.
 
-The numbers on the card ("1766 figures found in 308 texts, 0 described") cover the **whole index**, i.e. all corpora. With **Scope** you pick a single corpus; the numbers and **Describe** then cover only its texts. "Search already read PDFs" always covers the whole index.
+**Getting started** – best before the first indexing run, so Zotivity finds the figures while reading:
+
+1. Under **Settings → Language models** choose a model that understands images; the helper model is usually enough. Examples are Claude, GPT and Gemini, many OpenAI-compatible servers and, locally, a vision model via Ollama (then the images stay on your computer). Set the **reasoning depth** to a value the server knows – some have no "medium", only "low", "high" and above.
+2. Under **Settings → Index → Figures** switch them on and choose: **Model** (helper or main model), **Maximum per text** (default 40; figures with a caption first), **Send the image** (off: only caption and text in the chart go to the model – cheaper but less accurate) and, if you like, **Describe automatically after each indexing run**.
+3. Index the corpus. Figures are described automatically after the run or with **Describe**. Already indexed: switch on and **Search already read PDFs**.
+
+**Costs:** per figure Zotivity reckons with about 1700 input tokens with the image (900 without) and 150–400 output tokens; 1000 figures are about 1.7 million input tokens. With a local model or a university server without billing this costs nothing.
+
+The numbers on the card (e.g. "250 figures found in 40 texts, 0 described") cover the **whole index**, i.e. all corpora. With **Scope** you pick a single corpus; the numbers and **Describe** then cover only its texts. "Search already read PDFs" always covers the whole index.
 
 **Describe automatically after each indexing run** (off by default): after each indexing run – by hand, from the queue, in the background or from Zotero – and after "Search already read PDFs", a separate task describes the figures still open, across the whole index. Indexing does not wait for it. **At most per run** (default 200) limits the amount; figures with a caption come first, the rest follows with the next run. As no confirmation with an estimate is shown, paid models charge without further confirmation. If the key for the chosen model is missing, the run report says so. If an automatic task produces no description at all (model not reachable), automatic describing pauses for six hours; describing by hand lifts the pause.
-
-The list of problems shows each attachment separately. An item with several attachments can be searchable despite a problem – the search then shows "indexed".
 
 ### Web page snapshots
 
