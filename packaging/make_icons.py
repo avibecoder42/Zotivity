@@ -1,6 +1,7 @@
 """Programmsymbol aus dem SVG der Oberfläche erzeugen: zotivity.ico (Windows) und icon.png (Linux, 256 px).
 
-Aufruf: python packaging/make_icons.py   (benötigt nur PyMuPDF, das Zotivity ohnehin verwendet)
+Aufruf: python packaging/make_icons.py   (benötigt PyMuPDF, nur zum Entwickeln; Zotivity selbst nutzt es nicht mehr.
+Ohne PyMuPDF bleiben die eingecheckten Symbole, der Build läuft weiter)
 """
 
 from __future__ import annotations
@@ -8,7 +9,6 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
-import pymupdf as fitz
 
 ROOT = Path(__file__).resolve().parent.parent
 SVG = ROOT / "src" / "zotivity" / "server" / "static" / "img" / "icon.svg"
@@ -16,6 +16,8 @@ SIZES = (16, 20, 24, 32, 40, 48, 64, 128, 256)
 
 
 def render_png(size: int) -> bytes:
+    import pymupdf as fitz
+
     doc = fitz.open(stream=SVG.read_bytes(), filetype="svg")
     page = doc[0]
     scale = size / page.rect.width
@@ -36,6 +38,13 @@ def write_ico(path: Path, pngs: dict[int, bytes]) -> None:
 
 
 def main() -> None:
+    try:
+        import pymupdf  # noqa: F401
+    except ImportError:
+        if (ROOT / "packaging" / "zotivity.ico").exists():
+            print("Symbole übersprungen (PyMuPDF fehlt; die eingecheckten Symbole bleiben)")
+            return
+        raise
     pngs = {s: render_png(s) for s in SIZES}
     write_ico(ROOT / "packaging" / "zotivity.ico", pngs)
     (ROOT / "src" / "zotivity" / "server" / "static" / "img" / "icon.png").write_bytes(pngs[256])

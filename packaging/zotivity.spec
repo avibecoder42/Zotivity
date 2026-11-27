@@ -25,7 +25,7 @@ if sys.platform == "win32":
 datas += collect_data_files("certifi")
 datas += collect_data_files("google.genai")
 # Pakete, die zur Laufzeit ihre eigene Version oder Einstiegspunkte lesen
-for dist in ("keyring", "google-genai", "anthropic", "openai", "httpx", "fastapi", "uvicorn", "pydantic", "pymupdf"):
+for dist in ("keyring", "google-genai", "anthropic", "openai", "httpx", "fastapi", "uvicorn", "pydantic", "pypdfium2"):
     try:
         datas += copy_metadata(dist)
     except Exception:  # noqa: BLE001 - nicht installiert

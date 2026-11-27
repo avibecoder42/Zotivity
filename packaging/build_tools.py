@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from zotivity import __version__  # noqa: E402
 
 PACKAGES = ["fastapi", "starlette", "pydantic", "pydantic_core", "uvicorn", "httpx", "httpcore", "h11", "anyio",
-            "keyring", "pywin32-ctypes", "platformdirs", "numpy", "PyMuPDF", "openai", "anthropic", "google-genai",
+            "keyring", "pywin32-ctypes", "platformdirs", "numpy", "pypdfium2", "openai", "anthropic", "google-genai",
             "google-auth", "pywebview", "pythonnet", "clr_loader", "proxy_tools", "bottle", "certifi", "idna",
             "sniffio", "distro", "jiter", "typing_extensions", "websockets", "tenacity", "requests", "urllib3",
             "charset-normalizer", "mcp", "pyinstaller"]
@@ -78,7 +78,8 @@ def licenses(target: str) -> None:
             if (llama / name).exists():
                 shutil.copy2(llama / name, folder / name)
     lines += ["", "Python " + sys.version.split()[0] + ": PSF License",
-              "PyMuPDF / MuPDF: AGPL-3.0 (Quellcode: https://github.com/pymupdf/PyMuPDF)",
+              "pypdfium2 / PDFium (PDF lesen): BSD-3-Clause oder Apache-2.0; PDFium: BSD-3-Clause mit den Lizenzen "
+              "seiner Bestandteile (https://github.com/pypdfium2-team/pypdfium2, https://pdfium.googlesource.com/pdfium)",
               f"llama.cpp {llama_build} (eingebaute Embedding-Laufzeit): MIT (https://github.com/ggml-org/llama.cpp)",
               "LLVM OpenMP (libomp, Teil von llama.cpp): Apache-2.0 WITH LLVM-exception",
               "citeproc-js 2.4.63 (Vorschau im CSL-Editor): CPAL-1.0 oder AGPL-3.0 "

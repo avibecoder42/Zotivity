@@ -121,7 +121,7 @@ def _hex_to_text(m: re.Match) -> str:
 
 
 def clean_pdf_label(label: str | None) -> str:
-    """Seitenbeschriftung aus der PDF lesbar machen. PyMuPDF gibt Beschriftungen, die in der PDF als Hex-Text
+    """Seitenbeschriftung aus der PDF lesbar machen. PDF-Bibliotheken geben Beschriftungen, die in der PDF als Hex-Text
     stehen, teils roh zurück – „<FEFF0032>“ ist UTF-16 für „2“; auch Bereiche wie „<FEFF0037>–<FEFF0038>“."""
     s = _HEX_STRING.sub(_hex_to_text, label or "")
     if s.startswith("þÿ") or s.startswith("ÿþ"):  # UTF-16 mit BOM, als Latin-1 gelesen
