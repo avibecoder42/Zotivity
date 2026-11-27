@@ -175,6 +175,16 @@ class ServerSettings(BaseModel):
     exit_after_zotero_closed_minutes: int = Field(0, ge=0)
 
 
+class FigureSettings(BaseModel):
+    # Abbildungen in PDFs (Bilder, Diagramme) beim Einlesen erkennen; ein Sprachmodell beschreibt sie, und die
+    # Beschreibung wird mit Seite durchsuchbar (Abschnitte der Art „figure“, „maschinell beschrieben“)
+    enabled: bool = False
+    model: Literal["helper", "main"] = "helper"
+    # das Bild mitschicken (für Modelle, die Bilder verstehen); sonst nur Bildunterschrift und Text in der Grafik
+    send_image: bool = True
+    max_per_doc: int = Field(40, ge=1, le=500)
+
+
 class BackupSettings(BaseModel):
     # Sicherung in einen selbst gewählten Ordner (z. B. switchdrive): Index, Recherchen, Einstellungen, eigene
     # Zitierstile (backup.py); "" = aus
@@ -211,6 +221,7 @@ class Settings(BaseModel):
     review: ReviewSettings = Field(default_factory=ReviewSettings)
     server: ServerSettings = Field(default_factory=ServerSettings)
     backup: BackupSettings = Field(default_factory=BackupSettings)
+    figures: FigureSettings = Field(default_factory=FigureSettings)
 
 
 def _deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:

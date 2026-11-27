@@ -250,7 +250,11 @@ Diese Einstellungen stehen unter **Einstellungen → Index**; das Zahnrad oben i
 
 ### Texte ohne Text
 
-„Ohne Text“ sind meist Scans ohne Textebene. Abhilfe: unter **Einstellungen → Experten → Einlesen** die Texterkennung (OCR) einschalten (benötigt eine Tesseract-Installation) oder die PDF mit Texterkennung neu speichern. Danach **Erneut versuchen**.
+„Ohne Text“ sind meist Scans ohne Textebene. Abhilfe: unter **Einstellungen → Experten → Einlesen** die Texterkennung (OCR) einschalten (benötigt eine Tesseract-Installation: Zotivity sucht `tesseract.exe` im Suchpfad und unter „Programme\Tesseract-OCR“) oder die PDF mit Texterkennung neu speichern. Danach **Erneut versuchen**.
+
+### Abbildungen
+
+Unter **Einstellungen → Index → Abbildungen** lassen sich Abbildungen in PDFs nutzen. Beim Einlesen findet Zotivity eingebettete Bilder und gezeichnete Diagramme, die gross genug sind, mit ihrer Bildunterschrift („Abbildung 3 …“, „Fig. 2 …“) und dem Text in der Grafik (Achsen, Legende). Logos, Zierrat und ganze Scan-Seiten zählen nicht. **Beschreiben** lässt ein Sprachmodell (Hilfs- oder Hauptmodell) jede Abbildung in wenigen Sätzen beschreiben – mit dem Bild, wenn das Modell Bilder versteht, sonst nur aus Bildunterschrift und Text; vorher zeigt Zotivity die geschätzten Token. Die Beschreibungen werden mit Seite durchsuchbar und erscheinen unter „Fragen“ als **Abbildung (maschinell beschrieben)**; das Modell zitiert sie nicht wörtlich. Zahlen aus Diagrammen können falsch gelesen sein – im Zweifel die Abbildung im PDF ansehen. Schon eingelesene PDFs durchsucht **In eingelesenen PDFs suchen** (liest nur, bettet den Text nicht neu ein). Die Beschreibungen hängen an der Datei: Wird dieselbe Datei neu eingelesen, bleiben sie und kosten nichts.
 
 Die Liste der Probleme führt jeden Anhang einzeln auf. Hat ein Eintrag mehrere Anhänge, kann er trotz eines Problems durchsuchbar sein – die Suche zeigt dann „indexiert“.
 

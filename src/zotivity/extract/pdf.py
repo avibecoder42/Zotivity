@@ -297,6 +297,9 @@ _CAPTION = re.compile(r"^\s*(?:abbildung|abb\.|figure|fig\.|grafik|schaubild|dia
                       re.IGNORECASE)
 MIN_FIGURE_SIDE = 60.0  # Punkt; kleiner sind Logos, Symbole, Zierrat
 MIN_FIGURE_AREA = 0.02  # Anteil der Seite
+MIN_UNCAPTIONED_AREA = 0.06  # Bilder ohne Bildunterschrift erst ab diesem Anteil der Seite
+MAX_CHART_TEXT = 350  # Zeichen: mehr Text in einer Zeichnung ohne Bildunterschrift = Tabelle oder Kasten
+MAX_CAPTION_GAP = 60.0  # Punkt zwischen Abbildung und Bildunterschrift
 
 
 def _merge_boxes(boxes: list[tuple[float, float, float, float]], pad: float = 12.0) -> list[list[float]]:
@@ -370,13 +373,21 @@ def _figures_on_page(index: int, page_w: float, page_h: float, images: list, pat
     for m in _merge_boxes([p for p in paths if (p[2] - p[0]) < 0.95 * page_w or (p[3] - p[1]) < 0.95 * page_h]):
         if big(m) and not any(_overlap(m, f.bbox) > 0.5 for f in out):
             out.append(FigureCandidate(index, tuple(m), "drawing"))
+    kept = []
     for f in out:
         f.caption = _caption_for(f.bbox, positioned)
         if f.kind == "drawing":
-            f.text = " ".join(t for x0, y0, x1, y1, t in positioned
-                              if x0 >= f.bbox[0] - 2 and x1 <= f.bbox[2] + 2 and y0 >= f.bbox[1] - 2
-                              and y1 <= f.bbox[3] + 2)[:1500]
-    return out
+            inner = " ".join(t for x0, y0, x1, y1, t in positioned
+                             if x0 >= f.bbox[0] - 2 and x1 <= f.bbox[2] + 2 and y0 >= f.bbox[1] - 2
+                             and y1 <= f.bbox[3] + 2)
+            # Ohne Bildunterschrift: viel Text in den Linien ist eine Tabelle oder ein Kasten, kein Diagramm
+            if not f.caption and len(inner) > MAX_CHART_TEXT:
+                continue
+            f.text = inner[:1500]
+        elif not f.caption and (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]) < MIN_UNCAPTIONED_AREA * area:
+            continue  # kleines Bild ohne Unterschrift: meist Logo oder Porträt
+        kept.append(f)
+    return kept
 
 
 def _overlap(a, b) -> float:
@@ -388,17 +399,18 @@ def _overlap(a, b) -> float:
 
 
 def _caption_for(bbox, positioned) -> str:
-    """Bildunterschrift: ein Block, der mit „Abbildung 3“, „Fig. 2“ … beginnt, nahe unter oder über der Abbildung;
-    sonst der nächste solche Block auf der Seite."""
+    """Bildunterschrift: ein Block, der mit „Abbildung 3“, „Fig. 2“ … beginnt, direkt unter oder über der Abbildung
+    (höchstens MAX_CAPTION_GAP entfernt und in der Breite überlappend); sonst keine."""
     best, best_d = "", 1e9
     for x0, y0, x1, y1, t in positioned:
         if not _CAPTION.match(t):
             continue
         dy = y0 - bbox[3] if y0 >= bbox[3] - 5 else bbox[1] - y1 if y1 <= bbox[1] + 5 else 0
-        dx = max(0.0, max(bbox[0], x0) - min(bbox[2], x1))
-        d = abs(dy) + dx * 0.5
-        if d < best_d:
-            best, best_d = t, d
+        overlap = min(bbox[2], x1) - max(bbox[0], x0)
+        if abs(dy) > MAX_CAPTION_GAP or overlap <= 0:
+            continue
+        if abs(dy) < best_d:
+            best, best_d = t, abs(dy)
     return best[:600]
 
 

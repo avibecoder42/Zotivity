@@ -2,6 +2,23 @@
 
 All notable changes, newest first.
 
+## 1.3.0 – 2026-11-27
+
+### Changed
+- **New PDF engine: PDFium (pypdfium2) instead of PyMuPDF.** PyMuPDF is licensed under AGPL or a commercial
+  licence; PDFium is BSD/Apache. Text, paragraphs, running heads and printed page numbers come from the same steps as
+  before. Compared on 18 real PDFs (articles and books up to 659 pages): 99.6 % of the characters, 98.9 % identical
+  words, page numbers identical on every page, about 5 ms per page. Text drawn twice for bold print is no longer
+  read twice. EPUB files are read chapter by chapter from the archive.
+- **Text recognition (OCR) runs `tesseract.exe`** (searched on the path and under Program Files\Tesseract-OCR) on a
+  rendered image of the page; the setting and its result are the same as before.
+
+### Added
+- **Figures in PDFs** (Settings → Index → Figures, off by default). Images and drawn charts are found while reading,
+  with caption and the text inside the chart. "Describe" has the helper or main model describe them – with the image
+  if the model understands images – after showing the estimated tokens. The descriptions become searchable with their
+  page, appear as "Figure (machine-described)" and are not quoted verbatim. Reading the same file again keeps them.
+
 ## 1.2.9 – 2026-11-26
 
 ### Added

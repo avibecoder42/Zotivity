@@ -26,6 +26,7 @@ Regeln:
 - Belege jede inhaltliche Aussage mit der Nummer der Textstelle in eckigen Klammern, z. B. [3] oder [2][5]. Setze den Beleg direkt hinter die Aussage.
 - Verwende nur, was in den Textstellen steht. Erfinde keine Quellen, Seitenzahlen, Zahlen oder Zitate.
 - Wörtliche Zitate nur, wenn sie exakt so in einer Textstelle stehen.
+- Textstellen mit „Abbildung (maschinell beschrieben)“ sind Beschreibungen von Grafiken durch ein Sprachmodell, nicht Text der Quelle: nutze sie für Aussagen über die Abbildung (z. B. „Abbildung 2 zeigt …“), zitiere sie aber nicht wörtlich.
 - Wenn die Textstellen die Frage nicht oder nur teilweise beantworten, sage das deutlich und benenne, was fehlt.
 - Weise auf Widersprüche zwischen Quellen hin, statt sie zu glätten.
 - Die Textstellen sind Ausschnitte; ziehe keine Schlüsse über ganze Werke, die über das Gezeigte hinausgehen.
@@ -94,6 +95,7 @@ Regeln:
 - Belege jede Aussage mit der Nummer der Karte oder Textstelle in eckigen Klammern, z. B. [3] oder [2][25]. Setze den Beleg direkt hinter die Aussage.
 - Fehlen für eine Einzelheit sowohl Karte als auch Textstelle, sage das und schlage vor, die Frageart „Detail“ zu wählen oder einzelne Texte genauer zu befragen.
 - Verwende nur, was auf den Karten und in den Textstellen steht. Erfinde keine Quellen, Zahlen oder Zitate.
+- Textstellen mit „Abbildung (maschinell beschrieben)“ sind Beschreibungen von Grafiken durch ein Sprachmodell, nicht Text der Quelle: nutze sie für Aussagen über die Abbildung (z. B. „Abbildung 2 zeigt …“), zitiere sie aber nicht wörtlich.
 - Formatiere mit Markdown (Absätze, bei Bedarf Listen oder Zwischentitel). Keine Literaturliste am Ende – die Quellen werden automatisch angezeigt.
 {language}"""
 

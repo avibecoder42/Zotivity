@@ -239,7 +239,7 @@ function popover() {
       ref: el => { if (!p.placed) requestAnimationFrame(() => fitToWindow(el, p, { flipAbove: p.y - 28 })); } },
     h('div', { class: 'popover-head' }, h('span', { class: 'cite static' }, s.n),
       h('div', null, h('div', { class: 'popover-title' }, s.citation), h('div', { class: 'popover-sub' }, s.title))),
-    h('div', { class: 'popover-meta' }, s.kind === 'abstract' ? 'Abstract' : s.page_label ? t('Seite {p}', { p: s.page_label })
+    h('div', { class: 'popover-meta' }, s.kind === 'abstract' ? 'Abstract' : s.kind === 'figure' ? t('Abbildung (maschinell beschrieben)') + (s.page_label ? `, ${t('Seite {p}', { p: s.page_label })}` : '') : s.page_label ? t('Seite {p}', { p: s.page_label })
       : s.kind === 'text' ? t('ohne Seitenzahl (o. S.)') : ''),
     h('div', { class: 'popover-text' }, s.text.length > 700 ? s.text.slice(0, 700) + ' …' : s.text),
     h('div', { class: 'row' },

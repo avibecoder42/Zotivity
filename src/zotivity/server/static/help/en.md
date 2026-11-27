@@ -249,7 +249,11 @@ These settings are under **Settings → Index**; the gear at the top of the Inde
 
 ### Texts without text
 
-"No text" usually means scans without a text layer. Remedy: enable text recognition (OCR) under **Settings → Expert → Reading** (requires a Tesseract installation) or save the PDF again with text recognition. Then click **Try again**.
+"No text" usually means scans without a text layer. Remedy: enable text recognition (OCR) under **Settings → Expert → Reading** (requires a Tesseract installation: Zotivity looks for `tesseract.exe` on the path and under "Program Files\Tesseract-OCR") or save the PDF again with text recognition. Then click **Try again**.
+
+### Figures
+
+Under **Settings → Index → Figures** you can use figures in PDFs. While reading, Zotivity finds embedded images and drawn charts that are large enough, with their caption ("Figure 3 …", "Abbildung 2 …") and the text in the chart (axes, legend). Logos, decoration and whole scanned pages do not count. **Describe** has a language model (helper or main model) describe each figure in a few sentences – with the image if the model understands images, otherwise from caption and text only; Zotivity shows the estimated tokens first. The descriptions become searchable with their page and appear under Ask as **Figure (machine-described)**; the model does not quote them verbatim. Numbers in charts may be misread – if in doubt, look at the figure in the PDF. **Search already read PDFs** searches PDFs read earlier (reads only, does not re-embed the text). Descriptions belong to the file: reading the same file again keeps them at no cost.
 
 The list of problems shows each attachment separately. An item with several attachments can be searchable despite a problem – the search then shows "indexed".
 

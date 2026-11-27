@@ -126,6 +126,16 @@ CREATE TABLE IF NOT EXISTS search_history(
 CREATE TABLE IF NOT EXISTS review_pages(
     review_id INTEGER, ref TEXT, page INTEGER, PRIMARY KEY(review_id, ref)
 );
+-- Abbildungen in PDFs (Bilder und Diagramme) der zuletzt gelesenen Fassung eines Anhangs; fkey verbindet sie mit der
+-- Beschreibung durch ein Sprachmodell (figure_texts), die erhalten bleibt, solange die Datei gleich ist
+CREATE TABLE IF NOT EXISTS figures(
+    lib TEXT, att_key TEXT, item_key TEXT, n INTEGER, page INTEGER, kind TEXT, bbox TEXT, caption TEXT, text TEXT,
+    fkey TEXT, PRIMARY KEY(lib, att_key, n)
+);
+CREATE INDEX IF NOT EXISTS figures_item ON figures(lib, item_key);
+CREATE TABLE IF NOT EXISTS figure_texts(
+    fkey TEXT PRIMARY KEY, description TEXT, model TEXT, with_image INTEGER, created_at REAL
+);
 -- In Zotero gelöschte Einträge: Kurzangaben, damit Belege in Forschungsständen und Antworten lesbar bleiben und auf
 -- eine noch vorhandene Kopie desselben Werks umgestellt werden können (siehe references.py)
 CREATE TABLE IF NOT EXISTS removed_items(
@@ -786,9 +796,10 @@ class Store:
     # -- Abschnitte ------------------------------------------------------------------
     def replace_chunks(self, lib: str, item_key: str, att_key: str, chunks: list[Chunk]) -> list[int]:
         """Abschnitte eines Anhangs ersetzen. Ist der Text unverändert (z. B. erneutes Lesen nur für die
-        Seitenzahlen), werden nur die Seitenangaben aktualisiert – die Einbettungen bleiben erhalten."""
+        Seitenzahlen), werden nur die Seitenangaben aktualisiert – die Einbettungen bleiben erhalten.
+        Abschnitte der Abbildungen (kind „figure“) bleiben unberührt; die schreibt set_figure_chunks."""
         with self.write() as con:
-            old = con.execute("SELECT id, text FROM chunks WHERE lib=? AND att_key=? ORDER BY ord",
+            old = con.execute("SELECT id, text FROM chunks WHERE lib=? AND att_key=? AND kind != 'figure' ORDER BY ord",
                               (lib, att_key)).fetchall()
             if old and len(old) == len(chunks) and all(o["text"] == c.text for o, c in zip(old, chunks)):
                 for o, c in zip(old, chunks):
@@ -798,7 +809,7 @@ class Store:
                                 (item_key, c.ord, c.kind, c.page_start, c.page_end, c.page_label,
                                  json.dumps(breaks) if breaks else None, o["id"]))
                 return [o["id"] for o in old]
-            con.execute("DELETE FROM chunks WHERE lib=? AND att_key=?", (lib, att_key))
+            con.execute("DELETE FROM chunks WHERE lib=? AND att_key=? AND kind != 'figure'", (lib, att_key))
             ids = []
             for c in chunks:
                 breaks = getattr(c, "breaks", None)
@@ -808,6 +819,63 @@ class Store:
                     (lib, item_key, att_key, c.ord, c.kind, c.page_start, c.page_end, c.page_label, c.text,
                      json.dumps(breaks) if breaks else None),
                 )
+                ids.append(cur.lastrowid)
+        return ids
+
+    # -- Abbildungen ------------------------------------------------------------------
+    def put_figures(self, lib: str, att_key: str, item_key: str, figures: list[dict]) -> None:
+        """Abbildungen eines Anhangs ersetzen (je Abbildung: page, kind, bbox, caption, text, fkey)."""
+        with self.write() as con:
+            con.execute("DELETE FROM figures WHERE lib=? AND att_key=?", (lib, att_key))
+            con.executemany(
+                "INSERT INTO figures VALUES(?,?,?,?,?,?,?,?,?,?)",
+                [(lib, att_key, item_key, n, f["page"], f["kind"], json.dumps(f["bbox"]), f.get("caption", ""),
+                  f.get("text", ""), f["fkey"]) for n, f in enumerate(figures)])
+
+    def figures(self, lib: str, att_key: str) -> list[dict]:
+        """Abbildungen eines Anhangs mit Beschreibung (falls vorhanden)."""
+        rows = self.con.execute(
+            "SELECT f.*, t.description, t.model, t.with_image FROM figures f LEFT JOIN figure_texts t ON t.fkey=f.fkey"
+            " WHERE f.lib=? AND f.att_key=? ORDER BY f.n", (lib, att_key)).fetchall()
+        return [{**dict(r), "bbox": json.loads(r["bbox"])} for r in rows]
+
+    def figures_to_describe(self, items: set[tuple[str, str]] | None = None) -> list[dict]:
+        """Abbildungen ohne Beschreibung (items: nur dieser Einträge), samt Pfad des Anhangs."""
+        rows = self.con.execute(
+            "SELECT f.*, a.path, a.parent FROM figures f JOIN attachments a ON a.lib=f.lib AND a.key=f.att_key"
+            " LEFT JOIN figure_texts t ON t.fkey=f.fkey WHERE t.fkey IS NULL ORDER BY f.lib, f.att_key, f.n").fetchall()
+        out = [{**dict(r), "bbox": json.loads(r["bbox"])} for r in rows]
+        return out if items is None else [r for r in out if (r["lib"], r["item_key"]) in items]
+
+    def figure_stats(self, items: set[tuple[str, str]] | None = None) -> dict:
+        rows = self.con.execute("SELECT f.lib, f.item_key, t.fkey IS NOT NULL AS described FROM figures f"
+                                " LEFT JOIN figure_texts t ON t.fkey=f.fkey").fetchall()
+        rows = [r for r in rows if items is None or (r["lib"], r["item_key"]) in items]
+        return {"figures": len(rows), "described": sum(1 for r in rows if r["described"]),
+                "texts": len({(r["lib"], r["item_key"]) for r in rows})}
+
+    def set_figure_description(self, fkey: str, description: str, model: str, with_image: bool) -> None:
+        with self.write() as con:
+            con.execute("INSERT OR REPLACE INTO figure_texts VALUES(?,?,?,?,?)",
+                        (fkey, description, model, 1 if with_image else 0, time.time()))
+
+    def set_figure_chunks(self, lib: str, item_key: str, att_key: str, chunks: list[Chunk]) -> list[int]:
+        """Abschnitte der Art „figure“ eines Anhangs ersetzen; Textabschnitte und deren Vektoren bleiben."""
+        with self.write() as con:
+            old = [r[0] for r in con.execute("SELECT id FROM chunks WHERE lib=? AND att_key=? AND kind='figure'",
+                                            (lib, att_key))]
+            if old:
+                ph = ",".join("?" * len(old))
+                con.execute(f"DELETE FROM embeddings WHERE chunk_id IN ({ph})", old)
+                con.execute(f"DELETE FROM chunks WHERE id IN ({ph})", old)
+            top = con.execute("SELECT COALESCE(MAX(ord), -1) FROM chunks WHERE lib=? AND att_key=?",
+                              (lib, att_key)).fetchone()[0]
+            ids = []
+            for k, c in enumerate(chunks):
+                cur = con.execute(
+                    "INSERT INTO chunks(lib, item_key, att_key, ord, kind, page_start, page_end, page_label, text)"
+                    " VALUES(?,?,?,?,?,?,?,?,?)",
+                    (lib, item_key, att_key, top + 1 + k, "figure", c.page_start, c.page_end, c.page_label, c.text))
                 ids.append(cur.lastrowid)
         return ids
 

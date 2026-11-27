@@ -1753,6 +1753,29 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
             raise HTTPException(500, "Sicherung fehlgeschlagen – Details im Protokoll.")
         return index_backups()
 
+    # Abbildungen in PDFs (Einstellungen → Index): suchen, beschreiben lassen, Stand
+    @app.get("/api/figures")
+    def figures_status():
+        from zotivity import figures as figures_mod
+
+        return figures_mod.estimate(engine)
+
+    @app.post("/api/figures/scan")
+    def figures_scan():
+        from zotivity import figures as figures_mod
+
+        return job_or_409("index", "Abbildungen in eingelesenen PDFs suchen", lambda job: figures_mod.scan(engine, job),
+                          group="index")
+
+    @app.post("/api/figures/describe")
+    def figures_describe(body: dict = Body(default={})):
+        from zotivity import figures as figures_mod
+
+        limit = body.get("limit")
+        return job_or_409("figures", "Abbildungen beschreiben",
+                          lambda job: figures_mod.describe(engine, job, limit=int(limit) if limit else None),
+                          group="figures")
+
     # Sicherung in einen selbst gewählten Ordner (Einstellungen → Index): Index, Recherchen, Einstellungen, Zitierstile
     def _backup_status() -> dict:
         s = backup_mod.status(engine)

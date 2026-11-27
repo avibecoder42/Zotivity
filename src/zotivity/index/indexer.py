@@ -361,6 +361,8 @@ class Indexer:
         if path and path.exists():
             kwargs = {"max_pages": icfg.max_pages_per_document, "min_chars_per_page": icfg.min_chars_per_page,
                       "ocr": icfg.ocr, "ocr_languages": icfg.ocr_languages}
+            if settings.figures.enabled:  # Abbildungen gleich mit suchen (nur PDF)
+                kwargs["figures"] = True
             # Seitenspanne laut Zotero (z. B. 114–126) als Gegenprobe für die gedruckten Seitenzahlen
             page_range = parse_page_range(((self.store.item(lib, parent) or {}).get("data") or {}).get("pages"))
             if page_range:
@@ -413,6 +415,15 @@ class Indexer:
         self.store.replace_chunks(lib, parent, key, chunks)
         # Gedruckte Seitenzahl je PDF-Seite ("" = ohne) – für Seitenangaben in Belegen und deren Links
         labels = [p.label for p in doc.pages] if doc.method in ("pdfium", "pymupdf", "ocr") else []
+        # Abbildungen: gefundene speichern; schon beschriebene (gleiche Datei) werden gleich wieder Abschnitte
+        from zotivity import figures as figures_mod
+
+        if settings.figures.enabled and doc.method in ("pdfium", "ocr"):
+            self.store.put_figures(lib, key, parent, figures_mod.records(doc.figures, read_md5,
+                                                                          settings.figures.max_per_doc))
+            self.store.set_figure_chunks(lib, parent, key, figures_mod.chunks_for(self.store.figures(lib, key), labels))
+        elif not settings.figures.enabled:
+            self.store.set_figure_chunks(lib, parent, key, [])
         self.store.set_attachment_status(lib, key, "indexed", error=warning or None, method=doc.method,
                                          n_pages=doc.n_pages, n_chars=doc.char_count, n_chunks=len(chunks),
                                          indexed_md5=read_md5, indexed_at=time.time(),

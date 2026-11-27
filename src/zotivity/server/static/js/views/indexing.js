@@ -1,7 +1,7 @@
 // Indexierung: genauer Fortschritt (Dokument, Abschnitte, Restzeit), Etappen, Schutzfunktionen, Sicherung.
 // Rechts: die Texte des gewählten Korpus (indexiert, offen, Probleme), anklickbar nach Zotero.
 import { h } from '../core/vdom.js';
-import { state, update, ui, toast, run, saveSettings, loadCorpora, loadSetup, loadStatus, watchJob, runningJob, submitIndexRun,
+import { state, update, ui, toast, run, confirmDialog, saveSettings, loadCorpora, loadSetup, loadStatus, watchJob, runningJob, submitIndexRun,
   moveQueued, removeQueued } from '../core/store.js';
 import * as api from '../core/api.js';
 import { t } from '../core/i18n.js';
@@ -399,6 +399,48 @@ export function backupCard() {
       btn(t('Jetzt sichern'), { size: 'sm', icon: 'download', disabled: !!runningJob('index'), why: t('Während einer Indexierung wird am Ende automatisch gesichert.'),
         onClick: async () => { s.backups = await run(() => api.post('/api/index/backup')); toast(t('Index gesichert.'), 'success'); update(); } }),
       b && api.isDesktop() && btn(t('Ordner öffnen'), { size: 'sm', kind: 'ghost', icon: 'folder', onClick: () => api.revealPath(b.folder) }))));
+}
+
+// Abbildungen in PDFs: beim Einlesen finden, von einem Sprachmodell beschreiben lassen, durchsuchbar machen
+export function figuresCard() {
+  const s = st();
+  const cfg = state.settings && state.settings.figures;
+  if (!cfg) return null;
+  if (cfg.enabled && s.figures === undefined) {
+    s.figures = null;
+    api.get('/api/figures').then(r => { s.figures = r; update(); }).catch(() => { s.figures = { error: true }; update(); });
+  }
+  const f = s.figures;
+  const reload = () => { s.figures = undefined; update(); };
+  const follow = async job => {
+    s.figJob = job.id; update();
+    const done = await watchJob(job.id, () => update());
+    s.figJob = null;
+    toast(done.message || done.phase || t('Fertig'), done.status === 'done' ? 'success' : 'error');
+    reload();
+  };
+  const scan = async () => { const job = await run(() => api.post('/api/figures/scan', {})); if (job) follow(job); };
+  const describe = async () => {
+    const m = cfg.model === 'main' ? t('Hauptmodell') : t('Hilfsmodell');
+    if (!await confirmDialog(t('Abbildungen beschreiben?'), t('{n} Abbildungen mit dem {m} beschreiben lassen. Geschätzt rund {i} Input-Token (mit Bild mehr) und {o} Output-Token; bei kostenpflichtigen Modellen fallen Kosten an.',
+      { n: fmtInt(f.open), m, i: fmtInt(f.input_tokens), o: `${fmtInt(f.output_tokens[0])}–${fmtInt(f.output_tokens[1])}` }), { ok: t('Beschreiben'), ai: true })) return;
+    const job = await run(() => api.post('/api/figures/describe', {}));
+    if (job) follow(job);
+  };
+  const busy = !!s.figJob || !!runningJob('index') || !!runningJob('figures');
+  return card(t('Abbildungen'), 'file', h('div', { class: 'stack' },
+    toggle({ checked: cfg.enabled, label: t('Abbildungen in PDFs erkennen und beschreiben lassen'), onChange: v => { saveSettings({ figures: { enabled: v } }); reload(); } }),
+    h('p', { class: 'muted small' }, t('Beim Einlesen findet Zotivity Bilder und Diagramme mit Bildunterschrift. Ein Sprachmodell beschreibt sie; die Beschreibung wird mit Seite durchsuchbar und ist als „maschinell beschrieben“ gekennzeichnet. Zahlen aus Diagrammen können falsch gelesen sein – im Zweifel die Abbildung im PDF ansehen.')),
+    cfg.enabled ? h('div', { class: 'row wrap' },
+      field(t('Modell'), select({ value: cfg.model, label: t('Modell für die Beschreibungen'), onChange: v => saveSettings({ figures: { model: v } }),
+        options: [{ value: 'helper', label: t('Hilfsmodell') }, { value: 'main', label: t('Hauptmodell') }] })),
+      field(t('Höchstens je Text'), numberInput({ value: cfg.max_per_doc, min: 1, max: 500, int: true, label: t('Höchstens je Text'), onChange: v => saveSettings({ figures: { max_per_doc: v } }) }))) : null,
+    cfg.enabled ? toggle({ checked: cfg.send_image, label: t('Bild mitschicken (für Modelle, die Bilder verstehen; sonst nur Bildunterschrift und Text in der Grafik)'), onChange: v => saveSettings({ figures: { send_image: v } }) }) : null,
+    cfg.enabled && f && !f.error ? h('p', { class: 'small' }, t('{a} Abbildungen in {b} Texten gefunden, {c} beschrieben.', { a: fmtInt(f.figures), b: fmtInt(f.texts), c: fmtInt(f.described) })) : null,
+    cfg.enabled ? h('div', { class: 'row wrap' },
+      btn(t('In eingelesenen PDFs suchen'), { size: 'sm', icon: 'search', disabled: busy, why: t('Es läuft bereits ein Auftrag.'), onClick: scan }),
+      btn(f && f.open ? t('Beschreiben ({n} offen)', { n: fmtInt(f.open) }) : t('Beschreiben'), { size: 'sm', kind: 'ai', icon: 'ai', disabled: busy || !(f && f.open), why: busy ? t('Es läuft bereits ein Auftrag.') : t('Keine Abbildung offen.'), onClick: describe })) : null,
+    cfg.enabled ? h('p', { class: 'muted small' }, t('Neu eingelesene PDFs werden beim Indexieren durchsucht; schon eingelesene mit „In eingelesenen PDFs suchen“ (liest nur, bettet den Text nicht neu ein).')) : null));
 }
 
 // Sicherung in einen selbst gewählten Ordner (z. B. switchdrive): Index, Recherchen, Einstellungen, eigene Zitierstile

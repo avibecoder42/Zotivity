@@ -178,7 +178,7 @@ function sourcesBlock(m) {
     h('div', { class: 'source-list' }, m.sources.map(x => h('div', { class: 'source', key: x.chunk_id, id: `src-${x.chunk_id}` },
       h('div', { class: 'source-head' }, h('span', { class: 'cite static' }, x.n),
         h('div', { class: 'source-title' }, h('b', null, x.citation), ' · ', x.title),
-        h('span', { class: 'muted small' }, x.kind === 'abstract' ? 'Abstract' : x.page_label ? `${t('S.')} ${x.page_label}` : '')),
+        h('span', { class: 'muted small' }, x.kind === 'abstract' ? 'Abstract' : x.kind === 'figure' ? `${t('Abbildung (maschinell beschrieben)')}${x.page_label ? `, ${t('S.')} ${x.page_label}` : ''}` : x.page_label ? `${t('S.')} ${x.page_label}` : '')),
       h('div', { class: ['source-text', !x.text && 'muted'] }, x.text || (x.whole ? t('Diese Seite liess sich im Text nicht finden.') : '')),
       h('div', { class: 'source-links' },
         x.zotero_pdf && h('a', { href: x.zotero_pdf }, icon('pdf', 13), ' ', x.page_label ? t('PDF öffnen (S. {p})', { p: x.page_label }) : t('PDF öffnen')),

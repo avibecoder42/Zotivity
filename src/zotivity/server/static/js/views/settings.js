@@ -10,7 +10,7 @@ import { navigate, viewHeader } from './shell.js';
 import { zoteroHelp, setupCard } from './setup.js';
 import { loadInfo } from './research/common.js';
 import { installedModelsCard, compareButton, builtinOptionsCard, adoptNotice, activateSpace } from './embedmodels.js';
-import { autoCard, safetyCard, backupCard, folderBackupCard } from './indexing.js';
+import { autoCard, safetyCard, backupCard, folderBackupCard, figuresCard } from './indexing.js';
 import { duplicatesSettingsCard } from './duplicates.js';
 
 const TABS = [
@@ -581,7 +581,7 @@ function languageTab() {
 // ------------------------------------------------------------------ Darstellung
 // Index: automatisch und in Etappen, Schutz für grosse Bibliotheken, Sicherung (Karten aus indexing.js)
 function indexTab() {
-  return [autoCard(), safetyCard(), duplicatesSettingsCard(), backupCard(), folderBackupCard()];
+  return [autoCard(), safetyCard(), figuresCard(), duplicatesSettingsCard(), backupCard(), folderBackupCard()];
 }
 
 function appearanceTab() {

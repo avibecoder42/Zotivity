@@ -360,6 +360,8 @@ endgültige Text bleiben deine Arbeit (siehe [die Gefahr des Deskilling](#werkze
   [Datenschutzerklärung](PRIVACY.de.md).
 - **Sicherungen** bleiben auf dem Computer, ausser du wählst unter Einstellungen → Index einen Ordner (z. B.
   switchdrive): Dann kommen Index, Recherchen, Einstellungen und eigene Zitierstile dorthin, API-Schlüssel nie.
+- **Abbildungen** (optional): Bildunterschrift, Text der Seite und – für Modelle, die Bilder verstehen – ein Bild
+  der Abbildung gehen nur an das gewählte Sprachmodell, wenn du «Beschreiben» wählst.
 - **Downloads** von Modellen sind mit Commit und SHA-256 festgelegt; die eingebaute Laufzeit nimmt nur Anfragen mit dem
   zufälligen Schlüssel von Zotivity an.
 
@@ -400,7 +402,7 @@ suchen und mit Seitenzahl und Zotero-Link zitieren.
 - **Eingebaute Laufzeit startet nicht:** Fehlt eine Programmdatei (z. B. von einem Virenscanner entfernt), Zotivity
   neu installieren. Ladefehler eines Modells stehen in `Logs\llama-<Modell>.log`.
 - **Dokumente «ohne Text»:** Scans ohne Textebene. Texterkennung über *Einstellungen → Experten → Einlesen → OCR*
-  (benötigt eine Tesseract-Installation) oder die PDFs vorher mit OCR versehen.
+  (benötigt eine Tesseract-Installation; Zotivity ruft `tesseract.exe` auf) oder die PDFs vorher mit OCR versehen.
 - **Logs:** `%LOCALAPPDATA%\Zotivity\Logs\zotivity.log`.
 - **Zotero-Datenordner in einem Cloud-Ordner** (OneDrive, Dropbox …): Zotero rät davon ab, weil das die Datenbank
   beschädigen kann; besser die Zotero-eigene Synchronisation verwenden. Zotivity ist davon nicht betroffen (liest nur

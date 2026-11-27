@@ -348,6 +348,8 @@ work (see [the risk of deskilling](#use-it-as-a-tool--the-risk-of-deskilling)).
   updates at start-up") or under Settings → Program & data. Details: [privacy policy](PRIVACY.md).
 - **Backups** stay on your computer unless you choose a folder under Settings → Index (e.g. switchdrive): then
   index, database searches, settings and own citation styles are copied there; API keys never are.
+- **Figures** (optional): the caption, page text and, for models that understand images, an image of the figure go
+  to the chosen language model only when you choose "Describe".
 - **Model downloads** are pinned to a commit and SHA-256; the built-in runtime only accepts requests carrying
   Zotivity's random key.
 

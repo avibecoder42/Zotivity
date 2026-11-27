@@ -1,6 +1,6 @@
 # Privacy in Zotivity
 
-As of version 1.2.9, 26 November 2026 · [Deutsch](PRIVACY.de.md)
+As of version 1.3.0, 27 November 2026 · [Deutsch](PRIVACY.de.md)
 
 Zotivity runs on your computer. There is no Zotivity account, no usage statistics, no crash reports and no
 advertising. Settings, index, knowledge corpora, chats, literature reviews and searches are kept in Zotivity's data
@@ -23,6 +23,8 @@ each service apply to the data you send there.
   OSF, swisscovery). The "Test" button next to a key sends one small request to the service.
 - **Zotero web API (api.zotero.org):** only if you store a key for it.
 - **Hugging Face:** only when you download or search for an embedding model.
+- **Figures:** only if you switch them on under Settings → Index and choose "Describe". Then the caption, text of
+  the page and – for models that understand images – an image of the figure are sent to the chosen language model.
 - **Citation styles from zotero.org:** only when you fetch a style in the CSL editor.
 - **Backup to a folder of your choice:** only if you choose a folder under Settings → Index. If it is a synchronised
   folder (e.g. switchdrive or OneDrive), that program uploads the backup to its cloud. API keys are never in the

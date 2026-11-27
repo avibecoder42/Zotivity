@@ -1,6 +1,6 @@
 # Datenschutz bei Zotivity
 
-Stand: Version 1.2.9, 26. November 2026 · [English](PRIVACY.md)
+Stand: Version 1.3.0, 27. November 2026 · [English](PRIVACY.md)
 
 Zotivity läuft auf deinem Computer. Es gibt kein Konto bei Zotivity, keine Nutzungsstatistik, keine Absturzberichte
 und keine Werbung. Einstellungen, Index, Wissenskorpora, Chats, Forschungsstände und Recherchen liegen im
@@ -24,6 +24,9 @@ jeweiligen Dienst gelten dessen Bedingungen und Datenschutzerklärung.
   Probeanfrage an den Dienst.
 - **Zotero-Web-API (api.zotero.org):** nur, wenn du dafür einen Schlüssel speicherst.
 - **Hugging Face:** nur, wenn du ein Embedding-Modell herunterlädst oder nach einem suchst.
+- **Abbildungen:** nur, wenn du sie unter Einstellungen → Index einschaltest und «Beschreiben» wählst. Dann gehen
+  Bildunterschrift, Text der Seite und – für Modelle, die Bilder verstehen – ein Bild der Abbildung an das gewählte
+  Sprachmodell.
 - **Zitierstile von zotero.org:** nur, wenn du im CSL-Editor einen Stil holst.
 - **Sicherung in einen eigenen Ordner:** nur, wenn du unter Einstellungen → Index einen Ordner wählst. Liegt er in
   einem synchronisierten Ordner (z. B. switchdrive oder OneDrive), lädt dessen Programm die Sicherung in seine
