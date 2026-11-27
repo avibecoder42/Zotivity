@@ -9,7 +9,8 @@ All notable changes, newest first.
   licence; PDFium is BSD/Apache. Text, paragraphs, running heads and printed page numbers come from the same steps as
   before. Compared on 18 real PDFs (articles and books up to 659 pages): 99.6 % of the characters, 98.9 % identical
   words, page numbers identical on every page, about 5 ms per page. Text drawn twice for bold print is no longer
-  read twice. EPUB files are read chapter by chapter from the archive.
+  read twice. Maths letters in formulas (italic N, x) become ordinary letters, so a search for "N = 120" finds
+  them; emojis stay. EPUB files are read chapter by chapter from the archive.
 - **Text recognition (OCR) runs `tesseract.exe`** (searched on the path and under Program Files\Tesseract-OCR) on a
   rendered image of the page; the setting and its result are the same as before.
 

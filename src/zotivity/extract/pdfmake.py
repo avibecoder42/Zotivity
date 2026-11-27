@@ -86,8 +86,21 @@ def _content(page: Page) -> bytes:
     return b"\n".join(out)
 
 
-def build(pages: list[Page], labels: list[tuple[int, str, int]] | None = None) -> bytes:
-    """PDF-Datei als Bytes. labels: [(erste Seite 0-basiert, Stil „D“ oder „r“, erste Nummer)]."""
+def _to_unicode_cmap(mapping: dict[str, str]) -> bytes:
+    """ToUnicode-Tabelle: Zeichen der Schrift → beliebiger Unicode-Text (auch ausserhalb der Grundebene, wie 𝑁 in
+    Formel-PDFs)."""
+    rows = "\n".join(f"<{ord(src):02X}> <{dst.encode('utf-16-be').hex().upper()}>" for src, dst in mapping.items())
+    cmap = ("/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CMapName /Zotivity def\n/CMapType 2 def\n"
+            "1 begincodespacerange\n<00> <FF>\nendcodespacerange\n"
+            f"{len(mapping)} beginbfchar\n{rows}\nendbfchar\n"
+            "endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend").encode("ascii")
+    return b"<< /Length " + str(len(cmap)).encode() + b" >>\nstream\n" + cmap + b"\nendstream"
+
+
+def build(pages: list[Page], labels: list[tuple[int, str, int]] | None = None,
+          to_unicode: dict[str, str] | None = None) -> bytes:
+    """PDF-Datei als Bytes. labels: [(erste Seite 0-basiert, Stil „D“ oder „r“, erste Nummer)]. to_unicode: Zeichen,
+    die beim Auslesen als anderer Text erscheinen sollen (ToUnicode-Tabelle der Schrift)."""
     objs: list[bytes] = []
 
     def add(body: bytes) -> int:
@@ -96,7 +109,8 @@ def build(pages: list[Page], labels: list[tuple[int, str, int]] | None = None) -
 
     catalog = add(b"")  # 1, später gefüllt
     pages_id = add(b"")  # 2
-    font = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")
+    cmap = b" /ToUnicode " + str(add(_to_unicode_cmap(to_unicode))).encode() + b" 0 R" if to_unicode else b""
+    font = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding" + cmap + b" >>")
     pixels = bytes([96 + (i * 7) % 64 for i in range(64 * 64)])  # 64×64 Graustufen
     data = zlib.compress(pixels)
     image = add(b"<< /Type /XObject /Subtype /Image /Width 64 /Height 64 /ColorSpace /DeviceGray /BitsPerComponent 8"

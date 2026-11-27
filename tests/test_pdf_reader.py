@@ -156,6 +156,38 @@ def test_epub_chapters_in_spine_order(tmp_path):
     assert "Erster Text über Jugendhilfe." in text and all(p.label == "" for p in doc.pages)
 
 
+def test_characters_outside_the_basic_plane(tmp_path):
+    """Formel-PDFs: N und x in mathematischer Kursive und Emojis liefert PDFium als zwei UTF-16-Hälften. Ohne
+    Zusammensetzen liess sich der Text nicht speichern («surrogates not allowed»). Mathematische Buchstaben werden zu
+    gewöhnlichen, damit die Suche «N = 120» findet; beide Lesewege (Zeilen, Zeichen für Zeichen) liefern dasselbe."""
+    import pypdfium2 as pdfium
+
+    page = pdfmake.Page()
+    page.text(60, 80, "Stichprobe N = 120, Mittelwert x # Ende.", 11)
+    page.text(60, 100, "Zweite Zeile ohne Sonderzeichen.", 11)
+    path = tmp_path / "formel.pdf"
+    path.write_bytes(pdfmake.build([page], to_unicode={"N": "\U0001d441", "x": "\U0001d465", "#": "\U0001f99c"}))
+    expected = "Stichprobe N = 120, Mittelwert x \U0001f99c Ende."
+    text = extract_pdf(path).pages[0].text
+    assert text.split("\n\n")[0] == expected
+    text.encode("utf-8")  # speicherbar
+    doc = pdfium.PdfDocument(str(path))
+    try:
+        p = doc[0]
+        lines = reader._page_lines_by_char(p.get_textpage(), p.get_cropbox()[3], p.get_mediabox())
+        assert lines[0].text == expected
+    finally:
+        doc.close()
+
+
+def test_fix_text():
+    fix = reader._fix_text
+    assert fix("a𝑁b") == "aNb"  # Paar zusammengesetzt, mathematisches N als N
+    assert fix("x\ud835 y\udc41z") == "x yz"  # einzelne Hälften fallen weg
+    assert fix("\U0001d499 = \U0001d7cf, ℎ") == "x = 1, h"  # fett-kursives x, fette 1, Planck-h
+    assert fix("Papagei \U0001f99c, m² und ﬁ") == "Papagei \U0001f99c, m² und ﬁ"  # sonst gleich
+
+
 def test_png_encoder():
     import numpy as np
 

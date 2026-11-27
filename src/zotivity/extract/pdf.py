@@ -21,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import unicodedata
 import zipfile
 import zlib
 from collections import Counter
@@ -145,18 +146,33 @@ class _Line:
 
     @property
     def text(self) -> str:
-        return "".join(self.chars).strip()
+        return _fix_text("".join(self.chars)).strip()
 
 
 _SPACES = str.maketrans({"\t": " ", "\xa0": " ", "\x00": "", "￾": "", "￿": ""})
+_SURROGATE = re.compile("[\ud800-\udfff]")
+_MATH_LETTERS = re.compile("[\U0001d400-\U0001d7ffℎ]")
+
+
+def _fix_text(s: str) -> str:
+    """Zeichen ausserhalb der Grundebene von Unicode (𝑁, 𝑥 in Formeln, Emojis) liefert PDFium als zwei UTF-16-Hälften
+    (Surrogatpaar). Paare zusammensetzen, einzelne Hälften weglassen – sonst lässt sich der Text nicht als UTF-8
+    speichern. Mathematische Buchstaben und Ziffern (𝑁, 𝒙, ℎ, 𝟏) als gewöhnliche, damit die Suche „N = 120“ findet."""
+    if _SURROGATE.search(s):
+        s = s.encode("utf-16-le", "surrogatepass").decode("utf-16-le", "ignore")
+    if _MATH_LETTERS.search(s):
+        s = _MATH_LETTERS.sub(lambda m: unicodedata.normalize("NFKC", m.group()), s)
+    return s
 
 
 def _page_lines(textpage, top: float, clip: tuple[float, float, float, float]) -> list[_Line]:
     """Zeilen einer Seite in der Reihenfolge des Inhalts. PDFium trennt Zeilen mit eingefügtem \\r\\n. Der Text kommt in
     einem Aufruf; Rahmen und Schriftgrösse nur je Zeile (erstes und letztes Zeichen, „lose“ Rahmen nach Schriftgrösse,
     damit Zeilen mit und ohne Unterlängen gleich hoch sind). top: Oberkante der sichtbaren Seite, clip: Mediabox –
-    Zeilen ganz ausserhalb fallen weg. Stimmt die Länge des Texts nicht mit der Zahl der Zeichen überein (Zeichen
-    ausserhalb der Grundebene von Unicode), liest die langsamere Fassung Zeichen für Zeichen."""
+    Zeilen ganz ausserhalb fallen weg. Zeichen ausserhalb der Grundebene von Unicode (𝑁 in Formeln) zählt PDFium als
+    zwei Zeichen (UTF-16-Hälften): dann den Text Codeeinheit für Codeeinheit übernehmen, damit die Stellen zu den
+    Zeichennummern passen; _fix_text setzt die Hälften je Zeile wieder zusammen. Passt auch das nicht, liest die
+    langsamere Fassung Zeichen für Zeichen."""
     import pypdfium2.raw as raw
 
     tp = textpage.raw
@@ -165,7 +181,10 @@ def _page_lines(textpage, top: float, clip: tuple[float, float, float, float]) -
         return []
     text = textpage.get_text_range(0, n)
     if len(text) != n:
-        return _page_lines_by_char(textpage, top, clip)
+        buf = (ctypes.c_ushort * (n + 1))()
+        if raw.FPDFText_GetText(tp, 0, n, buf) - 1 != n:
+            return _page_lines_by_char(textpage, top, clip)
+        text = "".join(map(chr, buf[:n]))
     left, bottom, right, ctop = clip
     rect = raw.FS_RECTF()
     ref = ctypes.byref(rect)
@@ -188,7 +207,7 @@ def _page_lines(textpage, top: float, clip: tuple[float, float, float, float]) -
         lt, lb = max(t0, t1), min(b0, b1)
         if x1 < left or x0 > right or lt < bottom or lb > ctop:
             continue  # ganz ausserhalb der Mediabox (wie bisher „Mediabox-Clip“)
-        line_text = stripped.translate(_SPACES)
+        line_text = _fix_text(stripped.translate(_SPACES))
         if line_text.strip():
             lines.append(_Line([line_text], min(x0, x1), top - lt, max(x0, x1), top - lb,
                                raw.FPDFText_GetFontSize(tp, i0)))
@@ -217,6 +236,10 @@ def _page_lines_by_char(textpage, top: float, clip: tuple[float, float, float, f
         if u == 32 or u == 9 or u == 0xA0:  # Leerzeichen (auch von PDFium eingefügte zwischen Wörtern)
             if cur is not None and cur.chars[-1] != " ":
                 cur.chars.append(" ")
+            continue
+        if 0xDC00 <= u < 0xE000:  # zweite Hälfte eines Surrogatpaars: gehört zum vorigen Zeichen
+            if cur is not None and "\ud800" <= cur.chars[-1] < "\udc00":
+                cur.chars.append(chr(u))
             continue
         if u == 0 or u >= 0xFFFE or not get_box(tp, i, ref):
             continue
@@ -576,7 +599,7 @@ def extract_pdf(
             labels, result.label_source = detect_page_labels(cands, pdf_labels, page_range)
             raw = _strip_running_heads(raw)
             for i in range(n):
-                text = "\n\n".join(raw[i]).strip()
+                text = _fix_text("\n\n".join(raw[i]).strip())  # Sicherheitsnetz: nie halbe Zeichen speichern
                 result.pages.append(PageText(index=i, label=labels[i], text=text, has_images=images[i]))
         finally:
             doc.close()
