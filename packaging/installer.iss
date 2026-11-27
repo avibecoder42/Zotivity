@@ -264,6 +264,21 @@ begin
   Result := StrToIntDef(Num, 23120);
 end;
 
+procedure ForceStopApp();
+var
+  Code, I: Integer;
+begin
+  Log('Zotivity reagiert nicht – wird mit taskkill beendet');
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM {#AppExe} /IM {#LegacyName}.exe /IM {#OlderName}.exe', '',
+       SW_HIDE, ewWaitUntilTerminated, Code);
+  for I := 1 to 20 do
+  begin
+    if not AppRunning() then
+      Exit;
+    Sleep(250);
+  end;
+end;
+
 procedure StopRunningApp();
 var
   Http: Variant;
@@ -290,6 +305,9 @@ begin
       Exit;
     Sleep(250);
   end;
+  // Hängt Zotivity (z. B. an einer laufenden Anfrage an ein Sprachmodell), selbst beenden – laufende Aufträge
+  // gehen dabei verloren, der Index bleibt heil (SQLite schreibt in Transaktionen)
+  ForceStopApp();
 end;
 
 function EnsureAppClosed(): Boolean;

@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -120,20 +122,55 @@ def _no_images_key(model) -> str:
     return f"figures_no_images:{model.label}"
 
 
+# Bis 1.3.0 (lokal) wurde „versteht keine Bilder“ auch bei anderen Fehlern gemerkt (z. B. abgelehnte Denktiefe):
+# solche Merker einmal löschen – versteht ein Modell wirklich keine Bilder, merkt es sich das beim nächsten Mal wieder
+_NO_IMAGES_RESET = "figures_no_images_reset"
+_IMAGE_ERROR = re.compile(r"image|vision|multi-?modal|bild", re.IGNORECASE)
+
+
+def _image_error(e: Exception) -> bool:
+    """Lehnt das Modell das Bild ab (statt z. B. einen Parameter)? Nur dann ohne Bild weiter und es sich merken."""
+    return bool(_IMAGE_ERROR.search(str(e)))
+
+
+def missing_chunks(store) -> dict[tuple[str, str], str]:
+    """Anhänge, deren brauchbare Beschreibungen nicht alle als Abschnitte im Index stehen (z. B. weil ein Auftrag
+    beim Beenden abgebrochen wurde): (lib, Anhang) → Eintrag."""
+    want: dict[tuple[str, str], list] = {}
+    for lib, att_key, item_key, desc in store.con.execute(
+            "SELECT f.lib, f.att_key, f.item_key, t.description FROM figures f JOIN figure_texts t ON t.fkey=f.fkey"):
+        desc = (desc or "").strip()
+        if desc and not desc.lower().startswith(NOT_A_FIGURE):
+            want.setdefault((lib, att_key), [item_key, 0])[1] += 1
+    have = {(r[0], r[1]): r[2] for r in store.con.execute(
+        "SELECT lib, att_key, COUNT(*) FROM chunks WHERE kind='figure' GROUP BY lib, att_key")}
+    return {k: item for k, (item, n) in want.items() if have.get(k, 0) != n}
+
+
 def describe(engine, job, items: set[tuple[str, str]] | None = None, limit: int | None = None,
              fkeys: set[str] | None = None) -> dict:
-    """Abbildungen ohne Beschreibung beschreiben lassen; danach je Anhang die Abschnitte schreiben und einbetten.
-    items: nur diese Einträge (z. B. ein Korpus), fkeys: nur diese Abbildungen (Knopf unter „Fragen“), limit: höchstens
-    so viele (Abbildungen mit Bildunterschrift zuerst)."""
+    """Abbildungen ohne Beschreibung beschreiben lassen; die Abschnitte eines Anhangs werden geschrieben und
+    eingebettet, sobald seine Abbildungen fertig sind (ein abgebrochener Auftrag verliert so wenig; fehlende Abschnitte
+    trägt der nächste Auftrag nach). items: nur diese Einträge (z. B. ein Korpus), fkeys: nur diese Abbildungen (Knopf
+    unter „Fragen“), limit: höchstens so viele (Abbildungen mit Bildunterschrift zuerst)."""
     from zotivity.extract.pdf import FIGURE_MARGIN, render_page_png
     from zotivity.rag.sources import author_year
 
     store = engine.store
+    if store.get_meta(_NO_IMAGES_RESET) != "1":
+        with store.write() as con:
+            con.execute("DELETE FROM meta WHERE key LIKE 'figures_no_images:%'")
+        store.set_meta(_NO_IMAGES_RESET, "1")
     todo = store.figures_to_describe(items)
     if fkeys is not None:
         todo = [f for f in todo if f["fkey"] in fkeys]
     if limit and len(todo) > limit:
         todo = sorted(todo, key=lambda f: not f.get("caption"))[:limit]
+    # Abschnitte, die nachzutragen sind (nicht beim Knopf unter „Fragen“: der soll schnell antworten)
+    to_refresh: dict[tuple[str, str], str] = {}
+    if fkeys is None:
+        to_refresh = {k: v for k, v in missing_chunks(store).items() if items is None or (k[0], v) in items}
+    remaining = Counter((f["lib"], f["att_key"]) for f in todo)
     model, effort = _model(engine, job)
     send_image = engine.settings.figures.send_image and store.get_meta(_no_images_key(model)) != "1"
     job.update(phase="Abbildungen beschreiben", total=len(todo), done=0,
@@ -166,6 +203,11 @@ def describe(engine, job, items: set[tuple[str, str]] | None = None, limit: int 
         except LLMError as e:
             if not images:
                 raise
+            if not _image_error(e):
+                # anderer Fehler, z. B. ein Parameter, den der Anschluss inzwischen weglässt: mit Bild nochmals
+                log.info("Abbildung: erneuter Versuch mit Bild (%s)", e)
+                text = model.complete(SYSTEM, [ChatMessage("user", prompt, images=images)], params).text
+                return f, " ".join(text.split()), True
             # Versteht das Modell keine Bilder, ohne Bild weiter (und es sich für dieses Modell merken)
             log.info("Abbildung ohne Bild beschrieben (%s)", e)
             state["images"] = False
@@ -176,13 +218,41 @@ def describe(engine, job, items: set[tuple[str, str]] | None = None, limit: int 
             text = model.complete(SYSTEM, [ChatMessage("user", prompt)], params).text
         return f, " ".join(text.split()), bool(images)
 
-    touched: dict[tuple[str, str], str] = {}
+    # Einbetten nicht gleichzeitig mit einem Indexierlauf (beide schreiben in den Vektorindex): unterwegs nur, wenn
+    # gerade keiner läuft; am Ende wird gewartet
+    lock = engine.index_lock
+    # Anhänge, deren Abbildungen fertig sind und deren Abschnitte noch zu schreiben sind (zuerst die nachzutragenden)
+    ready: dict[tuple[str, str], str] = {k: v for k, v in to_refresh.items() if k not in remaining}
+
+    def write_chunks(wait: bool) -> None:
+        if not ready:
+            return
+        if wait:
+            while not lock.acquire(timeout=2):
+                job.check()
+                job.update(phase="Wartet auf die laufende Indexierung")
+            job.update(phase="Abbildungen einbetten")
+        elif not lock.acquire(blocking=False):
+            return
+        try:
+            for key in list(ready):
+                result["chunks"] += refresh_chunks(engine, key[0], key[1], ready.pop(key), job)
+        finally:
+            lock.release()
+
     workers = max(1, min(engine.settings.review.parallel_requests, 4))
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        futures = [ex.submit(one, f) for f in todo]
-        for fut in as_completed(futures):
+        figure_of = {ex.submit(one, f): f for f in todo}
+        for fut in as_completed(figure_of):
+            fig = figure_of[fut]
+            key = (fig["lib"], fig["att_key"])
             try:
                 f, text, with_image = fut.result()
+                store.set_figure_description(f["fkey"], text, model.label, with_image)
+                result["described"] += 1
+                result["with_image"] += int(with_image)
+                to_refresh[key] = f["item_key"]
+                job.step(1, f"S. {f['page'] + 1}: {(f.get('caption') or '')[:80]}")
             except Exception as e:  # noqa: BLE001
                 if job.cancelled:
                     break
@@ -190,27 +260,18 @@ def describe(engine, job, items: set[tuple[str, str]] | None = None, limit: int 
                 result["error"] = str(e)
                 job.note(f"Abbildung nicht beschrieben: {e}")
                 job.step()
-                continue
-            store.set_figure_description(f["fkey"], text, model.label, with_image)
-            result["described"] += 1
-            result["with_image"] += int(with_image)
-            touched[(f["lib"], f["att_key"])] = f["item_key"]
-            job.step(1, f"S. {f['page'] + 1}: {(f.get('caption') or '')[:80]}")
+            # Alle Abbildungen dieses Anhangs fertig (beschrieben oder gescheitert): Abschnitte gleich schreiben
+            remaining[key] -= 1
+            if remaining[key] <= 0:
+                del remaining[key]
+                if key in to_refresh:
+                    ready[key] = to_refresh[key]
+                write_chunks(wait=False)
         if job.cancelled:
-            for fut in futures:
+            for fut in figure_of:
                 fut.cancel()
-    if touched:
-        # Einbetten nicht gleichzeitig mit einem Indexierlauf (beide schreiben in den Vektorindex)
-        lock = engine.index_lock
-        while not lock.acquire(timeout=2):
-            job.check()
-            job.update(phase="Wartet auf die laufende Indexierung")
-        try:
-            job.update(phase="Abbildungen einbetten")
-            for (lib, att_key), item_key in touched.items():
-                result["chunks"] += refresh_chunks(engine, lib, att_key, item_key, job)
-        finally:
-            lock.release()
+    if not job.cancelled:
+        write_chunks(wait=True)  # was unterwegs wegen einer laufenden Indexierung warten musste
     if result["described"]:  # das Modell antwortet wieder: automatisches Beschreiben nicht mehr pausieren
         store.set_meta("figures_auto_pause_until", "0")
     job.counters.update(described=result["described"], errors=result["errors"], todo=len(todo))  # für die Oberfläche
@@ -239,8 +300,18 @@ def start_auto(engine, note=None) -> bool:
     if float(store.get_meta("figures_auto_pause_until") or 0) > time.time():
         return False
     open_n = len(store.figures_to_describe())
-    if not open_n:
+    repair = missing_chunks(store)  # Beschreibungen ohne Abschnitte (abgebrochener Auftrag): nachtragen
+    if not open_n and not repair:
         return False
+    if not open_n:
+        try:
+            engine.jobs.start("figures", AUTO_TITLE, lambda job: describe(engine, job, limit=cfg.auto_limit),
+                              group="figures")
+        except RuntimeError:
+            return False
+        if note:
+            note(f"Abschnitte der Abbildungen werden nachgetragen ({len(repair)} Texte)")
+        return True
     from zotivity.rag.chat import missing_key_message
 
     llm = engine.settings.llm

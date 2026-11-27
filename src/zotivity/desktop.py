@@ -30,6 +30,7 @@ APP_NAME = "Zotivity"
 MUTEX_NAME = "ZotivityRunningMutex"  # vom Installer erkannt (AppMutex)
 CLI_COMMANDS = {"serve", "index", "search", "ask", "keys", "status", "plugin", "mcp", "--version", "-h", "--help"}
 OPEN_SCHEMES = ("zotero:", "http:", "https:", "mailto:")
+EXIT_GRACE_SECONDS = 8.0  # so lange darf das Beenden dauern, dann hart (das Setup wartet 15 s)
 
 
 # ---------------------------------------------------------------------------------- Hilfen
@@ -304,6 +305,7 @@ class DesktopHost:
         self.quit_when_idle = False
         self._pending_open: dict | None = None
         self.geometry: WindowGeometry | None = None
+        self._watchdog_started = False
 
     # -- Dienst --------------------------------------------------------------------------
     def start_server(self) -> None:
@@ -451,9 +453,44 @@ class DesktopHost:
 
         if self.geometry:
             self.geometry.save()
+        self._cancel_jobs()
         if self.server:
             self.server.should_exit = True
         clear_state()
+        self._exit_watchdog()
+
+    def _cancel_jobs(self) -> None:
+        """Beim Beenden laufende Aufträge abbrechen: Sonst wartet Python beim Beenden, bis z. B. alle anstehenden
+        Beschreibungen von Abbildungen fertig sind – minutenlang, und das Setup meldet „Zotivity läuft noch“."""
+        if not self.engine:
+            return
+        try:
+            self.engine.index_queue.clear()
+            for j in self.running_jobs():
+                self.engine.jobs.cancel(j["id"])
+        except Exception:  # noqa: BLE001 - Beenden geht vor
+            log.exception("Aufträge beim Beenden nicht abgebrochen")
+
+    def _exit_watchdog(self, seconds: float = EXIT_GRACE_SECONDS) -> None:
+        """Hängt das Beenden trotzdem (eine Anfrage an ein Sprachmodell läuft noch), nach einigen Sekunden hart beenden.
+        Hilfsprozesse (eingebaute Laufzeit) hängen an einem Windows-Job-Objekt und enden mit."""
+        if self._watchdog_started:
+            return
+        self._watchdog_started = True
+
+        def force() -> None:
+            log.warning("Zotivity beendet sich nicht von selbst – wird nach %s s hart beendet.", seconds)
+            try:
+                if self.engine:
+                    self.engine.shutdown()
+            except Exception:  # noqa: BLE001
+                pass
+            logging.shutdown()
+            os._exit(0)
+
+        timer = threading.Timer(seconds, force)
+        timer.daemon = True
+        timer.start()
 
     def _watch(self) -> None:
         """Nach „im Hintergrund weiterlaufen“: beenden, sobald nichts mehr läuft."""

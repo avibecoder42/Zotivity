@@ -256,6 +256,7 @@ MESSAGES: dict[str, str] = {
     "Abbildungen einbetten": "Embedding figures",
     "Beschreibe {n} von {m} offenen Abbildungen (eigener Auftrag)": "Describing {n} of {m} open figures (separate task)",
     "Abbildungen nicht automatisch beschrieben: {e}": "Figures not described automatically: {e}",
+    "Abschnitte der Abbildungen werden nachgetragen ({n} Texte)": "Adding the missing figure passages ({n} texts)",
     "Durchsuche den genannten Text …": "Searching the text you named …",
     "Abbildung nicht beschrieben: {e}": "Figure not described: {e}",
     "Abbildungen noch nicht eingebettet (nächster Indexierlauf): {e}": "Figures not embedded yet (next indexing run): {e}",

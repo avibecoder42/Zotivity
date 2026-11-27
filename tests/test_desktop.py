@@ -115,3 +115,40 @@ def test_zoom_without_native_window_does_nothing():
 
     assert set_webview_zoom(SimpleNamespace(native=None), 1.25) is False
     assert JsApi(SimpleNamespace(window=SimpleNamespace())).set_zoom(9) is False
+
+
+def test_quit_cancels_jobs_and_forces_exit_when_stuck(zengine, monkeypatch):
+    """Beim Beenden (auch durch das Setup) laufende Aufträge abbrechen; hängt der Prozess trotzdem (eine Anfrage an
+    ein Sprachmodell läuft noch), nach kurzer Frist hart beenden – sonst meldet das Setup endlos „läuft noch“."""
+    import threading
+
+    started = threading.Event()
+    release = threading.Event()
+
+    def long_job(job):
+        started.set()
+        while not job.cancelled:
+            release.wait(0.01)
+        return "abgebrochen"
+
+    job = zengine.jobs.start("figures", "Abbildungen beschreiben", long_job, group="figures")
+    assert started.wait(2)
+    exits = []
+    monkeypatch.setattr(desktop.os, "_exit", lambda code: exits.append(code))
+    monkeypatch.setattr(desktop.logging, "shutdown", lambda: None)
+    monkeypatch.setattr(desktop, "clear_state", lambda: None, raising=False)
+    host = desktop.DesktopHost(background=True, exit_with_zotero=None)
+    host.engine = zengine
+    host._cancel_jobs()
+    for _ in range(200):
+        if job.status != "running":
+            break
+        release.wait(0.01)
+    assert job.cancelled and job.status == "cancelled"
+    host._exit_watchdog(seconds=0.05)
+    host._exit_watchdog(seconds=0.05)  # nur ein Wächter
+    for _ in range(200):
+        if exits:
+            break
+        release.wait(0.01)
+    assert exits == [0]

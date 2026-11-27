@@ -110,8 +110,10 @@ class OpenAIChat(ChatModel):
             except (openai.BadRequestError, openai.UnprocessableEntityError) as e:  # Mistral lehnt mit 422 ab
                 msg = str(e).lower()
                 dropped = False
+                # Parameter, den der Server ablehnt: weglassen und nochmals. Auch wenn eine gleichzeitige Anfrage ihn
+                # schon gestrichen hat – diese hier wurde noch mit ihm gebaut (sonst Fehler statt Wiederholung).
                 for param in ("temperature", "reasoning_effort", "response_format", "stream_options"):
-                    if param in kw and param in msg and param not in self._dropped:
+                    if param in kw and param in msg:
                         self._dropped.add(param)
                         dropped = True
                 if not dropped and self._token_key in msg:

@@ -118,6 +118,25 @@ def test_rejected_parameter_is_dropped_and_not_sent_again():
     assert "reasoning_effort" in calls[0] and "reasoning_effort" not in calls[1] and "reasoning_effort" not in calls[2]
 
 
+def test_rejected_parameter_dropped_by_a_parallel_request_is_still_retried():
+    """Vier gleichzeitige Anfragen (Abbildungen beschreiben): Die erste streicht den abgelehnten Parameter, die zweite
+    wurde aber noch mit ihm gebaut. Sie muss ebenfalls ohne ihn wiederholen statt mit einem Fehler abzubrechen."""
+    chat = scripted([chunk("Antwort", "stop")], model="mistral-large-3")
+
+    class Race(FakeCompletions):
+        def create(self, **kw):
+            if "reasoning_effort" in kw:
+                self.calls.append(kw)
+                chat._dropped.add("reasoning_effort")  # die parallele Anfrage war schneller
+                raise rejected("reasoning_effort")
+            return super().create(**kw)
+
+    chat.client = NS(chat=NS(completions=Race([chunk("Antwort", "stop")])))
+    assert chat.complete("", [ChatMessage("user", "Frage")], GenParams(effort="high")).text == "Antwort"
+    calls = chat.client.chat.completions.calls
+    assert "reasoning_effort" in calls[0] and "reasoning_effort" not in calls[1]
+
+
 def sse(*chunks):
     lines = []
     for c in chunks:

@@ -102,6 +102,62 @@ def test_model_without_images_falls_back_to_text(library, monkeypatch):
     assert library.store.get_meta(figures._no_images_key(model)) == "1"
 
 
+def test_other_errors_do_not_switch_images_off(library, monkeypatch):
+    """Ein abgelehnter Parameter (Denktiefe) ist kein Zeichen, dass das Modell keine Bilder versteht: mit Bild
+    nochmals, nichts merken. Ein alter, falsch gesetzter Merker wird einmal gelöscht."""
+
+    class EffortOnce(ImageModel):
+        failed = False
+
+        def _stream(self, system, messages, params):
+            if not self.failed:
+                self.failed = True
+                raise LLMError("Server: ungültige Anfrage – reasoning_effort must be low, high, xhigh, max")
+            yield from super()._stream(system, messages, params)
+
+    model = EffortOnce()
+    install_models(monkeypatch, model, model)
+    library.store.set_meta(figures._no_images_key(model), "1")  # Merker aus der Fassung vor der Korrektur
+    res = figures.describe(library, Job("figures", "t"))
+    assert res["described"] == 1 and res["with_image"] == 1 and model.images == [1]
+    assert library.store.get_meta(figures._no_images_key(model)) is None
+    assert library.store.get_meta("figures_no_images_reset") == "1"
+
+
+def test_missing_chunks_are_added_by_the_next_job(library, monkeypatch):
+    """Wurde ein Auftrag vor dem Schreiben der Abschnitte beendet, trägt der nächste sie nach – auch der automatische,
+    wenn keine Abbildung mehr offen ist."""
+    model = ImageModel()
+    install_models(monkeypatch, model, model)
+    figures.describe(library, Job("figures", "t"))
+    assert figures.missing_chunks(library.store) == {}
+    library.store.set_figure_chunks("users/0", "ITEMF001", "ATTF0001", [])  # wie nach dem Abbruch
+    assert figures.missing_chunks(library.store) == {("users/0", "ATTF0001"): "ITEMF001"}
+    library.settings_store.update({"figures": {"auto_describe": True}})
+    notes = []
+    assert figures.start_auto(library, notes.append) is True
+    assert notes == ["Abschnitte der Abbildungen werden nachgetragen (1 Texte)"]
+    job = library.jobs.get(max(library.jobs._jobs))
+    for _ in range(400):
+        if job.status not in ("queued", "running"):
+            break
+        import time
+
+        time.sleep(0.02)
+    assert job.status == "done" and job.result["chunks"] == 1 and len(model.calls) == 1  # nichts neu beschrieben
+    assert ("figure", 1) in chunk_kinds(library) and figures.missing_chunks(library.store) == {}
+
+
+def test_figure_clip_beyond_the_page_is_clamped(tmp_path):
+    from zotivity.extract.pdf import render_page_png
+
+    path = figure_pdf(tmp_path / "rand.pdf")
+    png = render_page_png(path, 1, zoom=1.0, clip=(-40, 500, 700, 900))  # über Rand und Seitenende hinaus
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
+    png = render_page_png(path, 1, zoom=1.0, clip=(900, 900, 950, 950))  # ganz ausserhalb: die ganze Seite
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
+
+
 def test_decorative_images_do_not_become_chunks(library, monkeypatch):
     model = ImageModel(reply="Keine inhaltliche Abbildung.")
     install_models(monkeypatch, model, model)

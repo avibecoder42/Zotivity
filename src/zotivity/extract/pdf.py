@@ -775,7 +775,9 @@ def encode_png(arr) -> bytes:
 def render_page_png(path: Path, page_index: int, zoom: float = 1.6,
                     clip: tuple[float, float, float, float] | None = None) -> bytes:
     """Seite (oder mit clip einen Ausschnitt x0, y0, x1, y1 in Punkt, y von oben) als PNG – für Bildanfragen an
-    multimodale Sprachmodelle und für Abbildungen."""
+    multimodale Sprachmodelle und für Abbildungen. Der Ausschnitt wird auf die Seite begrenzt (Rand um eine Abbildung
+    am Seitenrand, Objekte, die über die Seite hinausragen); bleibt nichts übrig oder ist die Seite gedreht, kommt die
+    ganze Seite."""
     import pypdfium2 as pdfium
 
     with _PDFIUM_LOCK:
@@ -784,10 +786,11 @@ def render_page_png(path: Path, page_index: int, zoom: float = 1.6,
             page = doc[page_index]
             try:
                 crop = (0, 0, 0, 0)
-                if clip:
+                if clip and page.get_rotation() % 180 == 0:
                     w, h = page.get_width(), page.get_height()
-                    x0, y0, x1, y1 = clip
-                    crop = (max(0.0, x0), max(0.0, h - y1), max(0.0, w - x1), max(0.0, y0))
+                    x0, y0, x1, y1 = (min(max(v, 0.0), lim) for v, lim in zip(clip, (w, h, w, h)))
+                    if x1 - x0 >= 2 and y1 - y0 >= 2:
+                        crop = (x0, h - y1, w - x1, y0)
                 bitmap = page.render(scale=zoom, crop=crop, rev_byteorder=True)
                 try:
                     arr = bitmap.to_numpy()

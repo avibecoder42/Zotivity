@@ -30,9 +30,16 @@ All notable changes, newest first.
 - **Named text first:** if a question contains the title of a text in scope, its passages are searched separately
   and fill a little over half of the budget; the basis line names it.
 - **Texts with errors:** a run that leaves texts with errors or without text in its scope says so ("All other texts
-  are up to date. Not read again – with errors or without text: 16.") and offers **Try again**; per corpus also via ↻ in the corpus
-  list under Index and "Try texts with errors again" in the corpus menu. After an update, the first run reads texts
-  with errors again once by itself.
+  are up to date. Not read again – with errors or without text: 16.") and offers **Try again**; per corpus also via
+  ↻ in the corpus list under Index and "Try texts with errors again" in the corpus menu. After an update, the first
+  run reads texts with errors again once by itself.
+
+### Fixed
+- **Closing Zotivity no longer hangs** on running background tasks (e.g. reading in stages): they are cancelled, and
+  after a few seconds Zotivity ends regardless. The setup ends a Zotivity that does not respond instead of showing
+  "Zotivity is still running" again and again.
+- OpenAI-compatible servers: a parameter the server rejects (e.g. a reasoning effort it does not know) is left out
+  and the request repeated – also for requests running at the same time, which so far failed with an error.
 
 ## 1.2.9 – 2026-11-26
 
