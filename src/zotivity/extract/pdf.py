@@ -300,6 +300,7 @@ MIN_FIGURE_AREA = 0.02  # Anteil der Seite
 MIN_UNCAPTIONED_AREA = 0.06  # Bilder ohne Bildunterschrift erst ab diesem Anteil der Seite
 MAX_CHART_TEXT = 350  # Zeichen: mehr Text in einer Zeichnung ohne Bildunterschrift = Tabelle oder Kasten
 MAX_CAPTION_GAP = 60.0  # Punkt zwischen Abbildung und Bildunterschrift
+FIGURE_MARGIN = 24.0  # Punkt Rand um eine Abbildung (Beschriftungen; auch für das Bild ans Sprachmodell)
 
 
 def _merge_boxes(boxes: list[tuple[float, float, float, float]], pad: float = 12.0) -> list[list[float]]:
@@ -377,9 +378,10 @@ def _figures_on_page(index: int, page_w: float, page_h: float, images: list, pat
     for f in out:
         f.caption = _caption_for(f.bbox, positioned)
         if f.kind == "drawing":
+            pad = FIGURE_MARGIN  # Achsen- und Kategorienbeschriftungen stehen oft knapp ausserhalb der Linien
             inner = " ".join(t for x0, y0, x1, y1, t in positioned
-                             if x0 >= f.bbox[0] - 2 and x1 <= f.bbox[2] + 2 and y0 >= f.bbox[1] - 2
-                             and y1 <= f.bbox[3] + 2)
+                             if x0 >= f.bbox[0] - pad and x1 <= f.bbox[2] + pad and y0 >= f.bbox[1] - pad
+                             and y1 <= f.bbox[3] + pad and not _CAPTION.match(t))
             # Ohne Bildunterschrift: viel Text in den Linien ist eine Tabelle oder ein Kasten, kein Diagramm
             if not f.caption and len(inner) > MAX_CHART_TEXT:
                 continue

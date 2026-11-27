@@ -122,7 +122,7 @@ def _no_images_key(model) -> str:
 
 def describe(engine, job, items: set[tuple[str, str]] | None = None, limit: int | None = None) -> dict:
     """Abbildungen ohne Beschreibung beschreiben lassen; danach je Anhang die Abschnitte schreiben und einbetten."""
-    from zotivity.extract.pdf import render_page_png
+    from zotivity.extract.pdf import FIGURE_MARGIN, render_page_png
     from zotivity.rag.sources import author_year
 
     store = engine.store
@@ -143,7 +143,10 @@ def describe(engine, job, items: set[tuple[str, str]] | None = None, limit: int 
         images: list[bytes] = []
         if state["images"] and f.get("path") and Path(f["path"]).is_file():
             try:
-                images = [render_page_png(Path(f["path"]), f["page"], zoom=IMAGE_ZOOM, clip=tuple(f["bbox"]))]
+                x0, y0, x1, y1 = f["bbox"]
+                m = FIGURE_MARGIN
+                images = [render_page_png(Path(f["path"]), f["page"], zoom=IMAGE_ZOOM,
+                                          clip=(x0 - m, y0 - m, x1 + m, y1 + m))]
             except Exception as e:  # noqa: BLE001 - dann ohne Bild
                 log.info("Abbildung nicht gerendert: %s", e)
         prompt = PROMPT.format(
