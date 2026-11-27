@@ -3,7 +3,7 @@
 from fakes import make_pdf
 from test_indexing_search import TEEN, run_index
 
-from zotivity.extract.pdf import extract_with_pymupdf, substantive_chars
+from zotivity.extract.pdf import extract_pdf, substantive_chars
 
 STAMP = "Kopie von subito e.V., geliefert für Hochschule für Soziale Arbeit FHNW (SLI-Nr. 4711)"
 
@@ -11,10 +11,10 @@ STAMP = "Kopie von subito e.V., geliefert für Hochschule für Soziale Arbeit FH
 def test_stamp_only_pages_count_as_scan(tmp_path):
     scan = make_pdf(tmp_path / "scan.pdf", [STAMP] * 6, first_page=None)
     assert len(STAMP) > 40  # die Stempelzeile allein läge über der Grenze „Zeichen je Seite“
-    assert extract_with_pymupdf(scan).needs_ocr is True
+    assert extract_pdf(scan).needs_ocr is True
     # Echter Text mit derselben Kopfzeile bleibt Text
     text = make_pdf(tmp_path / "text.pdf", [TEEN * 4] * 6, header=STAMP)
-    doc = extract_with_pymupdf(text)
+    doc = extract_pdf(text)
     assert doc.needs_ocr is False and doc.char_count > 1000
 
 

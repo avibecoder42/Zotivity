@@ -1,7 +1,7 @@
 """Selbsttest des gebündelten Programms: ``Zotivity.exe --self-test <Ordner>``.
 
 Prüft ohne Fenster und ohne die Daten der Nutzerin bzw. des Nutzers anzufassen, ob alle Teile im Paket
-enthalten sind und laufen: Dienst (uvicorn/FastAPI), Oberfläche, Plugin-Dateien, PDF-Lesen (PyMuPDF),
+enthalten sind und laufen: Dienst (uvicorn/FastAPI), Oberfläche, Plugin-Dateien, PDF-Lesen (PDFium),
 Vektoren (NumPy), Schlüsselspeicher und die WebView2-Anbindung. Ergebnis: <Ordner>/selftest.json.
 """
 
@@ -34,26 +34,28 @@ def run(out_dir: str) -> int:
             report["steps"].append({"step": name, "ok": False, "error": traceback.format_exc(limit=6)})
 
     def pdf():
-        import pymupdf
+        import pypdfium2
 
-        doc = pymupdf.open()
-        page = doc.new_page()
-        page.insert_text((72, 72), "Selbsttest Zotivity: Kollaborative Dokumentation")
-        data = doc.tobytes()
-        text = pymupdf.open(stream=data, filetype="pdf")[0].get_text()
-        assert "Kollaborative" in text, text
-        return f"PyMuPDF {pymupdf.VersionBind}"
+        from zotivity.extract import pdfmake
+        from zotivity.extract.pdf import extract_pdf, render_page_png
+
+        path = home / "selftest-pdfium.pdf"
+        page = pdfmake.Page().text(72, 72, "Selbsttest Zotivity: Kollaborative Dokumentation – Übersicht")
+        page.charts.append((100, 200, 400, 420))
+        path.write_bytes(pdfmake.build([page]))
+        doc = extract_pdf(path, figures=True)
+        assert "Kollaborative Dokumentation – Übersicht" in doc.pages[0].text, doc.pages[0].text
+        assert doc.figures and doc.figures[0].kind == "drawing", doc.figures
+        assert render_page_png(path, 0, clip=doc.figures[0].bbox).startswith(b"\x89PNG")
+        return f"pypdfium2 {pypdfium2.version.PYPDFIUM_INFO}, PDFium {pypdfium2.version.PDFIUM_INFO}"
 
     def pdf_worker():
         """Lesen im eigenen Prozess – im gebündelten Programm startet dafür dieselbe EXE als Kindprozess."""
-        import pymupdf
-
+        from zotivity.extract import pdfmake
         from zotivity.extract.worker import ExtractionWorker
 
         path = home / "selftest.pdf"
-        doc = pymupdf.open()
-        doc.new_page().insert_text((72, 72), "Lese-Prozess: Selbsttest")
-        doc.save(path)
+        path.write_bytes(pdfmake.build([pdfmake.Page().text(72, 72, "Lese-Prozess: Selbsttest")]))
         worker = ExtractionWorker()
         try:
             result = worker.call(path, "application/pdf", timeout=120)

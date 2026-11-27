@@ -9,7 +9,6 @@ from pathlib import Path
 
 import httpx
 import keyring.backend
-import pymupdf
 
 from zotivity.llm.base import ChatModel, StreamEvent, Usage
 
@@ -39,16 +38,17 @@ def make_pdf(path: Path, pages: list[str], first_page: int | None = 1, header: s
              unnumbered: tuple[int, ...] = ()) -> Path:
     """Test-PDF; first_page: gedruckte Seitenzahl der ersten Seite in der Fusszeile (None = ohne Seitenzahlen),
     header: Kopfzeile auf jeder Seite, unnumbered: Seiten (0-basiert) ohne sichtbare Seitenzahl."""
-    doc = pymupdf.open()
+    from zotivity.extract import pdfmake
+
+    out = []
     for i, text in enumerate(pages):
-        page = doc.new_page()
-        page.insert_textbox(pymupdf.Rect(60, 60, 540, 780), text, fontsize=10)
+        page = pdfmake.text_page(text, size=10, box=(60, 60, 540, 780))
         if header:
-            page.insert_text((60, 35), header, fontsize=8)
+            page.text(60, 35, header, 8)
         if first_page is not None and i not in unnumbered:
-            page.insert_text((290, 815), str(first_page + i), fontsize=9)
-    doc.save(path)
-    doc.close()
+            page.text(290, 815, str(first_page + i), 9)
+        out.append(page)
+    path.write_bytes(pdfmake.build(out))
     return path
 
 

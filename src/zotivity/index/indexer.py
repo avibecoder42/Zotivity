@@ -412,7 +412,7 @@ class Indexer:
                                              min_chunk_tokens=ccfg.min_chunk_tokens))
         self.store.replace_chunks(lib, parent, key, chunks)
         # Gedruckte Seitenzahl je PDF-Seite ("" = ohne) – für Seitenangaben in Belegen und deren Links
-        labels = [p.label for p in doc.pages] if doc.method in ("pymupdf", "ocr") else []
+        labels = [p.label for p in doc.pages] if doc.method in ("pdfium", "pymupdf", "ocr") else []
         self.store.set_attachment_status(lib, key, "indexed", error=warning or None, method=doc.method,
                                          n_pages=doc.n_pages, n_chars=doc.char_count, n_chunks=len(chunks),
                                          indexed_md5=read_md5, indexed_at=time.time(),
